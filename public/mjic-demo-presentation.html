@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MJIC Demo Presentation</title>
+<style>
+:root{--navy:#0b1e3d;--gold:#d7ad4f;--cream:#f5f1e8;--ink:#172235}
+*{box-sizing:border-box}body{margin:0;background:var(--navy);color:white;font-family:Arial,sans-serif;overflow:hidden}
+.stage{min-height:100vh;display:grid;place-items:center;padding:7vw;background:radial-gradient(circle at 80% 15%,#314c74 0,transparent 32%),linear-gradient(135deg,#07152e,#0b1e3d 52%,#111f36)}
+.frame{width:min(960px,100%);aspect-ratio:16/9;position:relative;overflow:hidden;border:1px solid #ffffff33;border-radius:16px;box-shadow:0 24px 80px #0008;background:#f7f4ec}
+.slide{position:absolute;inset:0;padding:7%;display:grid;align-content:center;gap:1.2rem;opacity:0;transform:translateX(8%);animation:show 18s infinite;color:var(--ink)}
+.slide:nth-child(2){animation-delay:6s}.slide:nth-child(3){animation-delay:12s;background:linear-gradient(135deg,#d6b258,#f6e7bb)}
+.slide:first-child{background:linear-gradient(120deg,#f7f4ec 0 58%,#d7ad4f 58%)}
+h1{font-size:clamp(1.8rem,5vw,4.7rem);line-height:.95;margin:0;max-width:620px}h2{font-size:clamp(1.4rem,3vw,3rem);margin:0}.eyebrow{color:#98731e;font-weight:700;text-transform:uppercase;letter-spacing:.18em;font-size:.72rem}.copy{max-width:530px;font-size:clamp(.85rem,1.5vw,1.2rem);line-height:1.45}.pill{display:inline-block;background:var(--navy);color:#fff;padding:.75rem 1rem;border-radius:6px;font-weight:700;width:max-content}.badge{position:absolute;right:5%;bottom:7%;font-size:.7rem;font-weight:700;color:#fff;background:#0b1e3dcc;padding:.5rem .7rem;border-radius:999px}
+.jacket{position:absolute;right:9%;top:18%;width:28%;height:58%;background:var(--navy);clip-path:polygon(32% 0,45% 9%,55% 9%,68% 0,100% 22%,83% 38%,78% 28%,78% 100%,22% 100%,22% 28%,17% 38%,0 22%);filter:drop-shadow(0 20px 14px #0004)}
+.steps{display:flex;gap:1rem;flex-wrap:wrap}.step{background:#fff9;border:1px solid #fff;padding:1rem;border-radius:8px;min-width:130px}.step b{display:block;color:var(--navy);margin-bottom:.35rem}.step span{font-size:.8rem}
+.note{position:absolute;left:1rem;bottom:1rem;font-size:.68rem;color:#ffffffaa}@keyframes show{0%,30%{opacity:0;transform:translateX(8%)}5%,25%{opacity:1;transform:translateX(0)}35%,100%{opacity:0;transform:translateX(-8%)}}
+</style>
+</head>
+<body>
+<main class="stage"><div class="frame" role="img" aria-label="Fictional MJIC website presentation demo">
+<section class="slide"><span class="eyebrow">MJIC / Demo Presentation</span><h1>From idea to finished garment.</h1><p class="copy">A fictional preview of how Michael Jeffrey International Corporation helps teams choose a design, confirm a quote, and move into production.</p><span class="pill">Custom jackets and uniforms</span><div class="jacket"></div></section>
+<section class="slide"><span class="eyebrow">Three simple steps</span><h2>Design. Quote. Produce.</h2><div class="steps"><div class="step"><b>01 / Design</b><span>Pick a garment, fabric, color, and logo placement.</span></div><div class="step"><b>02 / Quote</b><span>See quantity pricing and send the request to sales.</span></div><div class="step"><b>03 / Produce</b><span>Approve the sample and track the production handoff.</span></div></div></section>
+<section class="slide"><span class="eyebrow">Made for Philippine teams</span><h2>Branded apparel that works as hard as your people.</h2><p class="copy">Use the website catalog, fabric selector, design studio, and quotation builder to prepare a better brief before contacting the MJIC team.</p><span class="pill">Replace this demo in Admin</span></section>
+<span class="badge">FICTIONAL DEMO - REPLACE WITH OFFICIAL MJIC VIDEO</span><span class="note">This is an editable placeholder presentation, not an official production video.</span>
+</div></main>
+</body>
+</html>
