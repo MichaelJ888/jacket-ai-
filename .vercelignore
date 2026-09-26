@@ -1,0 +1,4 @@
+# Trims non-runtime files from the Vercel deployment upload (faster deploys, no effect on the live app).
+*.md
+supabase/
+.vscode/

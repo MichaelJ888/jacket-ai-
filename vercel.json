@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/cron/staff-reminders?type=morning", "schedule": "0 0 * * *" }
+  ]
+}

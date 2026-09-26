@@ -103,6 +103,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
@@ -228,7 +229,7 @@
         <span class="hidden sm:inline text-xs font-semibold">Cart</span>
         <span x-show="quoteItems.length>0" x-cloak class="absolute -top-2 -right-2 bg-gold text-navy text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center" x-text="quoteItems.length"></span>
       </button>
-      <button onclick="alert('MJIC Admin Portal is restricted to authorized company networks.')" class="hidden sm:flex items-center gap-1.5 text-xs text-navy-400 hover:text-navy border hairline rounded-full px-3 py-1.5 transition-colors">
+      <button @click="openAdminOrExplain()" class="hidden sm:flex items-center gap-1.5 text-xs text-navy-400 hover:text-navy border hairline rounded-full px-3 py-1.5 transition-colors">
         <i data-lucide="lock" class="w-3.5 h-3.5"></i> Admin
       </button>
       <a href="#quote" class="bg-navy hover:bg-navy-600 text-white text-sm font-semibold px-5 py-2.5 rounded-md transition-colors">Request Bulk Quotation</a>
@@ -879,8 +880,9 @@
             </template>
             <i data-lucide="upload-cloud" class="w-6 h-6 text-navy-400 mb-2"></i>
             <p class="text-xs text-navy-400 mb-3">Upload your deposit slip / payment confirmation</p>
-            <input type="file" accept="image/*,.pdf" @change="depositFile = $event.target.files[0]?.name" class="text-xs">
+            <input type="file" accept="image/*" @change="handlePaymentUpload($event)" class="text-xs">
             <p x-show="depositFile" class="text-[11px] text-gold-600 mt-2" x-text="'Attached: ' + depositFile"></p>
+            <p x-show="paymentVerificationMessage" x-text="paymentVerificationMessage" class="text-[11px] mt-2" :class="paymentVerified ? 'text-emerald-700' : 'text-navy-400'"></p>
           </div>
         </div>
       </template>
@@ -1739,7 +1741,12 @@
     </div>
     <div class="flex-1 overflow-y-auto p-4 space-y-3 text-sm" x-ref="chatBody">
       <template x-for="(m,i) in chatLog" :key="i">
-        <div :class="m.from==='user' ? 'ml-auto bg-navy text-white' : 'bg-navy-50 text-navy-400'" class="max-w-[85%] rounded-lg px-3 py-2 text-xs" x-text="m.text"></div>
+        <div :class="m.from==='user' ? 'ml-auto bg-navy text-white' : 'bg-navy-50 text-navy-400'" class="max-w-[85%] rounded-lg px-3 py-2 text-xs">
+          <div class="whitespace-pre-wrap" x-text="m.text"></div>
+          <button x-show="m.downloadQuote" x-cloak @click="downloadChatQuotePdf(m.text)" class="mt-2 bg-gold text-navy font-semibold px-2.5 py-1.5 rounded text-[11px] inline-flex items-center gap-1">
+            <i data-lucide="download" class="w-3 h-3"></i> Download Quotation PDF
+          </button>
+        </div>
       </template>
     </div>
     <div class="p-3 border-t hairline flex gap-2">
@@ -1759,7 +1766,8 @@
     <div class="p-4 border-b hairline flex justify-between items-center print:hidden">
       <p class="font-semibold text-navy text-sm">Formal Quotation Preview</p>
       <div class="flex gap-2">
-        <button @click="window.print()" class="bg-navy text-white text-xs font-semibold px-4 py-2 rounded-md flex items-center gap-1.5"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Print / Save as PDF</button>
+        <button @click="downloadFormalQuotePdf()" class="bg-navy text-white text-xs font-semibold px-4 py-2 rounded-md flex items-center gap-1.5"><i data-lucide="download" class="w-3.5 h-3.5"></i> Download PDF</button>
+        <button @click="window.print()" class="border border-navy text-navy text-xs font-semibold px-4 py-2 rounded-md flex items-center gap-1.5"><i data-lucide="printer" class="w-3.5 h-3.5"></i> Print</button>
         <button @click="formalQuoteOpen=false" class="text-navy-400 hover:text-navy"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
     </div>
@@ -1890,8 +1898,8 @@ function mjApp(){
       {id:'qa',name:'QA Runner',scope:'buttons, state, rendering checks'},
       {id:'operations',name:'Operations Lead',scope:'queues recommendations for approval'}
     ],
-    search:'', activeCat:'All', selectedProduct:null, chatOpen:false, chatInput:'', toast:'',
-    activePayment:'gcash', depositFile:'', inquiry:{name:'',company:'',contact:'',message:''},
+    search:'', activeCat:'All', selectedProduct:null, chatOpen:false, chatInput:'', chatSessionId:crypto.randomUUID(), toast:'',
+    activePayment:'gcash', depositFile:'', paymentVerificationMessage:'', paymentVerified:false, inquiry:{name:'',company:'',contact:'',message:''},
     newProduct:{img:'',title:'',description:'',category:'',moq:20,leadTime:''}, editingProductId:null,
     formalQuoteOpen:false, clientInfo:{name:'', fullName:'', contactNumber:'', address:''}, signatureImg: safeLS.get('mji_signature',''),
     visitCount:0, lastVisit:'', updates:[], newUpdate:{img:'',caption:''}, clientNames:[], newClientName:'', newClientLogo:'',
@@ -2644,6 +2652,100 @@ function mjApp(){
       this.formalQuoteOpen = true;
     },
 
+    isQuotationResponse(text){
+      return /(?:total|deposit|down payment|unit price|price per piece)/i.test(text) && /(?:₱|php|\d[\d,]*(?:\.\d{2})?)/i.test(text);
+    },
+
+    playQuotationNotification(){
+      try{
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        const audioContext = new AudioContextClass();
+        const oscillator = audioContext.createOscillator();
+        const gain = audioContext.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(1174.66, audioContext.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.08, audioContext.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
+        oscillator.connect(gain); gain.connect(audioContext.destination);
+        oscillator.start(); oscillator.stop(audioContext.currentTime + 0.35);
+      }catch(error){ console.debug('Quotation notification sound unavailable.', error); }
+    },
+
+    downloadChatQuotePdf(text){
+      const jsPdf = window.jspdf?.jsPDF;
+      if(!jsPdf){ this.showToast('PDF generator is still loading — please try again.'); return; }
+      const pdf = new jsPdf();
+      const lines = pdf.splitTextToSize(text, 170);
+      pdf.setFontSize(16); pdf.setTextColor(11, 30, 61);
+      pdf.text('MICHAEL JEFFREY INTERNATIONAL CORPORATION', 20, 20);
+      pdf.setFontSize(10); pdf.setTextColor(145, 117, 33);
+      pdf.text('AI SALES QUOTATION | SUBJECT TO FINAL CONFIRMATION', 20, 28);
+      pdf.setFontSize(10); pdf.setTextColor(11, 30, 61);
+      pdf.text(`Date: ${this.quoteDate}`, 20, 38);
+      pdf.text(lines, 20, 50, {maxWidth:170, lineHeightFactor:1.45});
+      pdf.setFontSize(8); pdf.setTextColor(60, 86, 127);
+      pdf.text('This quotation is an estimate. Final pricing is confirmed after artwork, fabric, and quantity review.', 20, 280);
+      pdf.save(`MJIC-AI-Quotation-${Date.now()}.pdf`);
+    },
+
+    downloadFormalQuotePdf(){
+      if(this.quoteItems.length===0){ this.guideToEmptyCart(); return; }
+      const jsPdf = window.jspdf?.jsPDF;
+      if(!jsPdf){ this.showToast('PDF generator is still loading — please try again.'); return; }
+      const pdf = new jsPdf();
+      let y = 20;
+      pdf.setFontSize(16); pdf.setTextColor(11, 30, 61);
+      pdf.text('MICHAEL JEFFREY INTERNATIONAL CORPORATION', 20, y); y += 7;
+      pdf.setFontSize(9); pdf.setTextColor(145, 117, 33);
+      pdf.text('DBA CUSTOMIZED JACKETS AND MORE | FORMAL QUOTATION', 20, y); y += 10;
+      pdf.setTextColor(60, 86, 127); pdf.text(`Quotation No. ${this.quoteNumber}`, 20, y); y += 5;
+      pdf.text(`Date: ${this.quoteDate}`, 20, y); y += 10;
+      pdf.setTextColor(11, 30, 61); pdf.setFontSize(11);
+      pdf.text(`Company: ${this.clientInfo.name || 'Not provided'}`, 20, y); y += 6;
+      pdf.text(`Contact: ${this.clientInfo.fullName || 'Not provided'} | ${this.clientInfo.contactNumber || 'Not provided'}`, 20, y); y += 10;
+      pdf.setFontSize(10);
+      this.quoteItems.forEach((item) => {
+        const amount = this.lineTotal(item);
+        pdf.text(`${item.title} | ${item.tierQty} pcs | PHP ${Math.round(amount / item.tierQty).toLocaleString()} / pc | PHP ${amount.toLocaleString()}`, 20, y);
+        y += 7;
+        if(y > 270){ pdf.addPage(); y = 20; }
+      });
+      y += 5; pdf.setFontSize(12);
+      pdf.text(`Total Amount: PHP ${this.grandTotal().toLocaleString()}`, 20, y); y += 7;
+      pdf.text(`50% Down Payment: PHP ${Math.round(this.grandTotal() * 0.5).toLocaleString()}`, 20, y); y += 12;
+      pdf.setFontSize(9); pdf.setTextColor(60, 86, 127);
+      pdf.text('Valid for 15 days. Production starts after artwork approval and 50% down payment.', 20, y);
+      pdf.save(`${this.quoteNumber}.pdf`);
+    },
+
+    handlePaymentUpload(event){
+      const file = event.target.files?.[0];
+      if(!file) return;
+      if(!file.type.startsWith('image/')){ this.paymentVerificationMessage = 'Please upload a GCash or Maya screenshot image.'; return; }
+      this.depositFile = file.name;
+      this.paymentVerified = false;
+      this.paymentVerificationMessage = 'Reading payment screenshot...';
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const response = await fetch('/api/payment-verify', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({image:reader.result, expectedAmount:Math.round(this.grandTotal()*0.5), conversationId:this.chatSessionId})
+          });
+          const result = await response.json();
+          this.paymentVerified = Boolean(result.verified);
+          this.paymentVerificationMessage = result.verified
+            ? `Payment matched: PHP ${Number(result.amount).toLocaleString('en-PH', {minimumFractionDigits:2})}. Subject to final staff confirmation.`
+            : `Not automatically verified. Expected PHP ${Math.round(this.grandTotal()*0.5).toLocaleString()}. Please send the original screenshot to staff.`;
+        } catch(error) {
+          console.error('Payment verification error:', error);
+          this.paymentVerificationMessage = 'OCR unavailable. Please send the screenshot to staff for manual verification.';
+        }
+      };
+      reader.readAsDataURL(file);
+    },
+
     waMessage(){
       let msg = 'Hi Michael Jeffrey International, I would like to confirm this quotation:%0A%0A';
       this.quoteItems.forEach(i=>{ msg += '- '+i.title+' x'+i.tierQty+' pcs (₱'+this.lineTotal(i).toLocaleString()+')%0A'; });
@@ -2661,15 +2763,31 @@ function mjApp(){
         .catch(()=>{ /* fine if this fails before the site is deployed on Netlify */ });
     },
 
+    persistLead(lead){
+      fetch('/api/leads', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(lead)
+      }).catch(()=>{});
+    },
+
     sendViaWhatsApp(){
       if(this.quoteItems.length===0){ this.guideToEmptyCart(); return; }
       this.pushQuoteToCrm(); this.submitToNetlify('quotation', {client: this.clientInfo.name || 'Not provided', items: this.quoteItems.map(i=>i.title+' x'+i.tierQty).join(', '), total: this.grandTotal(), payment: this.activePayment});
+      this.persistLead({
+        name:this.clientInfo.fullName, company:this.clientInfo.name, contact:this.clientInfo.contactNumber,
+        message:this.quoteItems.map(i=>i.title+' x'+i.tierQty+' pcs').join('; '), source:'quotation',
+        details:{total:this.grandTotal(), payment:this.activePayment, address:this.clientInfo.address}
+      });
       window.open('https://wa.me/'+this.siteSettings.whatsappNumber+'?text='+this.waMessage(), '_blank');
     },
 
     sendViaViber(){
       if(this.quoteItems.length===0){ this.guideToEmptyCart(); return; }
       this.pushQuoteToCrm(); this.submitToNetlify('quotation', {client: this.clientInfo.name || 'Not provided', items: this.quoteItems.map(i=>i.title+' x'+i.tierQty).join(', '), total: this.grandTotal(), payment: this.activePayment});
+      this.persistLead({
+        name:this.clientInfo.fullName, company:this.clientInfo.name, contact:this.clientInfo.contactNumber,
+        message:this.quoteItems.map(i=>i.title+' x'+i.tierQty+' pcs').join('; '), source:'quotation',
+        details:{total:this.grandTotal(), payment:this.activePayment, address:this.clientInfo.address}
+      });
       // Viber's URI scheme does not reliably support pre-filled text like WhatsApp does,
       // so we copy the message to the clipboard and open the Viber chat directly.
       const plain = decodeURIComponent(this.waMessage()).replace(/%0A/g,'\n');
@@ -2681,12 +2799,14 @@ function mjApp(){
     sendInquiry(){
       const i = this.inquiry;
       this.submitToNetlify('inquiry', {name:i.name, company:i.company, contact:i.contact, message:i.message});
+      this.persistLead({...i, source:'inquiry'});
       let msg = 'Hi Michael Jeffrey International, I have an inquiry:%0A%0AName: '+i.name+'%0ACompany: '+i.company+'%0AContact: '+i.contact+'%0AMessage: '+i.message;
       window.open('https://wa.me/'+this.siteSettings.whatsappNumber+'?text='+msg, '_blank');
     },
     sendInquiryViber(){
       const i = this.inquiry;
       this.submitToNetlify('inquiry', {name:i.name, company:i.company, contact:i.contact, message:i.message});
+      this.persistLead({...i, source:'inquiry'});
       const plain = 'Hi Michael Jeffrey International, I have an inquiry:\n\nName: '+i.name+'\nCompany: '+i.company+'\nContact: '+i.contact+'\nMessage: '+i.message;
       navigator.clipboard?.writeText(plain).catch(()=>{});
       this.showToast('Inquiry copied — paste it once Viber opens.');
@@ -3028,49 +3148,58 @@ showToast(text){ this.toast = text; setTimeout(()=> this.toast='', 2600); },
 
 // Real-time Vercel AI Engine Integration
 async sendChat(){
-  const q = this.chatInput.trim();
-  if(!q) return;
-  
-  // 1. I-push ang mensahe ng user sa local chat log
-  this.chatLog.push({from:'user', text:q});
+  if(!this.chatInput || this.chatInput.trim() === '') return;
+
+  const userMsg = this.chatInput.trim();
+  this.chatLog.push({from:'user', text:userMsg});
   this.chatInput = '';
   this.scrollChat();
 
+  const loadingIndex = this.chatLog.length;
+  this.chatLog.push({from:'bot', text:'Typing...'});
+  this.scrollChat();
+
   try {
-    // 2. I-connect sa Vercel AI Sales Closer API Route
     const res = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: this.chatLog.map(m => ({
-          role: m.from === 'user' ? 'user' : 'assistant',
-          content: m.text
-        }))
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        messages:this.chatLog
+          .filter(message => message.text !== 'Typing...')
+          .map(message => ({
+            role:message.from === 'user' ? 'user' : 'assistant',
+            content:message.text
+          })),
+        conversationId:this.chatSessionId
       })
     });
 
-    const data = await res.text();
-    
-    // 3. I-push ang sagot ng AI sa UI
-    if (data) {
-      this.chatLog.push({from:'bot', text: data});
-    } else {
-      this.chatLog.push({from:'bot', text: 'Salamat sa paginquire! Ating sales manager ay makikipag-ugnayan sa iyo.'});
+    if(!res.ok || !res.body) throw new Error('API Error');
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let aiResponse = '';
+
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      aiResponse += decoder.decode(value, {stream:true});
+      this.chatLog[loadingIndex] = {from:'bot', text:aiResponse, downloadQuote:this.isQuotationResponse(aiResponse)};
+      this.scrollChat();
     }
-  } catch(e) {
-    // Offline fallback kapag walang internet
-    const lower = q.toLowerCase();
-    let reply = 'Kasalukuyang nagpoproseso ang system. Maaari ring tumawag sa aming hotline.';
-    if(lower.includes('moq') || lower.includes('minimum')) reply = "Our company-wide minimum order quantity is 20 pieces per design.";
-    else if(lower.includes('price') || lower.includes('cost') || lower.includes('magkano')) reply = "Pricing depends on category, fabric, and quantity tier. Use the Instant Price Quote Calculator in the Design Studio above for a live estimate.";
-    else if(lower.includes('deliver') || lower.includes('ship')) reply = "Delivery within Metro Manila is free. Nationwide and worldwide delivery is available via your preferred courier, billed at cost.";
-    else if(lower.includes('sample')) reply = "A free actual pre-production sample is included for confirmed orders of 100 pcs or more. For smaller trial orders, a sample is ₱2,500 + ₱500 per extra logo.";
-    else if(lower.includes('logo') || lower.includes('embroid') || lower.includes('print')) reply = "Your first company logo application (embroidery, DTF, or silkscreen) is free, 1\"–3\" wide. Individual names can be added too — ₱10/letter embroidery, ₱5/letter DTF.";
-    else if(lower.includes('lead time') || lower.includes('how long') || lower.includes('days')) reply = "Typical lead time is 7–18 business days. Need it faster? Rush order (7–10 days) is available for +₱200/pc.";
-    else if(lower.includes('pay') || lower.includes('gcash') || lower.includes('bank') || lower.includes('wise') || lower.includes('card')) reply = "We accept GCash, Maya, bank transfer (any PH bank), Wise, and debit/credit card. See the Checkout & Payment section for step-by-step instructions.";
-    else if(lower.includes('location') || lower.includes('address') || lower.includes('where')) reply = "Sales office: BGC, Taguig City. Production facility: Antipolo City.";
-    else if(lower.includes('fabric')) reply = "We stock Microfiber, Michael Angelo, Diamond Ripstop, Cotton Fleece, Taslan, Varsity Satin, and more — check the Fabrics section for colors and photos.";
-    this.chatLog.push({from:'bot', text:reply});
+
+    aiResponse += decoder.decode();
+    const hasQuotation = this.isQuotationResponse(aiResponse);
+    this.chatLog[loadingIndex] = {from:'bot', text:aiResponse || 'Salamat sa paginquire po.', downloadQuote:hasQuotation};
+    if(hasQuotation) this.playQuotationNotification();
+    this.scrollChat();
+  } catch(err) {
+    console.error(err);
+    this.chatLog[loadingIndex] = {
+      from:'bot',
+      text:'Pasensya na po, nagkaroon ng pansamantalang connection issue. Pwede po kayo mag-message ulit o tumawag sa ating hotline!'
+    };
+    this.scrollChat();
   }
     },
 

@@ -21,10 +21,10 @@ export async function GET() {
 
     if (error) {
       return NextResponse.json({
-        success: true,
-        message: 'Connected to Supabase successfully!',
-        note: error.message,
-      });
+        success: false,
+        message: 'Supabase is reachable, but the leads table is not ready.',
+        error: error.message,
+      }, { status: 503 });
     }
 
     return NextResponse.json({
