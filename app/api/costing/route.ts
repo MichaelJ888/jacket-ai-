@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '../_lib/integrations';
+import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../_lib/integrations';
 
 const STYLE_RULES = {
   windbreaker: { shellYards: 2, liningYards: 1.5, zipperPieces: 1, snapSets: 0, ribbingSets: 0 },
@@ -13,19 +13,6 @@ type Style = keyof typeof STYLE_RULES;
 function number(value: unknown, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function telegramHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] || character);
-}
-
-async function notifyTelegram(message: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }) });
-  } catch (error) { console.error('Costing Telegram notification failed:', error); }
 }
 
 export async function POST(req: Request) {
@@ -69,7 +56,7 @@ export async function POST(req: Request) {
       }
     }
 
-    void notifyTelegram(`<b>PROJECT COSTING READY</b>\nClient: ${telegramHtml(String(body.clientName || 'Not provided'))}\nProject: ${telegramHtml(String(body.projectName || style))}\nQuantity: ${quantity}\nMaterial estimate: <b>₱${totalCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</b>\nStatus: <b>PENDING APPROVAL</b>`);
+    void sendTelegramMessage(`<b>PROJECT COSTING READY</b>\nClient: ${escapeTelegramHtml(String(body.clientName || 'Not provided'))}\nProject: ${escapeTelegramHtml(String(body.projectName || style))}\nQuantity: ${quantity}\nMaterial estimate: <b>₱${totalCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</b>\nStatus: <b>PENDING APPROVAL</b>`);
     return NextResponse.json({ success: true, costing });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Costing failed' }, { status: 400 });

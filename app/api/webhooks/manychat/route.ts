@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { recordLead } from '../../_lib/integrations';
+import { escapeTelegramHtml, recordLead, sendTelegramMessage } from '../../_lib/integrations';
 
 function isAuthorized(req: Request) {
   const secret = process.env.MANYCHAT_WEBHOOK_SECRET;
@@ -7,22 +7,6 @@ function isAuthorized(req: Request) {
   const headerSecret = req.headers.get('x-manychat-secret');
   const authorization = req.headers.get('authorization');
   return headerSecret === secret || authorization === `Bearer ${secret}`;
-}
-
-async function sendTelegramAlert(text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-    });
-  } catch (error) {
-    console.error('ManyChat Telegram alert failed:', error);
-  }
 }
 
 export async function POST(req: Request) {
@@ -46,11 +30,11 @@ export async function POST(req: Request) {
       source: 'manychat-webhook',
       details: payload,
     });
-    void sendTelegramAlert([
+    void sendTelegramMessage([
       '<b>NEW MANYCHAT LEAD</b>',
-      name ? `<b>Name:</b> ${name}` : '',
-      contact ? `<b>Contact:</b> ${contact}` : '',
-      message ? `<b>Message:</b> ${message}` : '',
+      name ? `<b>Name:</b> ${escapeTelegramHtml(String(name))}` : '',
+      contact ? `<b>Contact:</b> ${escapeTelegramHtml(String(contact))}` : '',
+      message ? `<b>Message:</b> ${escapeTelegramHtml(String(message))}` : '',
     ].filter(Boolean).join('\n'));
 
     return NextResponse.json({ received: true });

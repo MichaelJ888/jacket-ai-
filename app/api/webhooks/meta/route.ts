@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { recordLead } from '../../_lib/integrations';
+import { escapeTelegramHtml, recordLead, sendTelegramMessage } from '../../_lib/integrations';
 
 function verifyMetaSignature(body: string, signature: string | null) {
   const secret = process.env.META_APP_SECRET;
@@ -10,22 +10,6 @@ function verifyMetaSignature(body: string, signature: string | null) {
   const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`);
   const received = Buffer.from(signature);
   return expected.length === received.length && timingSafeEqual(expected, received);
-}
-
-async function sendTelegramAlert(text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
-    });
-  } catch (error) {
-    console.error('Meta webhook Telegram alert failed:', error);
-  }
 }
 
 export async function GET(req: Request) {
@@ -67,7 +51,7 @@ export async function POST(req: Request) {
             source: payload.object === 'instagram' ? 'instagram-webhook' : 'facebook-webhook',
             details: { messageId: message.id, field: change.field, entryId: entry.id },
           });
-          void sendTelegramAlert(`<b>NEW SOCIAL INQUIRY</b>\n<b>Source:</b> ${payload.object || 'meta'}\n<b>Contact:</b> ${contact}\n<b>Message:</b> ${text}`);
+          void sendTelegramMessage(`<b>NEW SOCIAL INQUIRY</b>\n<b>Source:</b> ${escapeTelegramHtml(String(payload.object || 'meta'))}\n<b>Contact:</b> ${escapeTelegramHtml(String(contact))}\n<b>Message:</b> ${escapeTelegramHtml(text)}`);
           processed += 1;
         }
       }

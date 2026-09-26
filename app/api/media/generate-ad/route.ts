@@ -109,6 +109,7 @@ async function tryStabilityRender(prompt: string) {
         aspect_ratio: '1:1',
         seed: 42,
       }),
+      signal: AbortSignal.timeout(20000),
     });
 
     if (!response.ok) return null;

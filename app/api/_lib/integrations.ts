@@ -20,7 +20,7 @@ export async function fetchWithRetry(input: string, init: RequestInit, maxRetrie
   let lastError: unknown = null;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
     try {
-      const response = await fetch(input, init);
+      const response = await fetch(input, { ...init, signal: init.signal ?? AbortSignal.timeout(10000) });
       if (response.ok || response.status < 500) return response;
       lastError = new Error(`Request failed with status ${response.status}`);
     } catch (error) {

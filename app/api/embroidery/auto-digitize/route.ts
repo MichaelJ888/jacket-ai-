@@ -65,6 +65,7 @@ export async function POST(req: Request) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
         body: JSON.stringify({ image, widthInches, heightInches, placement }),
+        signal: AbortSignal.timeout(20000),
       });
       const payload = await response.json().catch(() => null);
 

@@ -48,7 +48,7 @@ export async function POST(req: Request) {
         confidence,
         verified,
         notes: parsed.notes || null,
-      });
+      }).select().single();
       if (error) console.error('Payment verification insert failed:', error.message);
       verificationId = verification?.id || null;
       if (!error && verificationId && verified) {

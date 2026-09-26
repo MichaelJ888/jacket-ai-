@@ -5,6 +5,8 @@ import {
   createEmbroideryJob,
   createPurchaseOrder,
   createStaffTask,
+  escapeTelegramHtml,
+  sendTelegramMessage,
   sendTelegramPhoto,
 } from '../_lib/integrations';
 
@@ -14,26 +16,6 @@ function normalizeStaffName(value: unknown) {
   if (typeof value !== 'string') return null;
   const staffName = [...STAFF].find((name) => name.toLowerCase() === value.trim().toLowerCase());
   return staffName || null;
-}
-
-async function sendTelegramNotification(message: string) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!botToken || !chatId) return;
-
-  try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'HTML' }),
-    });
-  } catch (error) {
-    console.error('Operations Telegram notification error:', error);
-  }
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] || character);
 }
 
 export async function POST(req: Request) {
@@ -51,7 +33,7 @@ export async function POST(req: Request) {
       const alert = action === 'clock_in'
         ? `⏰ <b>ATTENDANCE CLOCK-IN</b>\nStaff: <b>${staffName}</b>\nTime: ${new Date(record?.time_in || Date.now()).toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}`
         : `🏁 <b>ATTENDANCE CLOCK-OUT</b>\nStaff: <b>${staffName}</b>\nTotal: <b>${Math.floor(Number(record?.total_minutes || 0) / 60)} hrs ${Number(record?.total_minutes || 0) % 60} mins</b>\nEarned: <b>₱${Number(record?.total_earned || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</b>`;
-      void sendTelegramNotification(alert);
+      void sendTelegramMessage(alert);
       return NextResponse.json({ success: true, record });
     }
 
@@ -67,11 +49,11 @@ export async function POST(req: Request) {
       const result = await createPurchaseOrder({ supplierName, materialType, quantity, unitCost });
       if (result.error) return NextResponse.json({ success: false, error: result.error }, { status: 502 });
       const po = result.data;
-      void sendTelegramNotification([
+      void sendTelegramMessage([
         '📦 <b>NEW SUPPLIER PURCHASE ORDER</b>',
-        `PO Number: <b>${escapeHtml(po.po_number)}</b>`,
-        `Supplier: <b>${escapeHtml(supplierName)}</b>`,
-        `Material: <b>${escapeHtml(materialType)}</b>`,
+        `PO Number: <b>${escapeTelegramHtml(po.po_number)}</b>`,
+        `Supplier: <b>${escapeTelegramHtml(supplierName)}</b>`,
+        `Material: <b>${escapeTelegramHtml(materialType)}</b>`,
         `Quantity: <b>${quantity.toLocaleString('en-PH')}</b>`,
         `Total Cost: <b>₱${Number(po.total_cost).toLocaleString('en-PH', { minimumFractionDigits: 2 })}</b>`,
         'Status: <b>PENDING MANAGER APPROVAL</b>',
@@ -106,18 +88,18 @@ export async function POST(req: Request) {
 
       const caption = [
         '🧵 <b>EMBROIDERY DISPATCH — SPECS FOR ARTIST</b>',
-        `Project: <b>${escapeHtml(String(body.projectName || 'Not provided'))}</b>`,
-        `Client: <b>${escapeHtml(String(body.clientName || 'Not provided'))}</b>`,
-        `Garment: <b>${escapeHtml(String(body.garmentStyle || 'Not specified'))}</b> x <b>${Number(body.quantity) || 0}</b> pcs`,
-        `Placement: <b>${escapeHtml(placement)}</b>`,
+        `Project: <b>${escapeTelegramHtml(String(body.projectName || 'Not provided'))}</b>`,
+        `Client: <b>${escapeTelegramHtml(String(body.clientName || 'Not provided'))}</b>`,
+        `Garment: <b>${escapeTelegramHtml(String(body.garmentStyle || 'Not specified'))}</b> x <b>${Number(body.quantity) || 0}</b> pcs`,
+        `Placement: <b>${escapeTelegramHtml(placement)}</b>`,
         `Estimated Stitch Count: <b>${Number(job.stitch_count).toLocaleString('en-PH')}</b>`,
-        threadColors.length ? `Thread Colors: <b>${escapeHtml(threadColors.map((color: { name?: string }) => color?.name || String(color)).join(', '))}</b>` : '',
-        body.embroidererName ? `Assigned Embroiderer: <b>${escapeHtml(String(body.embroidererName))}</b> (${escapeHtml(String(body.embroidererContact || 'no contact given'))})` : '',
-        body.notes ? `Notes: ${escapeHtml(String(body.notes))}` : '',
+        threadColors.length ? `Thread Colors: <b>${escapeTelegramHtml(threadColors.map((color: { name?: string }) => color?.name || String(color)).join(', '))}</b>` : '',
+        body.embroidererName ? `Assigned Embroiderer: <b>${escapeTelegramHtml(String(body.embroidererName))}</b> (${escapeTelegramHtml(String(body.embroidererContact || 'no contact given'))})` : '',
+        body.notes ? `Notes: ${escapeTelegramHtml(String(body.notes))}` : '',
       ].filter(Boolean).join('\n');
 
       if (job.logo_image) void sendTelegramPhoto(job.logo_image, caption);
-      else void sendTelegramNotification(caption);
+      else void sendTelegramMessage(caption);
 
       return NextResponse.json({ success: true, embroideryJob: job });
     }
@@ -130,7 +112,7 @@ export async function POST(req: Request) {
 
       const result = await createStaffTask({ staffName, taskText, priority, dueAt: body.dueAt });
       if (result.error) return NextResponse.json({ success: false, error: result.error }, { status: 502 });
-      void sendTelegramNotification(`📝 <b>NEW TASK LOGGED</b>\nStaff: <b>${staffName}</b>\nPriority: <b>${priority.toUpperCase()}</b>\nTask: ${escapeHtml(taskText)}`);
+      void sendTelegramMessage(`📝 <b>NEW TASK LOGGED</b>\nStaff: <b>${staffName}</b>\nPriority: <b>${priority.toUpperCase()}</b>\nTask: ${escapeTelegramHtml(taskText)}`);
       return NextResponse.json({ success: true, task: result.data });
     }
 

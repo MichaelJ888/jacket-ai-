@@ -24,16 +24,6 @@ function allowedChatId(chatId: unknown) {
   return Boolean(process.env.TELEGRAM_CHAT_ID && String(chatId) === process.env.TELEGRAM_CHAT_ID);
 }
 
-async function sendTelegramMessage(chatId: string, text: string) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) return;
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ chat_id: chatId, text }),
-  });
-}
-
 function formatMinutes(totalMinutes: number) {
   return `${Math.floor(totalMinutes / 60)} hrs ${totalMinutes % 60} mins`;
 }
@@ -73,7 +63,7 @@ export async function POST(req: Request) {
       reply = 'MJIC Ops Bot ready. Use IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>.';
     }
 
-    await sendTelegramMessage(String(chatId), reply);
+    await sendTelegramDirectMessage(String(chatId), reply);
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Telegram ops webhook error:', error);

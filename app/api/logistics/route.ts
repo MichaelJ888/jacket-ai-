@@ -41,7 +41,7 @@ export async function POST(req: Request) {
       let providerResponse: unknown = null;
       let status = 'APPROVED_PENDING_BOOKING';
       if (apiUrl && apiToken) {
-        const response = await fetch(apiUrl, { method: 'POST', headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ pickup_address: dispatch.pickup_address, delivery_address: dispatch.delivery_address, contact_name: dispatch.contact_name, contact_phone: dispatch.contact_phone, package_description: dispatch.package_description }) });
+        const response = await fetch(apiUrl, { method: 'POST', headers: { Authorization: `Bearer ${apiToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ pickup_address: dispatch.pickup_address, delivery_address: dispatch.delivery_address, contact_name: dispatch.contact_name, contact_phone: dispatch.contact_phone, package_description: dispatch.package_description }), signal: AbortSignal.timeout(15000) });
         providerResponse = await response.json().catch(() => null);
         if (!response.ok) return NextResponse.json({ error: 'Lalamove API rejected the dispatch', providerResponse }, { status: 502 });
         status = 'BOOKED';
