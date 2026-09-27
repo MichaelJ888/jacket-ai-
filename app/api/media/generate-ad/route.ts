@@ -1,4 +1,21 @@
 import { NextResponse } from 'next/server';
+import { experimental_getVideoStatus, experimental_startVideo } from 'ai';
+import {
+  completeMediaAdGeneration,
+  createMediaAdApproval,
+  createMediaAdGeneration,
+  escapeTelegramHtml,
+  failMediaAdGeneration,
+  getMediaAdGeneration,
+  getMediaAdVideoUrl,
+  markMediaAdApprovalNotificationFailed,
+  setMediaAdGenerationApproval,
+  sendTelegramMessage,
+  storeMediaAdVideo,
+} from '../../_lib/integrations';
+
+const VIDEO_MODEL = 'google/veo-3.1-fast-generate-001';
+const VIDEO_DURATION_SECONDS = 8;
 
 function toText(value: unknown, fallback = '') {
   if (typeof value === 'string') return value.trim();
@@ -92,40 +109,16 @@ function buildSocialPostingPlan(jacketStyles: string[]) {
   ];
 }
 
-async function tryStabilityRender(prompt: string) {
-  const apiKey = process.env.STABILITY_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const response = await fetch('https://api.stability.ai/v2beta/stable-image/generate/core', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        prompt,
-        output_format: 'png',
-        aspect_ratio: '1:1',
-        seed: 42,
-      }),
-      signal: AbortSignal.timeout(20000),
-    });
-
-    if (!response.ok) return null;
-    const bytes = Buffer.from(await response.arrayBuffer());
-    return `data:image/png;base64,${bytes.toString('base64')}`;
-  } catch (error) {
-    console.error('Stability image generation failed:', error);
-    return null;
-  }
-}
-
 export async function POST(req: Request) {
   try {
+    if (!process.env.AI_GATEWAY_API_KEY) {
+      return NextResponse.json({ success: false, error: 'AI Gateway is not configured.' }, { status: 503 });
+    }
+
     const body = await req.json();
     const mode = toText(body.mode, 'render');
     const clientName = toText(body.clientName, 'MJIC client');
+    const campaignName = toText(body.campaignName || body.productName || body.clientName, 'Sublimation Sports Uniforms');
     const jacketStyle = toText(body.jacketStyle, 'Corporate jacket');
     const jacketStyles = normalizeStyles(body.jacketStyles || body.jacketStyle);
     const logoUrl = toText(body.logoUrl, '');
@@ -136,14 +129,22 @@ export async function POST(req: Request) {
     const includeVoiceover = Boolean(body.includeVoiceover);
 
     const prompt = buildCreativePrompt({ clientName, jacketStyle, logoUrl, colorway, audience, callToAction, jacketStyles });
-    const renderUrl = await tryStabilityRender(prompt);
+    const videoJob = await experimental_startVideo({
+      model: VIDEO_MODEL,
+      prompt,
+      duration: VIDEO_DURATION_SECONDS,
+      aspectRatio: '9:16',
+      generateAudio: false,
+    });
 
-    const storyboard = [
-      { id: 'hero', seconds: 0, label: 'Hero product shot', caption: 'Premium studio render of the custom jacket with brand logo styling.' },
-      { id: 'detail', seconds: 4, label: 'Detail focus', caption: 'Zoom in on logo embroidery, zipper finish, and premium fabric texture.' },
-      { id: 'team', seconds: 8, label: 'Brand showcase', caption: 'Position the jacket in a corporate, team-ready presentation for client proposals.' },
-      { id: 'cta', seconds: 12, label: 'Offer close', caption: 'End with the CTA and conversion prompt for the next sales step.' },
-    ];
+    const generation = await createMediaAdGeneration({
+      campaignName,
+      modelId: VIDEO_MODEL,
+      operation: videoJob.operation,
+    });
+    if (!generation.data) {
+      return NextResponse.json({ success: false, error: generation.error || 'Unable to save video generation job.' }, { status: 503 });
+    }
 
     const activeStyles = jacketStyles.length ? jacketStyles : [jacketStyle];
     const voiceoverScript = buildVoiceoverScript({ clientName, jacketStyle, audience, callToAction, jacketStyles: activeStyles });
@@ -152,7 +153,9 @@ export async function POST(req: Request) {
     const payload = {
       success: true,
       mode,
-      status: renderUrl ? 'ready' : 'queued',
+      status: 'generating',
+      generationId: generation.data.id,
+      modelId: VIDEO_MODEL,
       clientName,
       jacketStyle,
       jacketStyles: activeStyles,
@@ -163,7 +166,8 @@ export async function POST(req: Request) {
       durationSeconds: Number.isFinite(durationSeconds) && durationSeconds > 0 ? durationSeconds : 15,
       includeVoiceover,
       prompt,
-      renderUrl: renderUrl || logoUrl || null,
+      renderUrl: null,
+      videoDurationSeconds: VIDEO_DURATION_SECONDS,
       storyboard: [
         {
           id: 'opening',
@@ -195,16 +199,122 @@ export async function POST(req: Request) {
       voiceoverTone: 'confident, polished, sales-focused, and trust-building',
       platformTargets: ['Facebook', 'Instagram Reels', 'TikTok', 'Meta ads'],
       generatedAt: new Date().toISOString(),
-      notes: renderUrl
-        ? 'Studio render and campaign brief generated using the configured pipeline.'
-        : 'No external render API key is configured; the route returned the creative prompt, scene structure, voiceover, and social plan for downstream execution.',
+      notes: 'Video generation is running in Vercel AI Gateway. Poll this route with the generationId to retrieve the finished cloud-stored video.',
     };
 
-    return NextResponse.json(payload);
+    return NextResponse.json({
+      ...payload,
+      approvalId: null,
+      approvalLogSaved: false,
+      approvalNotificationSent: false,
+    });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Media generation failed' },
       { status: 400 },
+    );
+  }
+}
+
+export async function GET(request: Request) {
+  const generationId = new URL(request.url).searchParams.get('generationId') || '';
+  if (!/^[0-9a-f-]{36}$/i.test(generationId)) {
+    return NextResponse.json({ success: false, error: 'A valid generationId is required.' }, { status: 400 });
+  }
+
+  try {
+    const stored = await getMediaAdGeneration(generationId);
+    if (stored.error) return NextResponse.json({ success: false, error: stored.error }, { status: 503 });
+    if (!stored.data) return NextResponse.json({ success: false, error: 'Video generation job not found.' }, { status: 404 });
+
+    if (stored.data.status === 'FAILED') {
+      return NextResponse.json({ success: false, status: 'failed', error: stored.data.error_message }, { status: 502 });
+    }
+
+    if (stored.data.status === 'COMPLETED' && stored.data.video_storage_path) {
+      const video = await getMediaAdVideoUrl(stored.data.video_storage_path);
+      if (video.error || !video.url) return NextResponse.json({ success: false, error: video.error || 'Video URL unavailable.' }, { status: 503 });
+      return NextResponse.json({
+        success: true,
+        status: 'ready',
+        generationId,
+        videoUrl: video.url,
+        renderUrl: video.url,
+        approvalId: stored.data.approval_id,
+      });
+    }
+
+    const operation = stored.data.operation as Parameters<typeof experimental_getVideoStatus>[1]['operation'];
+    const status = await experimental_getVideoStatus(stored.data.model_id, { operation });
+    if (status.status === 'pending') {
+      return NextResponse.json({ success: true, status: 'generating', generationId });
+    }
+    if (status.status === 'error') {
+      await failMediaAdGeneration(generationId, status.error);
+      return NextResponse.json({ success: false, status: 'failed', error: status.error }, { status: 502 });
+    }
+
+    const generatedVideo = status.videos[0] as unknown as {
+      url?: string;
+      data?: Uint8Array | string;
+      base64?: string;
+      uint8Array?: Uint8Array;
+    };
+    let videoBytes: Uint8Array;
+    if (typeof generatedVideo.url === 'string') {
+      const response = await fetch(generatedVideo.url, { signal: AbortSignal.timeout(30000) });
+      if (!response.ok) throw new Error('AI Gateway video download failed.');
+      videoBytes = new Uint8Array(await response.arrayBuffer());
+    } else if (generatedVideo.data instanceof Uint8Array) {
+      videoBytes = generatedVideo.data;
+    } else if (typeof generatedVideo.base64 === 'string') {
+      videoBytes = Buffer.from(generatedVideo.base64, 'base64');
+    } else if (typeof generatedVideo.data === 'string') {
+      videoBytes = Buffer.from(generatedVideo.data, 'base64');
+    } else if (generatedVideo.uint8Array instanceof Uint8Array) {
+      videoBytes = generatedVideo.uint8Array;
+    } else {
+      throw new Error('AI Gateway returned an unsupported video format.');
+    }
+
+    if (videoBytes.byteLength > 100 * 1024 * 1024) throw new Error('Generated video exceeds the 100 MB storage limit.');
+    const saved = await storeMediaAdVideo(generationId, videoBytes);
+    if (saved.error || !saved.path) throw new Error(saved.error || 'Unable to store generated video.');
+
+    const completed = await completeMediaAdGeneration(generationId, saved.path);
+    if (completed.error) throw new Error(completed.error);
+    if (completed.data) {
+      const approval = await createMediaAdApproval(completed.data.campaign_name);
+      if (approval.error) console.error('Media ad approval log insert failed:', approval.error);
+      if (approval.data) {
+        await setMediaAdGenerationApproval(generationId, approval.data.id);
+        const video = await getMediaAdVideoUrl(saved.path);
+        const notificationSent = video.url ? await sendTelegramMessage(
+          `Boss,\nready na ang AI-generated video ad para sa ${escapeTelegramHtml(completed.data.campaign_name)}. Review it here before boosting: ${escapeTelegramHtml(video.url)}`,
+          { inline_keyboard: [[
+            { text: 'YES', callback_data: `boost_ad:yes:${approval.data.id}` },
+            { text: 'NO', callback_data: `boost_ad:no:${approval.data.id}` },
+          ]] },
+        ) : false;
+        if (!notificationSent) await markMediaAdApprovalNotificationFailed(approval.data.id);
+      }
+    }
+
+    const finalRecord = await getMediaAdGeneration(generationId);
+    const video = finalRecord.data?.video_storage_path ? await getMediaAdVideoUrl(finalRecord.data.video_storage_path) : { url: null, error: null };
+    if (video.error || !video.url) return NextResponse.json({ success: false, error: video.error || 'Video URL unavailable.' }, { status: 503 });
+    return NextResponse.json({
+      success: true,
+      status: 'ready',
+      generationId,
+      videoUrl: video.url,
+      renderUrl: video.url,
+      approvalId: finalRecord.data?.approval_id || null,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Video status check failed.' },
+      { status: 502 },
     );
   }
 }

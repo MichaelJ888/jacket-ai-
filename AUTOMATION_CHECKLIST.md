@@ -8,11 +8,12 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - [ ] Check `supabase/schema.sql` for an existing table before creating a new one.
 
 ## Existing API routes (app/api/)
-`chat`, `costing`, `cron/staff-reminders`, `embroidery/auto-digitize`, `leads`, `logistics`, `operations`, `order-status`, `payment-verify`, `telegram-notify`, `telegram-webhook`, `test-db`, `webhooks/manychat`, `webhooks/meta`.
+`chat`, `costing`, `cron/staff-reminders`, `cron/embroidery-pickup-alerts`, `embroidery/auto-digitize`, `leads`, `logistics`, `operations`, `order-status`, `payment-verify`, `telegram-notify`, `telegram-webhook`, `test-db`, `webhooks/manychat`, `webhooks/meta`.
 
 ## Build & deploy
 - Build command is `next build --webpack` (Turbopack panics on this project's global CSS — do not remove `--webpack`).
 - Vercel account is **Hobby tier**: native crons only run once/day. Anything more frequent must call `/api/cron/staff-reminders?type=watch` from an external scheduler (cron-job.org, GitHub Actions) or upgrade to Pro.
+- Embroidery pickup alerts require an external scheduler to call `/api/cron/embroidery-pickup-alerts` every 5 minutes with `Authorization: Bearer $CRON_SECRET`; this route will not run on time from a Hobby native cron.
 - After any Supabase schema change: run `npm run db:push` to apply `supabase/schema.sql` automatically (requires `SUPABASE_ACCESS_TOKEN` in `.env.local`, a personal access token from https://supabase.com/dashboard/account/tokens — never commit it), then run `npm run lint && npm run build` before `npx vercel --prod --yes`.
 
 ## Credit / token conservation rules

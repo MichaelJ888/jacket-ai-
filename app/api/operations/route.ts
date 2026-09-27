@@ -88,6 +88,7 @@ export async function POST(req: Request) {
 
       const caption = [
         '🧵 <b>EMBROIDERY DISPATCH — SPECS FOR ARTIST</b>',
+        `Job ID: <code>${job.id}</code>`,
         `Project: <b>${escapeTelegramHtml(String(body.projectName || 'Not provided'))}</b>`,
         `Client: <b>${escapeTelegramHtml(String(body.clientName || 'Not provided'))}</b>`,
         `Garment: <b>${escapeTelegramHtml(String(body.garmentStyle || 'Not specified'))}</b> x <b>${Number(body.quantity) || 0}</b> pcs`,

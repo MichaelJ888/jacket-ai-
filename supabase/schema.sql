@@ -175,8 +175,16 @@ create table if not exists public.embroidery_jobs (
   notes text,
   status text not null default 'PENDING_DISPATCH',
   dispatched_at timestamptz,
+  pickup_commitment_at timestamptz,
+  pickup_alert_sent_at timestamptz,
   created_at timestamptz default now()
 );
+
+alter table public.embroidery_jobs add column if not exists pickup_commitment_at timestamptz;
+alter table public.embroidery_jobs add column if not exists pickup_alert_sent_at timestamptz;
+create index if not exists embroidery_jobs_pickup_commitment_idx
+  on public.embroidery_jobs (pickup_commitment_at)
+  where pickup_commitment_at is not null and pickup_alert_sent_at is null;
 
 create table if not exists public.digitize_jobs (
   id uuid default gen_random_uuid() primary key,
@@ -216,6 +224,40 @@ create index if not exists suppliers_directory_category_idx on public.suppliers_
 revoke all on public.suppliers_directory from anon, authenticated;
 revoke all on public.embroidery_jobs from anon, authenticated;
 revoke all on public.digitize_jobs from anon, authenticated;
+
+create table if not exists public.media_ad_generations (
+  id uuid default gen_random_uuid() primary key,
+  campaign_name text not null,
+  model_id text not null,
+  operation jsonb not null,
+  status text not null default 'RUNNING' check (status in ('RUNNING', 'COMPLETED', 'FAILED')),
+  video_storage_path text,
+  approval_id uuid references public.media_ad_approvals(id),
+  error_message text,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+alter table public.media_ad_generations enable row level security;
+create index if not exists media_ad_generations_created_idx on public.media_ad_generations (created_at desc);
+revoke all on public.media_ad_generations from anon, authenticated;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('media-ad-renders', 'media-ad-renders', false, 104857600, array['video/mp4'])
+on conflict (id) do nothing;
+
+create table if not exists public.media_ad_approvals (
+  id uuid default gen_random_uuid() primary key,
+  campaign_name text not null,
+  status text not null default 'PENDING_APPROVAL' check (status in ('PENDING_APPROVAL', 'APPROVED', 'DECLINED', 'NOTIFICATION_FAILED')),
+  decided_at timestamptz,
+  decided_by_telegram_id text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.media_ad_approvals enable row level security;
+create index if not exists media_ad_approvals_created_idx on public.media_ad_approvals (created_at desc);
+revoke all on public.media_ad_approvals from anon, authenticated;
 
 alter table public.staff_profiles add column if not exists telegram_chat_id text;
 alter table public.staff_profiles add column if not exists link_code text;

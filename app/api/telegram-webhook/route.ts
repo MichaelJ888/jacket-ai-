@@ -5,11 +5,15 @@ import {
   completeLatestTaskForStaff,
   composeBossStyleMessage,
   createStaffTask,
+  answerTelegramCallbackQuery,
+  decideMediaAdApproval,
   generateStaffLinkCode,
   getPayrollSummary,
   getStaffByChatId,
   getStaffProfile,
   linkStaffTelegramChat,
+  removeTelegramInlineKeyboard,
+  setEmbroideryPickupCommitment,
   sendTelegramDirectMessage,
 } from '../_lib/integrations';
 
@@ -31,6 +35,56 @@ function formatMinutes(totalMinutes: number) {
 export async function POST(req: Request) {
   try {
     const update = await req.json();
+    const callback = update?.callback_query;
+    if (callback) {
+      const callbackChatId = callback.message?.chat?.id;
+      const callbackId = callback.id;
+      const actorId = callback.from?.id;
+      const ceoUserId = process.env.TELEGRAM_CEO_USER_ID;
+      const callbackChatType = callback.message?.chat?.type;
+      const callbackData = typeof callback.data === 'string' ? callback.data : '';
+      const authorizedActor = ceoUserId
+        ? String(actorId) === ceoUserId
+        : callbackChatType === 'private' && String(actorId) === String(callbackChatId);
+
+      if (!allowedChatId(callbackChatId) || !authorizedActor) {
+        if (callbackId) await answerTelegramCallbackQuery(String(callbackId), 'Not authorized.');
+        return NextResponse.json({ ok: true });
+      }
+
+      const decisionMatch = callbackData.match(/^boost_ad:(yes|no):([\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/i);
+      if (callbackId && decisionMatch) {
+        const [, answer, approvalId] = decisionMatch;
+        const decision = answer.toLowerCase() === 'yes' ? 'APPROVED' : 'DECLINED';
+        const result = await decideMediaAdApproval(approvalId, decision, String(actorId || ''));
+        if (result.error) {
+          await answerTelegramCallbackQuery(String(callbackId), 'Could not save this decision. Please try again.');
+          return NextResponse.json({ ok: true });
+        }
+
+        if (!result.data) {
+          await answerTelegramCallbackQuery(String(callbackId), 'This approval was already handled or is unavailable.');
+          if (callback.message?.message_id) {
+            await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+          }
+          return NextResponse.json({ ok: true });
+        }
+
+        const campaignName = result.data.campaign_name;
+        const response = decision === 'APPROVED'
+          ? `Approved: ${campaignName}. Ready for manual launch; ads were not published automatically because ad-account publishing is not configured.`
+          : `Declined: ${campaignName}. The ad will not be boosted.`;
+        await answerTelegramCallbackQuery(String(callbackId), decision === 'APPROVED' ? 'Boost approved.' : 'Boost declined.');
+        if (callback.message?.message_id) {
+          await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+        }
+        await sendTelegramDirectMessage(String(callbackChatId), response);
+      } else if (callbackId) {
+        await answerTelegramCallbackQuery(String(callbackId), 'This approval is no longer available.');
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     const message = update?.message;
     const chatId = message?.chat?.id;
     const chatType = message?.chat?.type;
@@ -46,9 +100,11 @@ export async function POST(req: Request) {
     const [command, nameValue, ...restWords] = text.split(/\s+/);
     const staffName = nameValue ? normalizeStaffName(nameValue) : null;
     const freeText = restWords.join(' ').trim();
-    let reply = 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>.';
+    let reply = 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm.';
 
-    if (/^in$/i.test(command)) {
+    if (/^pickup$/i.test(command)) {
+      reply = await handlePickupCommand(nameValue || '', freeText);
+    } else if (/^in$/i.test(command)) {
       reply = staffName ? formatClockResult('IN', staffName, await clockInStaff(staffName)) : 'Use: IN Jonathan or IN Linda';
     } else if (/^out$/i.test(command)) {
       reply = staffName ? formatClockResult('OUT', staffName, await clockOutStaff(staffName)) : 'Use: OUT Jonathan or OUT Linda';
@@ -60,7 +116,7 @@ export async function POST(req: Request) {
       const priority = command.toLowerCase() as 'task' | 'urgent' | 'emergency';
       reply = staffName && freeText ? await handleTaskCommand(staffName, freeText, priority === 'task' ? 'normal' : priority) : `Use: ${command.toUpperCase()} Jonathan <bilin text>`;
     } else if (/^start$/i.test(command)) {
-      reply = 'MJIC Ops Bot ready. Use IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>.';
+      reply = 'MJIC Ops Bot ready. Use IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, or PICKUP <job-id> YYYY-MM-DD HH:mm.';
     }
 
     await sendTelegramDirectMessage(String(chatId), reply);
@@ -90,6 +146,36 @@ async function handleTaskCommand(staffName: StaffName, taskText: string, priorit
     await sendTelegramDirectMessage(chatId, styled);
   }
   return `Naka-log na ang bilin para kay ${staffName} (${priority}). Ipapaalala ko sa kanya.`;
+}
+
+async function handlePickupCommand(jobId: string, commitment: string) {
+  const match = commitment.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+  if (!match || !/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(jobId)) {
+    return 'Use: PICKUP <job-id> YYYY-MM-DD HH:mm (Asia/Manila).';
+  }
+
+  const [, yearText, monthText, dayText, hourText, minuteText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  if (month < 1 || month > 12 || day < 1 || day > daysInMonth || hour > 23 || minute > 59) {
+    return 'Invalid date or time. Use YYYY-MM-DD HH:mm in Asia/Manila.';
+  }
+
+  const commitmentAt = new Date(`${yearText}-${monthText}-${dayText}T${hourText}:${minuteText}:00+08:00`);
+  if (commitmentAt.getTime() <= Date.now()) return 'Pickup commitment must be in the future.';
+
+  const result = await setEmbroideryPickupCommitment(jobId, commitmentAt.toISOString());
+  if (result.error) return `Pickup schedule error: ${result.error}`;
+  if (!result.data) return 'Embroidery job not found. Check the job ID and try again.';
+
+  const pickupTime = new Intl.DateTimeFormat('en-PH', {
+    dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Manila',
+  }).format(new Date(result.data.pickup_commitment_at));
+  return `Pickup commitment saved for ${result.data.project_name || result.data.client_name || 'embroidery job'} at ${pickupTime}. Ipapadala ko ang alert 30 minutes before pickup.`;
 }
 
 async function handlePrivateStaffMessage(chatId: string, text: string) {

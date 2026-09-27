@@ -10,6 +10,136 @@ export function getSupabaseAdmin() {
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
 
+export async function createMediaAdApproval(campaignName: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+
+  const { data, error } = await supabase
+    .from('media_ad_approvals')
+    .insert({ campaign_name: campaignName })
+    .select('id, campaign_name, status')
+    .single();
+  return { data, error: error?.message || null };
+}
+
+export async function createMediaAdGeneration(input: {
+  campaignName: string;
+  modelId: string;
+  operation: unknown;
+}) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+
+  const { data, error } = await supabase
+    .from('media_ad_generations')
+    .insert({
+      campaign_name: input.campaignName,
+      model_id: input.modelId,
+      operation: input.operation,
+      status: 'RUNNING',
+    })
+    .select('id, campaign_name, model_id, operation, status, video_storage_path, approval_id')
+    .single();
+  return { data, error: error?.message || null };
+}
+
+export async function getMediaAdGeneration(generationId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+
+  const { data, error } = await supabase
+    .from('media_ad_generations')
+    .select('id, campaign_name, model_id, operation, status, video_storage_path, approval_id, error_message')
+    .eq('id', generationId)
+    .maybeSingle();
+  return { data, error: error?.message || null };
+}
+
+export async function storeMediaAdVideo(generationId: string, video: Uint8Array) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { path: null, error: 'Supabase is not configured' };
+
+  const path = `${generationId}.mp4`;
+  const buffer = new ArrayBuffer(video.byteLength);
+  new Uint8Array(buffer).set(video);
+  const { error } = await supabase.storage
+    .from('media-ad-renders')
+    .upload(path, buffer, { contentType: 'video/mp4', upsert: true });
+  return { path: error ? null : path, error: error?.message || null };
+}
+
+export async function completeMediaAdGeneration(generationId: string, videoStoragePath: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+
+  const { data, error } = await supabase
+    .from('media_ad_generations')
+    .update({ status: 'COMPLETED', video_storage_path: videoStoragePath, completed_at: new Date().toISOString() })
+    .eq('id', generationId)
+    .eq('status', 'RUNNING')
+    .select('id, campaign_name, approval_id')
+    .maybeSingle();
+  return { data, error: error?.message || null };
+}
+
+export async function failMediaAdGeneration(generationId: string, errorMessage: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('media_ad_generations')
+    .update({ status: 'FAILED', error_message: errorMessage.slice(0, 1000), completed_at: new Date().toISOString() })
+    .eq('id', generationId)
+    .eq('status', 'RUNNING');
+  if (error) console.error('Media ad generation failure update failed:', error.message);
+}
+
+export async function setMediaAdGenerationApproval(generationId: string, approvalId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('media_ad_generations')
+    .update({ approval_id: approvalId })
+    .eq('id', generationId)
+    .is('approval_id', null);
+  if (error) console.error('Media ad generation approval link failed:', error.message);
+}
+
+export async function getMediaAdVideoUrl(path: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { url: null, error: 'Supabase is not configured' };
+
+  const { data, error } = await supabase.storage.from('media-ad-renders').createSignedUrl(path, 60 * 60 * 24 * 7);
+  return { url: data?.signedUrl || null, error: error?.message || null };
+}
+
+export async function decideMediaAdApproval(approvalId: string, decision: 'APPROVED' | 'DECLINED', telegramUserId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+
+  const { data, error } = await supabase
+    .from('media_ad_approvals')
+    .update({ status: decision, decided_at: new Date().toISOString(), decided_by_telegram_id: telegramUserId || null })
+    .eq('id', approvalId)
+    .eq('status', 'PENDING_APPROVAL')
+    .select('id, campaign_name, status, decided_at')
+    .maybeSingle();
+  return { data, error: error?.message || null };
+}
+
+export async function markMediaAdApprovalNotificationFailed(approvalId: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+
+  const { error } = await supabase
+    .from('media_ad_approvals')
+    .update({ status: 'NOTIFICATION_FAILED' })
+    .eq('id', approvalId)
+    .eq('status', 'PENDING_APPROVAL');
+  if (error) console.error('Media ad approval notification status update failed:', error.message);
+}
+
 export function escapeTelegramHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] || character);
 }
@@ -34,19 +164,50 @@ export async function fetchWithRetry(input: string, init: RequestInit, maxRetrie
   return null;
 }
 
-export async function sendTelegramMessage(text: string) {
+type TelegramInlineKeyboard = {
+  inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
+};
+
+export async function sendTelegramMessage(text: string, replyMarkup?: TelegramInlineKeyboard) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
+  if (!token || !chatId) return false;
   try {
-    await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const response = await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      }),
     });
+    return Boolean(response?.ok);
   } catch (error) {
     console.error('Telegram sendMessage failed:', error);
+    return false;
   }
+}
+
+export async function answerTelegramCallbackQuery(callbackQueryId: string, text: string) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !callbackQueryId) return;
+  await fetchWithRetry(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+  });
+}
+
+export async function removeTelegramInlineKeyboard(chatId: string, messageId: number) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId || !messageId) return;
+  await fetchWithRetry(`https://api.telegram.org/bot${token}/editMessageReplyMarkup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }),
+  });
 }
 
 // Sends a logo/reference photo to the operations Telegram chat. Accepts either
@@ -268,6 +429,55 @@ export async function createEmbroideryJob(job: {
   }).select().single();
 
   return { data, error: error?.message || null };
+}
+
+export async function setEmbroideryPickupCommitment(jobId: string, pickupCommitmentAt: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+
+  const { data, error } = await supabase.from('embroidery_jobs').update({
+    pickup_commitment_at: pickupCommitmentAt,
+    pickup_alert_sent_at: null,
+  }).eq('id', jobId).select('id, project_name, client_name, embroiderer_name, pickup_commitment_at').maybeSingle();
+  return { data, error: error?.message || null };
+}
+
+export async function listDueEmbroideryPickupAlerts(now = new Date()) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: [], error: 'Supabase is not configured' };
+
+  const nowIso = now.toISOString();
+  const alertWindowEnd = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.from('embroidery_jobs')
+    .select('id, project_name, client_name, embroiderer_name, pickup_commitment_at')
+    .is('pickup_alert_sent_at', null)
+    .gt('pickup_commitment_at', nowIso)
+    .lte('pickup_commitment_at', alertWindowEnd)
+    .order('pickup_commitment_at', { ascending: true });
+  return { data: data || [], error: error?.message || null };
+}
+
+export async function claimEmbroideryPickupAlert(jobId: string, now = new Date()) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+
+  const nowIso = now.toISOString();
+  const alertWindowEnd = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+  const { data, error } = await supabase.from('embroidery_jobs').update({ pickup_alert_sent_at: nowIso })
+    .eq('id', jobId)
+    .is('pickup_alert_sent_at', null)
+    .gt('pickup_commitment_at', nowIso)
+    .lte('pickup_commitment_at', alertWindowEnd)
+    .select('id, project_name, client_name, embroiderer_name, pickup_commitment_at')
+    .maybeSingle();
+  return { data, error: error?.message || null };
+}
+
+export async function releaseEmbroideryPickupAlert(jobId: string, claimedAt: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return;
+  await supabase.from('embroidery_jobs').update({ pickup_alert_sent_at: null })
+    .eq('id', jobId).eq('pickup_alert_sent_at', claimedAt);
 }
 
 export async function createDigitizeJob(job: {
