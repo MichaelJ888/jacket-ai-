@@ -182,12 +182,20 @@ export async function POST(req: Request) {
     const isFirstCustomerMessage = messages.filter((message: { role?: string }) => message?.role === 'user').length <= 1;
     const systemPrompt = isFirstCustomerMessage ? `${MJIC_SYSTEM_PROMPT}${FIRST_MESSAGE_ADDENDUM}` : MJIC_SYSTEM_PROMPT;
 
+    // Cache the (large, mostly static) system prompt on Anthropic's side so repeat
+    // requests re-read it from cache instead of paying full input-token price every turn.
+    // Ignored harmlessly by other providers (e.g. Gemini) since it's under the "anthropic" key.
+    const systemMessage = {
+      role: 'system' as const,
+      content: systemPrompt,
+      providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+    };
+
     const result = streamText({
       model: process.env.GEMINI_API_KEY
         ? google('gemini-3.6-flash')
         : anthropic('claude-sonnet-4-5'),
-      system: systemPrompt,
-      messages,
+      messages: [systemMessage, ...messages],
       stopWhen: isStepCount(3),
       onFinish: async ({ text }) => {
         if (text) await recordChatMessage({ role: 'assistant', content: text, conversationId });

@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "projectmem": {
+      "type": "stdio",
+      "command": "C:\\Users\\pc2\\AppData\\Local\\Programs\\Python\\Python311\\python.exe",
+      "args": ["-m", "projectmem.mcp_server"]
+    }
+  }
+}
