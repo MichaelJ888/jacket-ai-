@@ -12,9 +12,28 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 
 ## Build & deploy
 - Build command is `next build --webpack` (Turbopack panics on this project's global CSS — do not remove `--webpack`).
-- Vercel account is **Hobby tier**: native crons only run once/day. Anything more frequent must call `/api/cron/staff-reminders?type=watch` from an external scheduler (cron-job.org, GitHub Actions) or upgrade to Pro.
-- Embroidery pickup alerts require an external scheduler to call `/api/cron/embroidery-pickup-alerts` every 5 minutes with `Authorization: Bearer $CRON_SECRET`; this route will not run on time from a Hobby native cron.
+- Vercel account is **Hobby tier**: native crons only run once/day. More-frequent jobs are handled by `.github/workflows/scheduler.yml` (GitHub Actions), which calls `/api/cron/staff-reminders?type=watch` every 45 min and `/api/cron/embroidery-pickup-alerts` every 5 min with `Authorization: Bearer $CRON_SECRET`. Requires repo secrets `APP_BASE_URL` and `CRON_SECRET` set under GitHub repo Settings → Secrets → Actions.
 - After any Supabase schema change: run `npm run db:push` to apply `supabase/schema.sql` automatically (requires `SUPABASE_ACCESS_TOKEN` in `.env.local`, a personal access token from https://supabase.com/dashboard/account/tokens — never commit it), then run `npm run lint && npm run build` before `npx vercel --prod --yes`.
+
+## Cloud-hosted agent memory (replaces local projectmem MCP)
+- `public.agent_memory_events` (Supabase table, in `supabase/schema.sql`) is the append-only log for notes/decisions/issues/attempts/fixes — no local Python process required.
+- Use `npm run memory -- note "..."`, `decision "..."`, `issue "..." --location=path`, `attempt "..." --outcome=worked|failed`, `fix "..." --issue=<id>`, and `npm run memory -- summary` to read recent entries. Script: `scripts/memory.mjs`.
+- This replaces the desktop-only `.vscode/mcp.json` projectmem server for anything that should persist as part of the production system's history.
+
+## Required credentials — status as of 2026-09-28
+| Variable | Needed for | Status |
+|---|---|---|
+| `CRON_SECRET` | Auth for both cron routes | ✅ Set on Vercel production + `.env.local`, verified live (401 without it, 200 with it) |
+| `PAYMENT_WEBHOOK_SECRET` | Auth for `/api/order-status` (previously open to anyone — fixed) | ✅ Set on Vercel production + `.env.local` |
+| `AI_GATEWAY_API_KEY` | AI video ad generation via Veo 3.1 (`media/generate-ad`) | ✅ Already set on Vercel production |
+| `MANYCHAT_WEBHOOK_SECRET` | ManyChat lead webhook auth | ✅ Already set on Vercel production |
+| `LALAMOVE_API_URL` / `LALAMOVE_API_TOKEN` | Live dispatch booking (`logistics` route) instead of manual-approval fallback | ❌ Not set — needs a Lalamove Open API partner account |
+| `EMBROIDERY_DIGITIZE_API_URL` / `EMBROIDERY_DIGITIZE_API_KEY` | Auto logo→DST digitizing instead of manual queue | ❌ Not set — needs Ink/Stitch self-hosted endpoint or EmbroideryIO account |
+| `META_APP_SECRET` | Meta (FB/IG/WhatsApp) webhook signature verification | ❌ `.env.local` has a placeholder value (`your-meta-app-secret`) — needs the real app secret from Meta for Developers |
+| `META_WEBHOOK_VERIFY_TOKEN` | Meta webhook handshake | ✅ Set locally (`MJIC_Jacket_AI_Secret_2026`) — confirm it's also set on Vercel and matches what's entered in Meta's dashboard |
+| `APP_BASE_URL`, `CRON_SECRET` (as **GitHub Actions** repo secrets, separate from Vercel env) | External scheduler workflow | ❌ Not set — add under GitHub → Settings → Secrets → Actions: `APP_BASE_URL=https://jacket-ai.vercel.app`, `CRON_SECRET=<same value as Vercel>` |
+
+`STABILITY_API_KEY` / `REPLICATE_API_KEY` are configured on Vercel and in `.env.local` but no route currently calls them — dead config, fine to leave for future embroidery/image-gen work or remove.
 
 ## Credit / token conservation rules
 - [ ] Scope every request to specific files (`#file:app/api/operations/route.ts`) instead of "the whole project."

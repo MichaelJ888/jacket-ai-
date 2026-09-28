@@ -1,46 +1,25 @@
 @AGENTS.md
 
 <!-- >>> projectmem bridge >>> -->
-## projectmem (MANDATORY)
+## Agent memory (MANDATORY) — cloud-hosted, no local MCP process
 
-This project uses projectmem for persistent memory + workflow rules.
+This project's persistent memory lives in Supabase table `public.agent_memory_events`
+(see `supabase/schema.sql`), read/written via `scripts/memory.mjs`. The local
+Python projectmem MCP server (`.vscode/mcp.json`) is retired — it consumed
+desktop RAM and is not part of the production automation system.
 
-This project is registered with projectmem as **jacket-ai**.
-Pass `project="jacket-ai"` on any projectmem tool call.
+SESSION START — before answering ANY question about this project, run
+`npm run memory -- summary` to load recent notes/decisions/issues/fixes.
 
-SESSION START — call these three MCP tools, in this order, BEFORE
-answering ANY question about this project:
+DURING work:
+  - On a bug discovery → `npm run memory -- issue "..." --location=path/to/file.ts`
+  - After each fix attempt → `npm run memory -- attempt "..." --outcome=worked|failed`
+  - After confirmation → `npm run memory -- fix "..." --issue=<event id>`
+  - On a design choice → `npm run memory -- decision "..."`
+  - On a gotcha / setup detail → `npm run memory -- note "..."`
+  - When a decision REPLACES an older one → add `--supersedes=<old event id>`
+    (ids come from `npm run memory -- summary`).
 
-  1. `get_instructions()` — loads the project's mandatory workflow
-     rules. Without this you will not know how to log work
-     correctly, when to use `add_note` vs `add_decision`, or how
-     the event log is structured.
-  2. `get_summary()` — loads project content. Do NOT answer from
-     conversation history or by re-reading package.json / README /
-     source files.
-  3. `get_project_map()` — loads structural layout when relevant.
-
-BEFORE modifying ANY file:
-  - Call `precheck_file(path)` — check failure history first.
-
-DURING work — use MCP write tools, NEVER edit `.projectmem/`
-files directly via filesystem write:
-  - On a bug discovery → `log_issue(summary, location)`.
-  - After each fix attempt → `record_attempt(summary, outcome)`.
-  - After confirmation → `record_fix(summary)`.
-  - On a design choice → `add_decision(summary)`.
-  - On a gotcha / setup detail → `add_note(summary)`.
-  - When a new decision REPLACES an older one → pass
-    `supersedes="<old event id>"` to `add_decision`. The log stays
-    append-only; the old decision is tagged retired and drops out of
-    summary.md, so the summary never shows two answers to the same
-    question. Get ids from `get_summary()` or `search_events()`.
-
-Editing `.projectmem/summary.md` or `.projectmem/PROJECT_MAP.md`
-directly bypasses event logging and breaks audit replay. The
-summary file regenerates from `events.jsonl` automatically — write
-via the MCP tools and the summary will follow.
-
-Do not re-scan source files when MCP tools can give you the same
-answer in ~500 tokens instead of ~5000. This is not optional.
+Do not edit `agent_memory_events` rows directly via SQL — always go through
+`scripts/memory.mjs` so the log stays append-only and auditable.
 <!-- <<< projectmem bridge <<< -->

@@ -7,7 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "node scripts/apply-schema.mjs"
+    "db:push": "node scripts/apply-schema.mjs",
+    "memory": "node scripts/memory.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.61",

@@ -1,0 +1,28 @@
+name: External scheduler (Vercel Hobby cron workaround)
+
+# Vercel Hobby tier only runs native crons once/day (see vercel.json).
+# These routes need more frequent calls, so GitHub Actions plays external scheduler.
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # embroidery pickup alerts
+    - cron: '*/45 * * * *'  # staff task watch-mode reminders
+  workflow_dispatch: {}
+
+jobs:
+  embroidery-pickup-alerts:
+    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call embroidery pickup alerts route
+        run: |
+          curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/embroidery-pickup-alerts" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  staff-task-watch:
+    if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call staff-reminders watch-mode route
+        run: |
+          curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/staff-reminders?type=watch" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

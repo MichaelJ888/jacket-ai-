@@ -283,3 +283,18 @@ revoke all on public.staff_tasks from anon, authenticated;
 
 revoke all on public.embroidery_jobs from anon, authenticated;
 revoke all on public.digitize_jobs from anon, authenticated;
+
+-- Cloud replacement for the local projectmem MCP server: append-only agent memory log.
+create table if not exists public.agent_memory_events (
+  id uuid default gen_random_uuid() primary key,
+  scope text not null check (scope in ('note', 'decision', 'issue', 'attempt', 'fix')),
+  summary text not null,
+  location text,
+  status text,
+  supersedes uuid references public.agent_memory_events (id),
+  created_at timestamptz default now()
+);
+
+create index if not exists agent_memory_events_scope_idx on public.agent_memory_events (scope, created_at desc);
+alter table public.agent_memory_events enable row level security;
+revoke all on public.agent_memory_events from anon, authenticated;
