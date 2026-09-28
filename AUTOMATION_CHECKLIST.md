@@ -30,8 +30,8 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 | `LALAMOVE_API_URL` / `LALAMOVE_API_TOKEN` | Live dispatch booking (`logistics` route) instead of manual-approval fallback | ❌ Not set — needs a Lalamove Open API partner account |
 | `EMBROIDERY_DIGITIZE_API_URL` / `EMBROIDERY_DIGITIZE_API_KEY` | Auto logo→DST digitizing instead of manual queue | ❌ Not set — needs Ink/Stitch self-hosted endpoint or EmbroideryIO account |
 | `META_APP_SECRET` | Meta (FB/IG/WhatsApp) webhook signature verification | ❌ `.env.local` has a placeholder value (`your-meta-app-secret`) — needs the real app secret from Meta for Developers |
-| `META_WEBHOOK_VERIFY_TOKEN` | Meta webhook handshake | ✅ Set locally (`MJIC_Jacket_AI_Secret_2026`) — confirm it's also set on Vercel and matches what's entered in Meta's dashboard |
-| `APP_BASE_URL`, `CRON_SECRET` (as **GitHub Actions** repo secrets, separate from Vercel env) | External scheduler workflow | ❌ Not set — add under GitHub → Settings → Secrets → Actions: `APP_BASE_URL=https://jacket-ai.vercel.app`, `CRON_SECRET=<same value as Vercel>` |
+| `META_WEBHOOK_VERIFY_TOKEN` | Meta webhook handshake | ✅ Set on Vercel production, verified live (GET handshake echoes challenge correctly) — still need to enter this same value in Meta's dashboard once the app exists |
+| `APP_BASE_URL`, `CRON_SECRET` (as **GitHub Actions** repo secrets, separate from Vercel env) | External scheduler workflow | ✅ Set by user in GitHub repo settings 2026-09-28 — workflow will start firing on its next `*/5`/`*/45` min tick |
 
 `STABILITY_API_KEY` / `REPLICATE_API_KEY` are configured on Vercel and in `.env.local` but no route currently calls them — dead config, fine to leave for future embroidery/image-gen work or remove.
 
