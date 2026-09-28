@@ -16,8 +16,11 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - After any Supabase schema change: run `npm run db:push` to apply `supabase/schema.sql` automatically (requires `SUPABASE_ACCESS_TOKEN` in `.env.local`, a personal access token from https://supabase.com/dashboard/account/tokens — never commit it), then run `npm run lint && npm run build` before `npx vercel --prod --yes`.
 
 ## Cloud-hosted agent memory (replaces local projectmem MCP)
-- `public.agent_memory_events` (Supabase table, in `supabase/schema.sql`) is the append-only log for notes/decisions/issues/attempts/fixes — no local Python process required.
+- `public.agent_memory_events` (Supabase table, in `supabase/schema.sql`) is the append-only log for notes/decisions/issues/attempts/fixes — no local Python process required. Has a `project` column (default `jacket-ai`) so the same table can be reused across repos via `--project=<name>`.
 - Use `npm run memory -- note "..."`, `decision "..."`, `issue "..." --location=path`, `attempt "..." --outcome=worked|failed`, `fix "..." --issue=<id>`, and `npm run memory -- summary` to read recent entries. Script: `scripts/memory.mjs`.
+- Run the "Memory: Session-start summary" VS Code task (`.vscode/tasks.json`) at the start of a session instead of relying on memory alone.
+- Read-only cloud access without the CLI: `GET /api/memory/summary` (auth: `Authorization: Bearer $CRON_SECRET`, optional `?scope=` / `?project=` / `?limit=` query params).
+- Retention: table is append-only and will grow unbounded. Review and archive (export + delete) events older than ~6 months once the table exceeds a few thousand rows — no automated cleanup job exists yet.
 - This replaces the desktop-only `.vscode/mcp.json` projectmem server for anything that should persist as part of the production system's history.
 
 ## Required credentials — status as of 2026-09-28

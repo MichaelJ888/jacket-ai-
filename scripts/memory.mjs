@@ -6,7 +6,8 @@
 //   node scripts/memory.mjs issue "bug summary" [--location=path/to/file.ts]
 //   node scripts/memory.mjs attempt "tried X" [--outcome=failed|worked]
 //   node scripts/memory.mjs fix "fixed the bug" [--issue=<id>]
-//   node scripts/memory.mjs summary [--scope=note|decision|issue|attempt|fix] [--limit=20]
+//   node scripts/memory.mjs summary [--scope=note|decision|issue|attempt|fix] [--limit=20] [--project=jacket-ai]
+// All writes default to --project=jacket-ai (this repo); pass --project=other-repo to reuse this same table elsewhere.
 import { readFileSync } from 'node:fs';
 
 const envPath = new URL('../.env.local', import.meta.url);
@@ -28,9 +29,11 @@ if (!supabaseUrl || !serviceKey) {
   process.exit(1);
 }
 
-const [scope, summary, ...rest] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const positionals = args.filter((arg) => !arg.startsWith('--'));
+const [scope, summary] = positionals;
 const flags = Object.fromEntries(
-  rest
+  args
     .filter((arg) => arg.startsWith('--'))
     .map((arg) => {
       const [key, value] = arg.slice(2).split('=');
@@ -49,7 +52,7 @@ async function writeEvent(eventScope, eventSummary, extra = {}) {
   const res = await fetch(table, {
     method: 'POST',
     headers: { ...headers, Prefer: 'return=representation' },
-    body: JSON.stringify({ scope: eventScope, summary: eventSummary, ...extra }),
+    body: JSON.stringify({ scope: eventScope, summary: eventSummary, project: flags.project ?? 'jacket-ai', ...extra }),
   });
   const body = await res.json().catch(() => null);
   if (!res.ok) {
@@ -62,6 +65,7 @@ async function writeEvent(eventScope, eventSummary, extra = {}) {
 async function printSummary() {
   const params = new URLSearchParams({ order: 'created_at.desc', limit: String(flags.limit ?? 20) });
   if (flags.scope) params.set('scope', `eq.${flags.scope}`);
+  if (flags.project) params.set('project', `eq.${flags.project}`);
   const res = await fetch(`${table}?${params.toString()}`, { headers });
   const body = await res.json().catch(() => null);
   if (!res.ok) {

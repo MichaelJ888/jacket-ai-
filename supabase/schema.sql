@@ -295,6 +295,10 @@ create table if not exists public.agent_memory_events (
   created_at timestamptz default now()
 );
 
+-- project column added later; guarded with if-not-exists so re-running this file stays idempotent.
+alter table public.agent_memory_events add column if not exists project text not null default 'jacket-ai';
+
 create index if not exists agent_memory_events_scope_idx on public.agent_memory_events (scope, created_at desc);
+create index if not exists agent_memory_events_project_idx on public.agent_memory_events (project, created_at desc);
 alter table public.agent_memory_events enable row level security;
 revoke all on public.agent_memory_events from anon, authenticated;

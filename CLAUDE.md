@@ -9,7 +9,8 @@ Python projectmem MCP server (`.vscode/mcp.json`) is retired — it consumed
 desktop RAM and is not part of the production automation system.
 
 SESSION START — before answering ANY question about this project, run
-`npm run memory -- summary` to load recent notes/decisions/issues/fixes.
+`npm run memory -- summary` (or the "Memory: Session-start summary" VS Code task)
+to load recent notes/decisions/issues/fixes.
 
 DURING work:
   - On a bug discovery → `npm run memory -- issue "..." --location=path/to/file.ts`
