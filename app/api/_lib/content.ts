@@ -151,7 +151,7 @@ async function advanceVideos(origin: string) {
 
     if (record.status !== 'COMPLETED') {
       try {
-        const response = await fetch(`${origin}/api/media/generate-ad?generationId=${generationId}`, { signal: AbortSignal.timeout(50000) });
+        const response = await fetch(`${origin}/api/media/generate-ad?generationId=${generationId}`, { headers: { Authorization: `Bearer ${process.env.CRON_SECRET || ''}` }, signal: AbortSignal.timeout(50000) });
         const body = (await response.json().catch(() => ({}))) as { status?: string };
         if (body.status === 'failed') await supabase.from('content_calendar').update({ status: 'FAILED', error: 'video generation failed' }).in('id', ids);
         else if (body.status === 'ready') await supabase.from('content_calendar').update({ status: 'AWAITING_APPROVAL' }).in('id', ids).eq('status', 'AWAITING_VIDEO');

@@ -1,0 +1,207 @@
+﻿"use client";
+
+import { useCallback, useEffect, useState } from "react";
+
+type Price = { key: string; name: string; category: string; unit: string; unit_cost: number; supplier_name: string | null; updated_at: string };
+type Overview = {
+  priceBook: Array<{ style: string; selling_price: number; target_margin_pct: number; labor_cost: number }>;
+  costings: Array<{ id: string; client_name: string | null; project_name: string | null; style: string; quantity: number; total_cost: number; status: string }>;
+  purchaseOrders: Array<{ po_number: string; supplier_name: string; material_type: string; total_cost: number; status: string }>;
+  quotes: Array<{ quote_number: string; client_name: string | null; total: number }>;
+  receipts: Array<{ reference: string | null; detected_amount: number | null; verified: boolean; fraud_score: number; fraud_flags: string[] }>;
+};
+
+const STYLES = ["windbreaker", "varsity", "corporate", "bomber"];
+const input = "rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900";
+const button = "rounded bg-zinc-900 px-3 py-1 text-sm font-medium text-white disabled:opacity-50";
+
+export default function AdminPage() {
+  const [token, setToken] = useState("");
+  const [authed, setAuthed] = useState(false);
+  const [tab, setTab] = useState<"prices" | "book" | "teach" | "overview">("prices");
+  const [prices, setPrices] = useState<Price[]>([]);
+  const [overview, setOverview] = useState<Overview | null>(null);
+  const [message, setMessage] = useState("");
+  const [draft, setDraft] = useState({ name: "", category: "fabric", unit: "yards", unitCost: "", supplierName: "" });
+  const [audience, setAudience] = useState("client");
+  const [pasted, setPasted] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+
+  const call = useCallback(async (path: string, init: RequestInit = {}, auth = token) => {
+    const response = await fetch(path, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${auth}` }, cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    return { ok: response.ok, status: response.status, data };
+  }, [token]);
+
+  const refresh = useCallback(async (auth = token) => {
+    const [p, o] = await Promise.all([call("/api/admin/prices", {}, auth), call("/api/admin/overview", {}, auth)]);
+    if (p.ok) setPrices(p.data.prices);
+    if (o.ok) setOverview(o.data);
+    return p.ok;
+  }, [call, token]);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("mjic_admin");
+    if (saved) {
+      void (async () => {
+        const response = await fetch("/api/admin/prices", { headers: { Authorization: `Bearer ${saved}` } });
+        if (response.ok) { setToken(saved); setPrices((await response.json()).prices); setAuthed(true); void refresh(saved); }
+      })();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function login() {
+    if (await refresh(token)) { sessionStorage.setItem("mjic_admin", token); setAuthed(true); setMessage(""); }
+    else setMessage("Wrong password.");
+  }
+
+  async function savePrice(row: { name: string; key?: string; category: string; unit: string; unitCost: number; supplierName?: string | null }) {
+    const result = await call("/api/admin/prices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(row) });
+    setMessage(result.ok ? `Saved ${row.name}` : result.data.error || "Save failed");
+    await refresh();
+  }
+
+  async function removePrice(key: string) {
+    if (!confirm("Delete this material?")) return;
+    await call(`/api/admin/prices?key=${encodeURIComponent(key)}`, { method: "DELETE" });
+    await refresh();
+  }
+
+  async function savePriceBook(row: { style: string; sellingPrice: number; targetMarginPct: number; laborCost: number }) {
+    const result = await call("/api/admin/price-book", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(row) });
+    setMessage(result.ok ? `Saved ${row.style}` : result.data.error || "Save failed");
+    await refresh();
+  }
+
+  async function teach(preview: boolean) {
+    const form = new FormData();
+    form.set("audience", audience);
+    form.set("text", pasted);
+    if (file) form.set("file", file);
+    const result = await call(`/api/admin/voice${preview ? "?preview=1" : ""}`, { method: "POST", body: form });
+    if (!result.ok) return setMessage(result.data.error || "Upload failed");
+    setMessage(preview ? `Found ${result.data.found} examples. First: ${JSON.stringify(result.data.sample?.[0] || {})}` : `Saved ${result.data.saved} examples for ${result.data.audience}.`);
+    if (!preview) { setPasted(""); setFile(null); }
+  }
+
+  async function draftPos(id: string) {
+    const result = await call("/api/costing/po", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ costingId: id }) });
+    setMessage(result.ok ? `Drafted ${result.data.drafted.length} POs (skipped ${result.data.skipped.length})` : result.data.error || "Failed");
+    await refresh();
+  }
+
+  if (!authed) {
+    return (
+      <main className="mx-auto max-w-sm p-8">
+        <h1 className="mb-4 text-xl font-bold">MJIC Admin</h1>
+        <input className={`${input} w-full`} type="password" placeholder="Admin password" value={token} onChange={(event) => setToken(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void login()} />
+        <button className={`${button} mt-3`} onClick={() => void login()}>Sign in</button>
+        {message && <p className="mt-3 text-sm text-red-600">{message}</p>}
+      </main>
+    );
+  }
+
+  const peso = (value: number) => `₱${Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+
+  return (
+    <main className="mx-auto max-w-5xl p-6 text-zinc-900">
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-xl font-bold">MJIC Admin</h1>
+        <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
+      </div>
+      <nav className="mb-4 flex gap-2">
+        {([["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["overview", "Overview"]] as const).map(([id, label]) => (
+          <button key={id} className={`rounded px-3 py-1 text-sm ${tab === id ? "bg-zinc-900 text-white" : "bg-zinc-200"}`} onClick={() => setTab(id)}>{label}</button>
+        ))}
+      </nav>
+      {message && <p className="mb-3 rounded bg-amber-100 p-2 text-sm">{message}</p>}
+
+      {tab === "prices" && (
+        <section>
+          <p className="mb-2 text-sm text-zinc-600">Edit any price and press Save. The BOM/costing, supplier POs and pricing advice all use these prices (history is kept).</p>
+          <table className="w-full text-sm">
+            <thead><tr className="text-left"><th>Material</th><th>Category</th><th>Unit</th><th>Cost / unit</th><th>Supplier</th><th /></tr></thead>
+            <tbody>
+              {prices.map((row) => <PriceRowEditor key={`${row.key}-${row.updated_at}`} row={row} onSave={savePrice} onDelete={removePrice} />)}
+              <tr className="border-t">
+                <td><input className={input} placeholder="New material" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></td>
+                <td><select className={input} value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })}>{["fabric", "accessory", "trim", "other"].map((c) => <option key={c}>{c}</option>)}</select></td>
+                <td><input className={`${input} w-20`} value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} /></td>
+                <td><input className={`${input} w-24`} type="number" value={draft.unitCost} onChange={(e) => setDraft({ ...draft, unitCost: e.target.value })} /></td>
+                <td><input className={input} value={draft.supplierName} onChange={(e) => setDraft({ ...draft, supplierName: e.target.value })} /></td>
+                <td><button className={button} disabled={!draft.name || draft.unitCost === ""} onClick={() => { void savePrice({ name: draft.name, category: draft.category, unit: draft.unit, unitCost: Number(draft.unitCost), supplierName: draft.supplierName }); setDraft({ ...draft, name: "", unitCost: "" }); }}>Add</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {tab === "book" && (
+        <section>
+          <p className="mb-2 text-sm text-zinc-600">Your selling price per piece, labor cost and target margin per style. Used by pricing advice (it only recommends; it never changes the chat prices by itself).</p>
+          {STYLES.map((style) => <BookRow key={style} style={style} current={overview?.priceBook.find((row) => row.style === style)} onSave={savePriceBook} />)}
+        </section>
+      )}
+
+      {tab === "teach" && (
+        <section className="space-y-3">
+          <p className="text-sm text-zinc-600">Upload your Word (.docx) or .txt chat/Q&amp;A file, and/or paste text. Use lines like <code>Client: ...</code> and <code>Me: ...</code> (or <code>Q:</code>/<code>A:</code>). Without those markers each paragraph is saved as one of your replies.</p>
+          <select className={input} value={audience} onChange={(e) => setAudience(e.target.value)}>
+            <option value="client">Replies to clients</option><option value="employee">Replies to employees</option><option value="supplier">Replies to suppliers</option>
+          </select>
+          <div><input type="file" accept=".docx,.txt" onChange={(e) => setFile(e.target.files?.[0] || null)} /></div>
+          <textarea className={`${input} h-48 w-full`} placeholder="Or paste Q&A here" value={pasted} onChange={(e) => setPasted(e.target.value)} />
+          <div className="flex gap-2"><button className={button} onClick={() => void teach(true)}>Preview</button><button className={button} onClick={() => void teach(false)}>Save to AI memory</button></div>
+        </section>
+      )}
+
+      {tab === "overview" && overview && (
+        <section className="space-y-6 text-sm">
+          <List title="Recent costings / BOMs" rows={overview.costings.map((c) => ({ id: c.id, text: `${c.client_name || c.project_name || c.style} · ${c.quantity} pcs · ${peso(c.total_cost)} · ${c.status}` }))} action={{ label: "Draft POs", run: draftPos }} />
+          <List title="Supplier POs" rows={overview.purchaseOrders.map((p) => ({ id: p.po_number, text: `${p.po_number} · ${p.supplier_name} · ${p.material_type} · ${peso(p.total_cost)} · ${p.status}` }))} />
+          <List title="PDF quotes" rows={overview.quotes.map((q) => ({ id: q.quote_number, text: `${q.quote_number} · ${q.client_name || ""} · ${peso(q.total)}` }))} />
+          <List title="Payment receipts (fraud check)" rows={overview.receipts.map((r, i) => ({ id: String(i), text: `${r.reference || "no ref"} · ${peso(r.detected_amount || 0)} · ${r.verified ? "verified" : "NOT verified"} · risk ${r.fraud_score}${r.fraud_flags?.length ? ` · ${r.fraud_flags.join(", ")}` : ""}` }))} />
+        </section>
+      )}
+    </main>
+  );
+}
+
+function PriceRowEditor({ row, onSave, onDelete }: { row: Price; onSave: (row: { name: string; key: string; category: string; unit: string; unitCost: number; supplierName: string }) => void; onDelete: (key: string) => void }) {
+  const [cost, setCost] = useState(String(row.unit_cost));
+  const [supplier, setSupplier] = useState(row.supplier_name || "");
+  return (
+    <tr className="border-t">
+      <td>{row.name}</td><td>{row.category}</td><td>{row.unit}</td>
+      <td><input className={`${input} w-24`} type="number" value={cost} onChange={(e) => setCost(e.target.value)} /></td>
+      <td><input className={input} value={supplier} onChange={(e) => setSupplier(e.target.value)} /></td>
+      <td className="space-x-2"><button className={button} onClick={() => onSave({ name: row.name, key: row.key, category: row.category, unit: row.unit, unitCost: Number(cost), supplierName: supplier })}>Save</button><button className="text-xs text-red-600" onClick={() => onDelete(row.key)}>Delete</button></td>
+    </tr>
+  );
+}
+
+function BookRow({ style, current, onSave }: { style: string; current?: { selling_price: number; target_margin_pct: number; labor_cost: number }; onSave: (row: { style: string; sellingPrice: number; targetMarginPct: number; laborCost: number }) => void }) {
+  const [price, setPrice] = useState(String(current?.selling_price ?? 0));
+  const [margin, setMargin] = useState(String(current?.target_margin_pct ?? 35));
+  const [labor, setLabor] = useState(String(current?.labor_cost ?? 0));
+  return (
+    <div className="mb-2 flex items-center gap-2 text-sm">
+      <span className="w-28 capitalize">{style}</span>
+      <label>Price <input className={`${input} w-24`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></label>
+      <label>Labor <input className={`${input} w-24`} type="number" value={labor} onChange={(e) => setLabor(e.target.value)} /></label>
+      <label>Margin % <input className={`${input} w-20`} type="number" value={margin} onChange={(e) => setMargin(e.target.value)} /></label>
+      <button className={button} onClick={() => onSave({ style, sellingPrice: Number(price), targetMarginPct: Number(margin), laborCost: Number(labor) })}>Save</button>
+    </div>
+  );
+}
+
+function List({ title, rows, action }: { title: string; rows: Array<{ id: string; text: string }>; action?: { label: string; run: (id: string) => void } }) {
+  return (
+    <div>
+      <h2 className="mb-1 font-semibold">{title}</h2>
+      {rows.length === 0 && <p className="text-zinc-500">Nothing yet.</p>}
+      {rows.map((row) => <div key={row.id} className="flex items-center justify-between border-t py-1"><span>{row.text}</span>{action && <button className="text-xs underline" onClick={() => action.run(row.id)}>{action.label}</button>}</div>)}
+    </div>
+  );
+}

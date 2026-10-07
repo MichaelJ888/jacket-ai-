@@ -1,4 +1,5 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
+import { isCronAuthorized } from '../../_lib/auth';
 import { experimental_getVideoStatus, experimental_startVideo } from 'ai';
 import {
   completeMediaAdGeneration,
@@ -110,6 +111,7 @@ function buildSocialPostingPlan(jacketStyles: string[]) {
 }
 
 export async function POST(req: Request) {
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     if (!process.env.AI_GATEWAY_API_KEY) {
       return NextResponse.json({ success: false, error: 'AI Gateway is not configured.' }, { status: 503 });
@@ -217,6 +219,7 @@ export async function POST(req: Request) {
 }
 
 export async function GET(request: Request) {
+  if (!isCronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const generationId = new URL(request.url).searchParams.get('generationId') || '';
   if (!/^[0-9a-f-]{36}$/i.test(generationId)) {
     return NextResponse.json({ success: false, error: 'A valid generationId is required.' }, { status: 400 });

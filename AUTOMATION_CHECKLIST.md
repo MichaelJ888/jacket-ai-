@@ -62,3 +62,18 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - Crons (GitHub Actions): `cron/watchdog` (45 min: health + bottlenecks), `cron/ceo-digest` (daily 8am Manila, weekly scorecard on Mondays), `cron/backup` (weekly JSON to private `db-backups` bucket, keeps 8).
 - Special-terms requests (discount, installment, bulk, rush) go to an approval; the AI sends only a holding line.
 - Model failover: Gemini -> Anthropic when `ANTHROPIC_API_KEY` is set.
+
+## Batch: BOM, quotes, fraud, insights, digitizer (admin-protected)
+| Route | Auth | Purpose |
+| --- | --- | --- |
+| `/admin` (page) | ADMIN_PASSWORD or CRON_SECRET | Material prices, selling prices, Teach the AI (.docx/.txt), overview |
+| `/api/admin/prices`, `/api/admin/price-book`, `/api/admin/overview`, `/api/admin/voice` | Bearer admin | Admin APIs |
+| `/api/costing` (+ `/api/costing/po`) | open (costing) / admin (PO) | Per-order BOM from admin prices; draft supplier POs |
+| `/api/quote-pdf` | Bearer admin | Branded PDF quote, private `quotes` bucket |
+| `/api/payment-verify` | open | Now scores fraud risk (duplicate ref, recipient, date, tamper) |
+| `/api/cron/insights` | CRON_SECRET | Weekly reorder forecast + price advice (Mon 9am Manila) |
+| `/api/cron/repo-watch` | CRON_SECRET | Monthly repo metadata watch |
+| `/api/embroidery/auto-digitize` | CRON_SECRET | Built-in DST/EXP/PES/JEF digitizer + QA + preview (`embroidery-files` bucket) |
+| `/api/media/generate-ad` | CRON_SECRET | Now secured |
+
+Env: optional `ADMIN_PASSWORD` (separate admin login).

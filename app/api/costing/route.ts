@@ -1,63 +1,33 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
+import { computeBom, draftPurchaseOrders, loadPrices } from '../_lib/bom';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../_lib/integrations';
 
-const STYLE_RULES = {
-  windbreaker: { shellYards: 2, liningYards: 1.5, zipperPieces: 1, snapSets: 0, ribbingSets: 0 },
-  varsity: { shellYards: 2, liningYards: 1.5, zipperPieces: 1, snapSets: 0, ribbingSets: 0 },
-  corporate: { shellYards: 2, liningYards: 1.5, zipperPieces: 1, snapSets: 0, ribbingSets: 0 },
-  bomber: { shellYards: 1.6, liningYards: 1.25, zipperPieces: 0, snapSets: 8, ribbingSets: 1 },
-} as const;
+export const dynamic = 'force-dynamic';
 
-type Style = keyof typeof STYLE_RULES;
-
-function number(value: unknown, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
+// Per-order BOM + costing. Prices come from the admin price table (request *UnitCost fields override).
+// Set draftPurchaseOrders: true to auto-draft supplier POs (PENDING_APPROVAL) from the BOM.
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const style = String(body.style || 'corporate').toLowerCase() as Style;
-    const rule = STYLE_RULES[style];
-    const quantity = number(body.quantity);
-    const tones = Math.min(5, Math.max(1, Math.floor(number(body.tones, 1))));
-    const isSample = Boolean(body.isSample);
-    if (!rule || quantity <= 0) return NextResponse.json({ error: 'Valid style and quantity are required.' }, { status: 400 });
+    const prices = await loadPrices();
+    const result = computeBom(body, prices);
+    if (result.error || !result.costing) return NextResponse.json({ error: result.error }, { status: 400 });
+    const costing = result.costing;
 
-    const shellAllowance = isSample ? 0 : number(body.shellAllowanceYards, 5);
-    const liningAllowance = isSample ? 0 : number(body.liningAllowanceYards, 0);
-    const zipperAllowance = isSample ? 0 : Math.max(0, Math.floor(number(body.zipperAllowancePieces, 4)));
-    const shellYards = quantity * rule.shellYards + shellAllowance;
-    const liningYards = quantity * rule.liningYards + liningAllowance;
-    const zipperType = String(body.zipperType || 'FZ Zipper 36-inch');
-    const centerZippers = quantity * rule.zipperPieces + zipperAllowance;
-    const continuousZipperYards = (body.hoodOrPocketZippers ? quantity * number(body.continuousZipperYardsPerPiece, 0.25) : 0) + (isSample ? 0 : number(body.continuousZipperAllowanceYards, 0));
-    const snapSets = quantity * rule.snapSets;
-    const ribbingSets = quantity * rule.ribbingSets;
-    const toneYards = Array.from({ length: tones }, (_, index) => ({ tone: index + 1, yards: Number((shellYards * (index === 0 ? 0.5 : 0.5 / (tones - 1 || 1))).toFixed(2)) }));
-
-    const materials = [
-      { material: 'Shell fabric', quantity: shellYards, unit: 'yards', unitCost: number(body.shellFabricUnitCost) },
-      { material: 'Lining', quantity: liningYards, unit: 'yards', unitCost: number(body.liningUnitCost) },
-      { material: zipperType, quantity: centerZippers, unit: 'pieces', unitCost: number(body.zipperUnitCost) },
-      { material: 'Continuous zipper', quantity: continuousZipperYards, unit: 'yards', unitCost: number(body.continuousZipperUnitCost) },
-      { material: 'Snap buttons', quantity: snapSets, unit: 'sets', unitCost: number(body.snapSetUnitCost) },
-      { material: 'Ribbing', quantity: ribbingSets, unit: 'sets', unitCost: number(body.ribbingSetUnitCost) },
-    ].filter((item) => item.quantity > 0).map((item) => ({ ...item, totalCost: Number((item.quantity * item.unitCost).toFixed(2)) }));
-    const totalCost = Number(materials.reduce((sum, item) => sum + item.totalCost, 0).toFixed(2));
-
-    const costing = { style, quantity, tones, isSample, assumptions: { shellYardsPerPiece: rule.shellYards, liningYardsPerPiece: rule.liningYards, shellAllowance, liningAllowance, zipperAllowance, toneYards, zipperType }, materials, totalCost };
+    let costingId: string | null = null;
     if (body.save !== false) {
       const supabase = getSupabaseAdmin();
       if (supabase) {
-        const { error } = await supabase.from('project_costings').insert({ project_name: body.projectName || null, client_name: body.clientName || null, company_name: body.companyName || null, contact: body.contact || null, style, quantity, is_sample: isSample, costing, total_cost: totalCost, status: 'PENDING_APPROVAL' });
+        const { data, error } = await supabase.from('project_costings').insert({ project_name: body.projectName || null, client_name: body.clientName || null, company_name: body.companyName || null, contact: body.contact || null, style: costing.style, quantity: costing.quantity, is_sample: costing.isSample, costing, total_cost: costing.totalCost, status: 'PENDING_APPROVAL' }).select('id').single();
         if (error) console.error('Project costing save failed:', error.message);
+        costingId = data?.id || null;
       }
     }
 
-    void sendTelegramMessage(`<b>PROJECT COSTING READY</b>\nClient: ${escapeTelegramHtml(String(body.clientName || 'Not provided'))}\nProject: ${escapeTelegramHtml(String(body.projectName || style))}\nQuantity: ${quantity}\nMaterial estimate: <b>₱${totalCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</b>\nStatus: <b>PENDING APPROVAL</b>`);
-    return NextResponse.json({ success: true, costing });
+    const purchaseOrders = body.draftPurchaseOrders ? await draftPurchaseOrders(costing.materials) : null;
+    const lines = costing.materials.map((item) => `• ${escapeTelegramHtml(item.material)}: ${item.quantity} ${item.unit}`).join('\n');
+    void sendTelegramMessage(`<b>PROJECT COSTING + BOM READY</b>\nClient: ${escapeTelegramHtml(String(body.clientName || 'Not provided'))}\nProject: ${escapeTelegramHtml(String(body.projectName || costing.style))}\nQuantity: ${costing.quantity}\n${lines}\nMaterial estimate: <b>₱${costing.totalCost.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</b>${costing.missingPrices.length ? `\n⚠️ No price set for: ${escapeTelegramHtml(costing.missingPrices.join(', '))}` : ''}${purchaseOrders ? `\nDraft POs: ${purchaseOrders.drafted.length}` : ''}\nStatus: <b>PENDING APPROVAL</b>`);
+    return NextResponse.json({ success: true, costingId, costing, purchaseOrders });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Costing failed' }, { status: 400 });
   }

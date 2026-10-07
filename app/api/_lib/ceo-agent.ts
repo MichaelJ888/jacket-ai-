@@ -1,4 +1,4 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+﻿import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText, isStepCount, tool } from 'ai';
 import { z } from 'zod';
 import { autonomyLimitPhp, isShadowMode, isVacationMode, setSetting } from './ceo-control';
@@ -15,6 +15,7 @@ import {
   saveStyleExample,
   setAllocationRule,
 } from './ceo-finance';
+import { demandForecast, pricingAdvice } from './insights';
 import { checkQuoteMargin, forecastRunwayDays, formatPeso } from './finance-logic';
 import {
   composeBossStyleMessage,
@@ -39,7 +40,7 @@ How you work:
 - Messages to staff, suppliers: write the instruction plainly; the system rewrites it in the boss's own voice. Do not mention AI.
 - Special errands, emergency deliveries, supplier chasing, task assignments: handle them with the matching tool, then confirm what you did in 1-3 lines.
 - Prefer the cheapest option that meets the deadline and say the peso impact when you know it.
-- Keep replies short (Telegram). No markdown tables. Use ₱ for pesos.`;
+- Keep replies short (Telegram). No markdown tables. Use â‚± for pesos.`;
 
 function buildTools() {
   const supabase = getSupabaseAdmin();
@@ -158,8 +159,8 @@ function buildTools() {
         }).select().single();
         if (error || !data) return { error: error?.message || 'Could not create dispatch' };
         await sendTelegramMessage(
-          `🚚 <b>${input.urgent ? 'URGENT ' : ''}DELIVERY REQUEST</b>\nProject: ${escapeTelegramHtml(input.projectName || 'n/a')}\nPickup: ${escapeTelegramHtml(input.pickupAddress)}\nDeliver to: ${escapeTelegramHtml(input.deliveryAddress)}\nContact: ${escapeTelegramHtml(input.contactName)} ${escapeTelegramHtml(input.contactPhone)}`,
-          { inline_keyboard: [[{ text: '✅ Book now', callback_data: `disp:approve:${data.id}` }, { text: '❌ Cancel', callback_data: `disp:reject:${data.id}` }]] },
+          `ðŸšš <b>${input.urgent ? 'URGENT ' : ''}DELIVERY REQUEST</b>\nProject: ${escapeTelegramHtml(input.projectName || 'n/a')}\nPickup: ${escapeTelegramHtml(input.pickupAddress)}\nDeliver to: ${escapeTelegramHtml(input.deliveryAddress)}\nContact: ${escapeTelegramHtml(input.contactName)} ${escapeTelegramHtml(input.contactPhone)}`,
+          { inline_keyboard: [[{ text: 'âœ… Book now', callback_data: `disp:approve:${data.id}` }, { text: 'âŒ Cancel', callback_data: `disp:reject:${data.id}` }]] },
         );
         return { dispatchId: data.id, status: 'PENDING_APPROVAL' };
       },
@@ -193,6 +194,12 @@ function buildTools() {
       description: 'Check whether a customer quote meets the target profit margin and give the minimum safe price.',
       inputSchema: z.object({ quotePrice: z.number(), totalCost: z.number(), targetMarginPercent: z.number().default(30) }),
       execute: async ({ quotePrice, totalCost, targetMarginPercent }) => checkQuoteMargin(quotePrice, totalCost, targetMarginPercent),
+    }),
+
+    business_insights: tool({
+      description: 'Weekly-style business advice: material reorder forecast (weeks of cover) and per-style price recommendations vs target margin. Advice only.',
+      inputSchema: z.object({}),
+      execute: async () => ({ forecast: (await demandForecast()).slice(0, 12), pricing: await pricingAdvice() }),
     }),
 
     teach_style: tool({

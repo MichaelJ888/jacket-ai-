@@ -712,3 +712,19 @@ export async function deductInventoryForOrder(materials: Array<{ material: strin
   }
   return { data: results, error: null };
 }
+
+export async function sendTelegramDocument(file: Uint8Array, filename: string, caption: string, mimeType = 'application/pdf') {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  try {
+    const form = new FormData();
+    form.set('chat_id', chatId);
+    form.set('caption', caption);
+    form.set('parse_mode', 'HTML');
+    form.set('document', new Blob([new Uint8Array(file)], { type: mimeType }), filename);
+    await fetch(`https://api.telegram.org/bot${token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(20000) });
+  } catch (error) {
+    console.error('Telegram document send failed:', error instanceof Error ? error.message : error);
+  }
+}

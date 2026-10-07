@@ -574,3 +574,77 @@ revoke all on public.approvals from anon, authenticated;
 insert into storage.buckets (id, name, public, file_size_limit)
 values ('db-backups', 'db-backups', false, 52428800)
 on conflict (id) do nothing;
+
+-- ===== Batch: admin prices, BOM, PDF quotes, fraud checks, pricing, repo tracker =====
+create table if not exists public.material_prices (
+  id uuid primary key default gen_random_uuid(),
+  key text not null unique,
+  name text not null,
+  category text not null default 'fabric',
+  unit text not null default 'yards',
+  unit_cost numeric not null default 0,
+  supplier_name text,
+  notes text,
+  updated_at timestamptz not null default now()
+);
+alter table public.material_prices enable row level security;
+revoke all on public.material_prices from anon, authenticated;
+
+create table if not exists public.material_price_history (
+  id uuid primary key default gen_random_uuid(),
+  key text not null,
+  old_cost numeric,
+  new_cost numeric not null,
+  changed_at timestamptz not null default now()
+);
+create index if not exists material_price_history_key_idx on public.material_price_history (key, changed_at desc);
+alter table public.material_price_history enable row level security;
+revoke all on public.material_price_history from anon, authenticated;
+
+create table if not exists public.price_book (
+  style text primary key,
+  selling_price numeric not null default 0,
+  target_margin_pct numeric not null default 35,
+  labor_cost numeric not null default 0,
+  updated_at timestamptz not null default now()
+);
+alter table public.price_book enable row level security;
+revoke all on public.price_book from anon, authenticated;
+
+create table if not exists public.pdf_quotes (
+  id uuid primary key default gen_random_uuid(),
+  quote_number text not null unique,
+  client_name text,
+  project_name text,
+  total numeric not null default 0,
+  storage_path text,
+  payload jsonb,
+  created_at timestamptz not null default now()
+);
+alter table public.pdf_quotes enable row level security;
+revoke all on public.pdf_quotes from anon, authenticated;
+
+alter table public.payment_verifications add column if not exists fraud_score numeric not null default 0;
+alter table public.payment_verifications add column if not exists fraud_flags jsonb not null default '[]'::jsonb;
+create index if not exists payment_verification_reference_idx on public.payment_verifications (reference);
+
+create table if not exists public.repo_candidates (
+  id uuid primary key default gen_random_uuid(),
+  url text not null unique,
+  purpose text,
+  license text,
+  stars integer,
+  last_push timestamptz,
+  status text not null default 'candidate',
+  notes text,
+  reviewed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.repo_candidates enable row level security;
+revoke all on public.repo_candidates from anon, authenticated;
+
+insert into public.repo_candidates (url, purpose, license, status, notes) values
+  ('https://github.com/EmbroidePy/pyembroidery', 'Embroidery format read/write; used to verify our encoders', 'MIT', 'adopted', 'Verification only (Python)'),
+  ('https://github.com/inkstitch/inkstitch', 'Digitizing algorithms reference', 'GPL-3.0', 'reference-only', 'Do not copy code'),
+  ('https://github.com/Embroidermodder/libembroidery', 'Format reference', 'Zlib', 'reference-only', 'Format ideas')
+on conflict (url) do nothing;
