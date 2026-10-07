@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin, sendTelegramMessage } from '../_lib/integrations';
+import { deductInventoryForOrder, escapeTelegramHtml, getSupabaseAdmin, reportCriticalError, sendTelegramMessage } from '../_lib/integrations';
 
 export async function POST(req: Request) {
   try {
@@ -13,7 +13,25 @@ export async function POST(req: Request) {
     if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
     const { data, error } = await supabase.from('payment_verifications').update({ verified: status === 'VERIFIED', notes: body.notes || null }).eq('id', verificationId).select().single();
     if (error) return NextResponse.json({ error: error.message }, { status: 502 });
-    await sendTelegramMessage(`💳 <b>PAYMENT STATUS UPDATED</b>\nVerification: <code>${verificationId}</code>\nStatus: <b>${status}</b>\nOrder status: <b>${status === 'VERIFIED' ? 'READY_FOR_PURCHASE_ORDER' : 'ON_HOLD'}</b>`);
-    return NextResponse.json({ success: true, verification: data, orderStatus: status === 'VERIFIED' ? 'READY_FOR_PURCHASE_ORDER' : 'ON_HOLD' });
-  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Order status update failed' }, { status: 400 }); }
+    const orderStatus = status === 'VERIFIED' ? 'READY_FOR_PURCHASE_ORDER' : 'ON_HOLD';
+    const messageLines = ['💳 <b>PAYMENT STATUS UPDATED</b>', `Verification: <code>${verificationId}</code>`, `Status: <b>${status}</b>`, `Order status: <b>${orderStatus}</b>`];
+    let inventory: Array<{ material: string; deducted: number; remaining: number; shortage: boolean }> | null = null;
+    if (status === 'VERIFIED' && Array.isArray(body.materials) && body.materials.length) {
+      const deduction = await deductInventoryForOrder(body.materials, `verification:${verificationId}`);
+      if (deduction.error) {
+        await reportCriticalError('order-status:inventory-deduction', new Error(deduction.error), { verificationId });
+        messageLines.push('Inventory deduction: <b>FAILED — check system logs</b>');
+      } else {
+        inventory = deduction.data;
+        for (const item of deduction.data || []) {
+          messageLines.push(`Stock: ${escapeTelegramHtml(item.material)} −${item.deducted} → ${item.remaining} left${item.shortage ? ' ⚠️ SHORTAGE' : ''}`);
+        }
+      }
+    }
+    await sendTelegramMessage(messageLines.join('\n'));
+    return NextResponse.json({ success: true, verification: data, orderStatus, inventory });
+  } catch (error) {
+    await reportCriticalError('order-status', error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Order status update failed' }, { status: 400 });
+  }
 }

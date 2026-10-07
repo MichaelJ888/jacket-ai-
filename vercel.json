@@ -1,5 +1,7 @@
 {
   "crons": [
-    { "path": "/api/cron/staff-reminders?type=morning", "schedule": "0 0 * * *" }
+    { "path": "/api/cron/staff-reminders?type=morning", "schedule": "0 0 * * *" },
+    { "path": "/api/cron/memory-archive", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/content-plan", "schedule": "0 22 * * *" }
   ]
 }

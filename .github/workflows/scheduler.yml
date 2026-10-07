@@ -26,3 +26,30 @@ jobs:
         run: |
           curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/staff-reminders?type=watch" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  retry-queue:
+    if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process outbound retry queue
+        run: |
+          curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/retry-queue" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  sales-followups:
+    if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run sales follow-ups and post-sale outreach
+        run: |
+          curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/sales-followups" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  content-publisher:
+    if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Advance videos and publish due social posts
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

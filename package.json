@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:push": "node scripts/apply-schema.mjs",
-    "memory": "node scripts/memory.mjs"
+    "memory": "node scripts/memory.mjs",
+    "test": "node --test \"app/**/*.test.ts\""
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.61",

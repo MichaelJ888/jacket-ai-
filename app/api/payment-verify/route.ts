@@ -1,7 +1,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText } from 'ai';
 import { NextResponse } from 'next/server';
-import { getSupabaseAdmin } from '../_lib/integrations';
+import { getSupabaseAdmin, reportCriticalError } from '../_lib/integrations';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ verified, verificationId, expectedAmount, amount: Number.isFinite(amount) ? amount : null, reference: parsed.reference || null, transactionDate: parsed.transactionDate || null, recipient: parsed.recipient || null, confidence, notes: parsed.notes || '' });
   } catch (error) {
     console.error('Payment OCR error:', error);
+    await reportCriticalError('payment-verify', error);
     return NextResponse.json({ verified: false, error: error instanceof Error ? error.message : 'Payment OCR failed.' }, { status: 502 });
   }
 }

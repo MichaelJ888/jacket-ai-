@@ -6,6 +6,7 @@ import {
   createPurchaseOrder,
   createStaffTask,
   escapeTelegramHtml,
+  reportCriticalError,
   sendTelegramMessage,
   sendTelegramPhoto,
 } from '../_lib/integrations';
@@ -121,6 +122,7 @@ export async function POST(req: Request) {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Invalid operations request';
     console.error('Operations route error:', error);
+    await reportCriticalError('operations', error);
     return NextResponse.json({ success: false, error: message }, { status: 400 });
   }
 }

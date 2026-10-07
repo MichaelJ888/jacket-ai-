@@ -637,10 +637,78 @@ Rewrite the following instruction into that voice. Output only the final message
 export async function composeBossStyleMessage(rawText: string): Promise<string> {
   if (!process.env.GEMINI_API_KEY) return rawText;
   try {
-    const result = await generateText({ model: bossVoiceModel('gemini-3.6-flash'), system: BOSS_VOICE_PROMPT, prompt: rawText });
+    // Few-shot: the CEO's own real messages (style_examples) teach the model his exact voice.
+    let system = BOSS_VOICE_PROMPT;
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      const { data: examples } = await supabase.from('style_examples').select('example').neq('audience', 'client').order('created_at', { ascending: false }).limit(8);
+      if (examples?.length) system += `\n\nReal examples of how the boss texts (copy this voice, vocabulary and length):\n${examples.map((row) => `- ${row.example}`).join('\n')}`;
+    }
+    const result = await generateText({ model: bossVoiceModel('gemini-3.6-flash'), system, prompt: rawText });
     return result.text.trim() || rawText;
   } catch (error) {
     console.error('Boss-style message composition failed, using raw text:', error);
     return rawText;
   }
+}
+
+// ---- Outbound request retry queue (durable retry for third-party API calls) ----
+// Processed by /api/cron/retry-queue; backed by the outbound_request_queue table.
+export async function enqueueOutboundRequest(kind: string, payload: Record<string, unknown>, maxAttempts = 5) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+  const { data, error } = await supabase.from('outbound_request_queue').insert({ kind, payload, max_attempts: maxAttempts }).select('id, kind, status').single();
+  return { data, error: error?.message || null };
+}
+
+// ---- Critical error reporting: persist to system_logs AND alert the ops Telegram chat. ----
+// Best-effort by design: never throws, so it is safe to call from any catch block.
+export async function reportCriticalError(context: string, error: unknown, details?: Record<string, unknown>) {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      const { error: insertError } = await supabase.from('system_logs').insert({
+        severity: 'critical',
+        context,
+        message: message.slice(0, 1000),
+        details: details || null,
+      });
+      if (insertError) console.error('system_logs insert failed:', insertError.message);
+    }
+  } catch (logError) {
+    console.error('system_logs insert threw:', logError);
+  }
+  const detailLines = details
+    ? Object.entries(details).map(([key, value]) => `${escapeTelegramHtml(key)}: ${escapeTelegramHtml(String(value))}`).join('\n')
+    : '';
+  await sendTelegramMessage(`🚨 <b>CRITICAL ERROR — ${escapeTelegramHtml(context)}</b>\n${escapeTelegramHtml(message.slice(0, 500))}${detailLines ? `\n${detailLines}` : ''}`);
+}
+
+// ---- Inventory deduction on order confirmation ----
+// Deducts fabric/material stock from material_inventory with an inventory_transactions audit
+// row per material. Stock is allowed to go negative so the true shortage is visible (flagged
+// via the `shortage` boolean); the caller decides how to surface it.
+export async function deductInventoryForOrder(materials: Array<{ material: string; quantity: number }>, reference: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { data: null, error: 'Supabase is not configured' };
+  const results: Array<{ material: string; deducted: number; remaining: number; shortage: boolean }> = [];
+  for (const item of materials) {
+    const materialName = String(item?.material || '').trim();
+    const quantity = Number(item?.quantity);
+    if (!materialName || !Number.isFinite(quantity) || quantity <= 0) continue;
+    const { data: row, error: readError } = await supabase.from('material_inventory').select('material_name, quantity_available').eq('material_name', materialName).maybeSingle();
+    if (readError) return { data: null, error: readError.message };
+    if (!row) {
+      results.push({ material: materialName, deducted: 0, remaining: 0, shortage: true });
+      continue;
+    }
+    const remaining = Number(row.quantity_available || 0) - quantity;
+    const { error: updateError } = await supabase.from('material_inventory').update({ quantity_available: remaining, updated_at: new Date().toISOString() }).eq('material_name', materialName);
+    if (updateError) return { data: null, error: updateError.message };
+    const { error: txError } = await supabase.from('inventory_transactions').insert({ material_name: materialName, quantity_change: -quantity, reason: 'ORDER_CONFIRMATION', reference });
+    if (txError) console.error('inventory_transactions insert failed:', txError.message);
+    results.push({ material: materialName, deducted: quantity, remaining, shortage: remaining < 0 });
+  }
+  return { data: results, error: null };
 }

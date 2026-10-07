@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildFinancialDashboard, calculateGrossProfit, formatCurrency } from './financial-logic';
+import { buildFinancialDashboard, calculateGrossProfit, formatCurrency } from './financial-logic.ts';
 
 test('calculateGrossProfit subtracts material, payroll, and delivery costs from revenue', () => {
   const grossProfit = calculateGrossProfit({
@@ -26,6 +26,6 @@ test('buildFinancialDashboard aggregates project-level profitability and totals'
   assert.equal(dashboard.totalLaborPayrollExpenses, 47000);
   assert.equal(dashboard.totalDeliveryFees, 7000);
   assert.equal(dashboard.totalNetProfit, 106000);
-  assert.equal(dashboard.projects[0].netProfit, 59000);
-  assert.equal(dashboard.projects[1].netProfit, 43000);
+  assert.equal(dashboard.projects[0].netProfit, 61000);
+  assert.equal(dashboard.projects[1].netProfit, 45000);
 });

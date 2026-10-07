@@ -13,6 +13,7 @@ import {
   getStaffProfile,
   linkStaffTelegramChat,
   removeTelegramInlineKeyboard,
+  reportCriticalError,
   setEmbroideryPickupCommitment,
   sendTelegramDirectMessage,
 } from '../_lib/integrations';
@@ -123,6 +124,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Telegram ops webhook error:', error);
+    await reportCriticalError('telegram-webhook', error);
     return NextResponse.json({ ok: true });
   }
 }

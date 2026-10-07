@@ -8,7 +8,9 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - [ ] Check `supabase/schema.sql` for an existing table before creating a new one.
 
 ## Existing API routes (app/api/)
-`chat`, `costing`, `cron/staff-reminders`, `cron/embroidery-pickup-alerts`, `embroidery/auto-digitize`, `leads`, `logistics`, `operations`, `order-status`, `payment-verify`, `telegram-notify`, `telegram-webhook`, `test-db`, `webhooks/manychat`, `webhooks/meta`.
+`chat`, `costing`, `cron/staff-reminders`, `cron/embroidery-pickup-alerts`, `cron/memory-archive`, `cron/retry-queue`, `embroidery/auto-digitize`, `leads`, `logistics`, `operations`, `order-status`, `payment-verify`, `telegram-notify`, `telegram-webhook`, `test-db`, `webhooks/manychat`, `webhooks/meta`.
+
+- `cron/retry-queue` processes the durable `outbound_request_queue` table (Lalamove booking retries after provider outages); scheduled every 45 min via the GitHub Actions `retry-queue` job in `.github/workflows/scheduler.yml`.
 
 ## Build & deploy
 - Build command is `next build --webpack` (Turbopack panics on this project's global CSS — do not remove `--webpack`).
@@ -20,7 +22,7 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - Use `npm run memory -- note "..."`, `decision "..."`, `issue "..." --location=path`, `attempt "..." --outcome=worked|failed`, `fix "..." --issue=<id>`, and `npm run memory -- summary` to read recent entries. Script: `scripts/memory.mjs`.
 - Run the "Memory: Session-start summary" VS Code task (`.vscode/tasks.json`) at the start of a session instead of relying on memory alone.
 - Read-only cloud access without the CLI: `GET /api/memory/summary` (auth: `Authorization: Bearer $CRON_SECRET`, optional `?scope=` / `?project=` / `?limit=` query params).
-- Retention: table is append-only and will grow unbounded. Review and archive (export + delete) events older than ~6 months once the table exceeds a few thousand rows — no automated cleanup job exists yet.
+- Retention: rows older than 6 months are archived — copied to `agent_memory_events_archive`, then deleted from the live table, with an audit `note` event — by the daily `/api/cron/memory-archive` Vercel cron (`CRON_SECRET` auth). Manual run: `npm run memory -- archive [--months=6] [--dry-run] [--project=x]`. History is never lost, only moved.
 - This replaces the desktop-only `.vscode/mcp.json` projectmem server for anything that should persist as part of the production system's history.
 
 ## Required credentials — status as of 2026-09-28
@@ -36,7 +38,7 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 | `META_WEBHOOK_VERIFY_TOKEN` | Meta webhook handshake | ✅ Set on Vercel production, verified live (GET handshake echoes challenge correctly) — still need to enter this same value in Meta's dashboard once the app exists |
 | `APP_BASE_URL`, `CRON_SECRET` (as **GitHub Actions** repo secrets, separate from Vercel env) | External scheduler workflow | ✅ Set by user in GitHub repo settings 2026-09-28 — workflow will start firing on its next `*/5`/`*/45` min tick |
 
-`STABILITY_API_KEY` / `REPLICATE_API_KEY` are configured on Vercel and in `.env.local` but no route currently calls them — dead config, fine to leave for future embroidery/image-gen work or remove.
+`STABILITY_API_KEY` / `REPLICATE_API_KEY` were dead config (no route ever called them) — removed from `.env.local` 2026-10-04. Still set on Vercel production env, left for possible future embroidery/image-gen work (`npx vercel env rm <NAME> production` to purge there too).
 
 ## Credit / token conservation rules
 - [ ] Scope every request to specific files (`#file:app/api/operations/route.ts`) instead of "the whole project."
@@ -46,3 +48,10 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 
 ## Sensitive/legacy items to flag, not silently ignore
 - [ ] Local `.env.local` Supabase service-role key has been observed returning 401 against the live project — verify against Vercel's env value before trusting local test results.
+
+## Goal 2 routes (sales closer, CRM, autoposter)
+- `/api/health` (+ `/api/test-db` alias): service-role health check, public, JSON status ok/degraded/down.
+- `/api/webhooks/meta`, `/api/webhooks/manychat`: inbound DMs/comments -> `_lib/sales-closer.ts` -> `crm_contacts` / `inbox_messages`.
+- `/api/crm`, `/api/voice`, `/api/content/plan`: Bearer `CRON_SECRET`. Pipeline view/human reply, voice ingestion (client/employee/supplier), content calendar.
+- Crons: `cron/sales-followups` + `cron/content-publisher` (GitHub Actions, 45 min), `cron/content-plan` (Vercel daily).
+- Optional env (features park as NEEDS_CREDENTIALS / undelivered until set): `META_PAGE_ACCESS_TOKEN`, `META_PAGE_ID`, `META_IG_USER_ID`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `YOUTUBE_CLIENT_ID/SECRET/REFRESH_TOKEN`, `TIKTOK_ACCESS_TOKEN`, `RESEND_API_KEY`, `RESEND_FROM`, `CONTENT_AUTO_APPROVE=1`, `CONTENT_VIDEOS_PER_WEEK`.

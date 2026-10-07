@@ -302,3 +302,249 @@ create index if not exists agent_memory_events_scope_idx on public.agent_memory_
 create index if not exists agent_memory_events_project_idx on public.agent_memory_events (project, created_at desc);
 alter table public.agent_memory_events enable row level security;
 revoke all on public.agent_memory_events from anon, authenticated;
+
+-- Retention archive for the memory log: rows older than ~6 months are copied here (then deleted
+-- from the live table) by `npm run memory -- archive` and the /api/cron/memory-archive daily cron.
+-- Keeps the hot table small without losing history. Deliberately no FK on supersedes and no scope
+-- check constraint so archival never breaks if the referenced row or a new scope isn't mirrored here.
+create table if not exists public.agent_memory_events_archive (
+  id uuid primary key,
+  scope text not null,
+  summary text not null,
+  location text,
+  status text,
+  supersedes uuid,
+  project text not null default 'jacket-ai',
+  created_at timestamptz,
+  archived_at timestamptz not null default now()
+);
+
+create index if not exists agent_memory_events_archive_created_idx on public.agent_memory_events_archive (created_at desc);
+alter table public.agent_memory_events_archive enable row level security;
+revoke all on public.agent_memory_events_archive from anon, authenticated;
+
+-- Durable retry queue for third-party outbound calls (e.g. Lalamove booking) so an approved
+-- dispatch is not lost when a provider is down. Processed by /api/cron/retry-queue.
+create table if not exists public.outbound_request_queue (
+  id uuid default gen_random_uuid() primary key,
+  kind text not null,
+  payload jsonb not null default '{}'::jsonb,
+  status text not null default 'PENDING' check (status in ('PENDING', 'DONE', 'FAILED')),
+  attempts integer not null default 0,
+  max_attempts integer not null default 5,
+  next_attempt_at timestamptz not null default now(),
+  last_error text,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index if not exists outbound_request_queue_due_idx on public.outbound_request_queue (next_attempt_at) where status = 'PENDING';
+alter table public.outbound_request_queue enable row level security;
+revoke all on public.outbound_request_queue from anon, authenticated;
+
+-- Critical system/error log; critical rows are also pushed to the ops Telegram chat.
+create table if not exists public.system_logs (
+  id uuid default gen_random_uuid() primary key,
+  severity text not null default 'error' check (severity in ('info', 'warning', 'error', 'critical')),
+  context text not null,
+  message text not null,
+  details jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists system_logs_created_idx on public.system_logs (created_at desc);
+alter table public.system_logs enable row level security;
+revoke all on public.system_logs from anon, authenticated;
+
+-- Audit trail for fabric/material stock movements (e.g. automatic deduction on order confirmation).
+create table if not exists public.inventory_transactions (
+  id uuid default gen_random_uuid() primary key,
+  material_name text not null,
+  quantity_change numeric not null,
+  reason text not null,
+  reference text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists inventory_transactions_material_idx on public.inventory_transactions (material_name, created_at desc);
+alter table public.inventory_transactions enable row level security;
+revoke all on public.inventory_transactions from anon, authenticated;
+
+
+-- ===== CEO command console, finance & profit allocation =====
+create table if not exists public.telegram_updates (
+  update_id bigint primary key,
+  created_at timestamptz default now()
+);
+alter table public.telegram_updates enable row level security;
+
+create table if not exists public.ceo_conversations (
+  id uuid default gen_random_uuid() primary key,
+  role text not null check (role in ('user', 'assistant')),
+  content text not null,
+  created_at timestamptz default now()
+);
+alter table public.ceo_conversations enable row level security;
+
+create table if not exists public.ledger_entries (
+  id uuid default gen_random_uuid() primary key,
+  entry_date date not null default ((now() at time zone 'Asia/Manila')::date),
+  entry_type text not null check (entry_type in ('income', 'expense')),
+  category text not null,
+  project_name text,
+  amount numeric not null check (amount > 0),
+  description text,
+  source text not null default 'manual',
+  reference text unique,
+  created_at timestamptz default now()
+);
+alter table public.ledger_entries enable row level security;
+create index if not exists ledger_entries_date_idx on public.ledger_entries (entry_date);
+create index if not exists ledger_entries_project_idx on public.ledger_entries (project_name);
+
+create table if not exists public.payment_requests (
+  id uuid default gen_random_uuid() primary key,
+  payee text not null,
+  amount numeric not null check (amount > 0),
+  purpose text not null,
+  category text not null default 'operations',
+  project_name text,
+  payee_details text,
+  status text not null default 'PENDING_APPROVAL' check (status in ('PENDING_APPROVAL', 'APPROVED', 'AWAITING_MANUAL_PAYMENT', 'PAID', 'REJECTED', 'FAILED')),
+  risk_tier text not null default 'standard',
+  requested_by text default 'AI',
+  idempotency_key text unique not null,
+  decided_by text,
+  decided_at timestamptz,
+  paid_at timestamptz,
+  provider_response jsonb,
+  created_at timestamptz default now()
+);
+alter table public.payment_requests enable row level security;
+
+create table if not exists public.profit_allocation_rules (
+  bucket text primary key,
+  percent numeric not null check (percent >= 0 and percent <= 100),
+  monthly_target numeric check (monthly_target is null or monthly_target >= 0),
+  priority integer not null default 100,
+  is_overflow boolean not null default false,
+  is_ceo_reward boolean not null default false,
+  active boolean not null default true,
+  updated_at timestamptz default now()
+);
+alter table public.profit_allocation_rules enable row level security;
+insert into public.profit_allocation_rules (bucket, percent, priority, is_overflow, is_ceo_reward) values
+  ('salaries', 25, 10, false, false),
+  ('rent', 10, 20, false, false),
+  ('electricity_utilities', 5, 30, false, false),
+  ('tax_reserve', 5, 40, false, false),
+  ('emergency_fund', 10, 50, false, false),
+  ('marketing', 5, 60, false, false),
+  ('equipment_growth', 5, 70, false, false),
+  ('ceo_reward', 5, 80, false, true),
+  ('rolling_capital', 30, 90, true, false)
+on conflict (bucket) do nothing;
+
+create table if not exists public.profit_allocations (
+  id uuid default gen_random_uuid() primary key,
+  project_name text not null,
+  period text not null,
+  net_profit numeric not null,
+  lines jsonb not null,
+  status text not null default 'PROPOSED' check (status in ('PROPOSED', 'APPROVED', 'REJECTED')),
+  decided_at timestamptz,
+  created_at timestamptz default now()
+);
+alter table public.profit_allocations enable row level security;
+
+create table if not exists public.job_heartbeats (
+  job text primary key,
+  last_run_at timestamptz not null default now(),
+  last_status text not null default 'ok',
+  last_alert_at timestamptz,
+  details jsonb
+);
+alter table public.job_heartbeats enable row level security;
+
+create table if not exists public.style_examples (
+  id uuid default gen_random_uuid() primary key,
+  kind text not null default 'staff',
+  example text not null,
+  created_at timestamptz default now()
+);
+alter table public.style_examples enable row level security;
+
+alter table public.material_inventory add column if not exists reorder_level numeric not null default 0;
+alter table public.material_inventory add column if not exists reorder_quantity numeric not null default 0;
+
+-- ===== Goal 2: unified CRM / inbox / content autoposter =====
+create table if not exists public.crm_contacts (
+  id uuid default gen_random_uuid() primary key,
+  channel text not null,
+  external_id text not null,
+  name text,
+  phone text,
+  email text,
+  company text,
+  stage text not null default 'new' check (stage in ('new', 'engaged', 'quoted', 'negotiating', 'won', 'lost', 'dormant')),
+  tags text[] not null default '{}',
+  lead_score integer not null default 0,
+  lifetime_value numeric not null default 0,
+  orders_count integer not null default 0,
+  notes text,
+  ai_paused boolean not null default false,
+  followup_count integer not null default 0,
+  next_followup_at timestamptz,
+  last_inbound_at timestamptz,
+  last_outbound_at timestamptz,
+  delivered_at timestamptz,
+  review_requested_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (channel, external_id)
+);
+create index if not exists crm_contacts_followup_idx on public.crm_contacts (stage, next_followup_at);
+create index if not exists crm_contacts_updated_idx on public.crm_contacts (updated_at desc);
+alter table public.crm_contacts enable row level security;
+revoke all on public.crm_contacts from anon, authenticated;
+
+create table if not exists public.inbox_messages (
+  id uuid default gen_random_uuid() primary key,
+  contact_id uuid not null references public.crm_contacts(id) on delete cascade,
+  channel text not null,
+  direction text not null check (direction in ('in', 'out')),
+  sender text not null check (sender in ('customer', 'ai', 'human')),
+  content text not null,
+  external_message_id text,
+  status text not null default 'sent' check (status in ('sent', 'draft', 'failed')),
+  created_at timestamptz not null default now()
+);
+create index if not exists inbox_messages_contact_idx on public.inbox_messages (contact_id, created_at desc);
+create unique index if not exists inbox_messages_dedupe_idx on public.inbox_messages (channel, external_message_id) where external_message_id is not null;
+alter table public.inbox_messages enable row level security;
+revoke all on public.inbox_messages from anon, authenticated;
+
+create table if not exists public.content_calendar (
+  id uuid default gen_random_uuid() primary key,
+  platform text not null check (platform in ('facebook', 'instagram', 'youtube', 'tiktok')),
+  media_type text not null default 'image' check (media_type in ('video', 'image', 'text')),
+  caption text not null,
+  hashtags text[] not null default '{}',
+  video_prompt text,
+  media_generation_id uuid references public.media_ad_generations(id),
+  media_url text,
+  scheduled_at timestamptz not null,
+  status text not null default 'PLANNED' check (status in ('PLANNED', 'AWAITING_VIDEO', 'AWAITING_APPROVAL', 'READY', 'PUBLISHED', 'FAILED', 'NEEDS_CREDENTIALS', 'SKIPPED')),
+  post_url text,
+  external_post_id text,
+  attempts integer not null default 0,
+  error text,
+  created_at timestamptz not null default now(),
+  published_at timestamptz
+);
+create index if not exists content_calendar_due_idx on public.content_calendar (status, scheduled_at);
+alter table public.content_calendar enable row level security;
+revoke all on public.content_calendar from anon, authenticated;
+
+alter table public.style_examples add column if not exists audience text not null default 'client';
+alter table public.style_examples add column if not exists prompt text;

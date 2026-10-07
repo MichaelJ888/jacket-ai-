@@ -1,10 +1,16 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { NextResponse } from 'next/server';
-import { escapeTelegramHtml, recordLead, sendTelegramMessage } from '../../_lib/integrations';
+import { after, NextResponse } from 'next/server';
+import { replyToComment } from '../../_lib/channels';
+import { type Channel } from '../../_lib/crm';
+import { reportCriticalError } from '../../_lib/integrations';
+import { handleInboundMessage } from '../../_lib/sales-closer';
 
+export const maxDuration = 60;
+
+// Fails closed: without META_APP_SECRET nothing can be authenticated.
 function verifyMetaSignature(body: string, signature: string | null) {
   const secret = process.env.META_APP_SECRET;
-  if (!secret) return true;
+  if (!secret) return false;
   if (!signature?.startsWith('sha256=')) return false;
 
   const expected = Buffer.from(`sha256=${createHmac('sha256', secret).update(body).digest('hex')}`);
@@ -25,41 +31,117 @@ export async function GET(req: Request) {
   return NextResponse.json({ error: 'Webhook verification failed' }, { status: 403 });
 }
 
+type Job = () => Promise<unknown>;
+
+type MessagingEvent = {
+  sender?: { id?: string };
+  message?: { mid?: string; text?: string; is_echo?: boolean; attachments?: Array<{ type?: string; payload?: { url?: string } }> };
+};
+
+type WhatsAppMessage = { id?: string; from?: string; text?: { body?: string }; image?: { id?: string }; type?: string };
+
+type Change = {
+  field?: string;
+  value?: {
+    item?: string;
+    verb?: string;
+    comment_id?: string;
+    id?: string;
+    message?: string;
+    text?: string;
+    from?: { id?: string; name?: string; username?: string };
+    messages?: WhatsAppMessage[];
+    contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>;
+  };
+};
+
+type Payload = { object?: string; entry?: Array<{ id?: string; messaging?: MessagingEvent[]; changes?: Change[] }> };
+
+function collectJobs(payload: Payload) {
+  const jobs: Job[] = [];
+  const socialChannel: Channel = payload.object === 'instagram' ? 'instagram' : 'facebook';
+
+  for (const entry of payload.entry || []) {
+    // Messenger / Instagram DMs
+    for (const event of entry.messaging || []) {
+      const message = event.message;
+      const senderId = event.sender?.id;
+      if (!message || message.is_echo || !senderId || senderId === entry.id) continue;
+      const imageUrls = (message.attachments || []).filter((item) => item.type === 'image' && item.payload?.url).map((item) => item.payload!.url!);
+      jobs.push(() => handleInboundMessage({ channel: socialChannel, externalId: senderId, text: message.text || '', messageId: message.mid, imageUrls }));
+    }
+
+    for (const change of entry.changes || []) {
+      const value = change.value || {};
+
+      // WhatsApp Cloud API
+      for (const message of value.messages || []) {
+        const from = message.from || value.contacts?.[0]?.wa_id;
+        if (!from) continue;
+        const text = message.text?.body || '';
+        if (!text && message.type !== 'image') continue;
+        const name = value.contacts?.[0]?.profile?.name;
+        jobs.push(() => handleInboundMessage({
+          channel: 'whatsapp',
+          externalId: from,
+          phone: from,
+          name,
+          text: text || '[image attachment]',
+          messageId: message.id,
+          imageUrls: message.type === 'image' ? [`whatsapp-media-id:${message.image?.id || ''}`] : [],
+        }));
+      }
+
+      // Facebook Page comment -> private reply + short public reply
+      if (change.field === 'feed' && value.item === 'comment' && value.verb === 'add' && value.comment_id && value.from?.id && value.from.id !== entry.id && value.message) {
+        const commentId = value.comment_id;
+        const text = value.message;
+        const from = value.from;
+        jobs.push(async () => {
+          const result = await handleInboundMessage({ channel: 'facebook', externalId: from.id!, name: from.name, text, messageId: `comment:${commentId}`, commentId });
+          if (result.handled && !result.duplicate) await replyToComment('facebook', commentId, 'Salamat po sa inyong comment! Na-message na po namin kayo para sa details at quotation.');
+        });
+      }
+
+      // Instagram comment
+      if (change.field === 'comments' && value.id && value.from?.id && value.from.id !== entry.id && value.text) {
+        const commentId = value.id;
+        const text = value.text;
+        const from = value.from;
+        jobs.push(async () => {
+          const result = await handleInboundMessage({ channel: 'instagram', externalId: from.id!, name: from.username, text, messageId: `comment:${commentId}`, commentId });
+          if (result.handled && !result.duplicate) await replyToComment('instagram', commentId, 'Salamat po! Na-DM na po namin kayo para sa details at quotation.');
+        });
+      }
+    }
+  }
+  return jobs;
+}
+
 export async function POST(req: Request) {
   const rawBody = await req.text();
   if (!verifyMetaSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
+  let payload: Payload;
   try {
-    const payload = JSON.parse(rawBody);
-    const entries = Array.isArray(payload.entry) ? payload.entry : [];
-    let processed = 0;
-
-    for (const entry of entries) {
-      const changes = Array.isArray(entry.changes) ? entry.changes : [];
-      for (const change of changes) {
-        const value = change?.value || {};
-        const messages = Array.isArray(value.messages) ? value.messages : [];
-        for (const message of messages) {
-          const text = typeof message.text?.body === 'string' ? message.text.body : '';
-          if (!text) continue;
-          const contact = message.from || value.contacts?.[0]?.wa_id || '';
-          await recordLead({
-            contact,
-            message: text,
-            source: payload.object === 'instagram' ? 'instagram-webhook' : 'facebook-webhook',
-            details: { messageId: message.id, field: change.field, entryId: entry.id },
-          });
-          void sendTelegramMessage(`<b>NEW SOCIAL INQUIRY</b>\n<b>Source:</b> ${escapeTelegramHtml(String(payload.object || 'meta'))}\n<b>Contact:</b> ${escapeTelegramHtml(String(contact))}\n<b>Message:</b> ${escapeTelegramHtml(text)}`);
-          processed += 1;
-        }
-      }
-    }
-
-    return NextResponse.json({ received: true, processed });
-  } catch (error) {
-    console.error('Meta webhook error:', error);
+    payload = JSON.parse(rawBody);
+  } catch {
     return NextResponse.json({ error: 'Invalid webhook payload' }, { status: 400 });
   }
+
+  const jobs = collectJobs(payload);
+  // Acknowledge immediately (Meta retries slow webhooks); the AI reply runs after the response.
+  after(async () => {
+    for (const job of jobs) {
+      try {
+        await job();
+      } catch (error) {
+        await reportCriticalError('meta-webhook:job', error);
+      }
+    }
+  });
+
+  return NextResponse.json({ received: true, queued: jobs.length });
 }

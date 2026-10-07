@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildProofApprovalState, formatApprovalStatus } from './proof-logic';
+import { buildProofApprovalState, formatApprovalStatus } from './proof-logic.ts';
 
 test('buildProofApprovalState marks production-ready after all proof stages are approved and the final check is signed off', () => {
   const state = buildProofApprovalState({
