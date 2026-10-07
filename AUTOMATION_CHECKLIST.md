@@ -55,3 +55,10 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - `/api/crm`, `/api/voice`, `/api/content/plan`: Bearer `CRON_SECRET`. Pipeline view/human reply, voice ingestion (client/employee/supplier), content calendar.
 - Crons: `cron/sales-followups` + `cron/content-publisher` (GitHub Actions, 45 min), `cron/content-plan` (Vercel daily).
 - Optional env (features park as NEEDS_CREDENTIALS / undelivered until set): `META_PAGE_ACCESS_TOKEN`, `META_PAGE_ID`, `META_IG_USER_ID`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `YOUTUBE_CLIENT_ID/SECRET/REFRESH_TOKEN`, `TIKTOK_ACCESS_TOKEN`, `RESEND_API_KEY`, `RESEND_FROM`, `CONTENT_AUTO_APPROVE=1`, `CONTENT_VIDEOS_PER_WEEK`.
+
+## Goal 4/5 additions
+- `_lib/ceo-control.ts`: `ceo_settings` (shadow_mode, vacation_mode, autonomy_limit_php) + `approvals` inbox (Telegram `appr:yes|no:<id>` buttons handled in telegram-webhook). CEO toggles modes by chatting the Telegram bot (`set_operating_mode` tool).
+- Shadow mode: AI drafts go to the CEO on Telegram, not to customers; follow-ups paused.
+- Crons (GitHub Actions): `cron/watchdog` (45 min: health + bottlenecks), `cron/ceo-digest` (daily 8am Manila, weekly scorecard on Mondays), `cron/backup` (weekly JSON to private `db-backups` bucket, keeps 8).
+- Special-terms requests (discount, installment, bulk, rush) go to an approval; the AI sends only a holding line.
+- Model failover: Gemini -> Anthropic when `ANTHROPIC_API_KEY` is set.

@@ -1,6 +1,7 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText, isStepCount, tool } from 'ai';
 import { z } from 'zod';
+import { autonomyLimitPhp, isShadowMode, isVacationMode, setSetting } from './ceo-control';
 
 import {
   accruePayrollToLedger,
@@ -198,6 +199,21 @@ function buildTools() {
       description: 'Save a real example of how the CEO writes to staff/suppliers/clients so all future messages copy his voice.',
       inputSchema: z.object({ kind: z.enum(['staff', 'supplier', 'client']), example: z.string() }),
       execute: async ({ kind, example }) => saveStyleExample(kind, example),
+    }),
+
+    set_operating_mode: tool({
+      description: 'Switch the autopilot. shadow_mode on = AI only drafts customer replies and sends them to the CEO instead of the customer (dry run). vacation_mode on = CEO away; daily digest becomes detailed and risky items still need approval. autonomy_limit_php = peso amount above which the AI must ask. Call with no changes to just read current settings.',
+      inputSchema: z.object({
+        shadow_mode: z.enum(['on', 'off']).optional(),
+        vacation_mode: z.enum(['on', 'off']).optional(),
+        autonomy_limit_php: z.number().min(0).optional(),
+      }),
+      execute: async (input) => {
+        if (input.shadow_mode) await setSetting('shadow_mode', input.shadow_mode);
+        if (input.vacation_mode) await setSetting('vacation_mode', input.vacation_mode);
+        if (input.autonomy_limit_php !== undefined) await setSetting('autonomy_limit_php', String(input.autonomy_limit_php));
+        return { shadow_mode: (await isShadowMode()) ? 'on' : 'off', vacation_mode: (await isVacationMode()) ? 'on' : 'off', autonomy_limit_php: await autonomyLimitPhp() };
+      },
     }),
   };
 }

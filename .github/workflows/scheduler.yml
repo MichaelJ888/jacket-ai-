@@ -6,6 +6,8 @@ on:
   schedule:
     - cron: '*/5 * * * *'   # embroidery pickup alerts
     - cron: '*/45 * * * *'  # staff task watch-mode reminders
+    - cron: '0 0 * * *'     # CEO daily briefing 8am Manila
+    - cron: '0 19 * * 0'    # weekly backup, Monday 3am Manila
   workflow_dispatch: {}
 
 jobs:
@@ -52,4 +54,31 @@ jobs:
       - name: Advance videos and publish due social posts
         run: |
           curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  watchdog:
+    if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Uptime and bottleneck watchdog
+        run: |
+          curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/watchdog" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  ceo-digest:
+    if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send CEO briefing
+        run: |
+          curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/ceo-digest" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  backup:
+    if: github.event.schedule == '0 19 * * 0' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Weekly database backup
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/backup" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { resolveApproval } from '../_lib/ceo-control';
 import {
   clockInStaff,
   clockOutStaff,
@@ -50,6 +51,15 @@ export async function POST(req: Request) {
 
       if (!allowedChatId(callbackChatId) || !authorizedActor) {
         if (callbackId) await answerTelegramCallbackQuery(String(callbackId), 'Not authorized.');
+        return NextResponse.json({ ok: true });
+      }
+
+      const approvalMatch = callbackData.match(/^appr:(yes|no):([\da-f-]{36})$/i);
+      if (callbackId && approvalMatch) {
+        const outcome = await resolveApproval(approvalMatch[2], approvalMatch[1].toLowerCase() === 'yes');
+        await answerTelegramCallbackQuery(String(callbackId), outcome.slice(0, 180));
+        if (callback.message?.message_id) await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+        await sendTelegramDirectMessage(String(callbackChatId), outcome);
         return NextResponse.json({ ok: true });
       }
 

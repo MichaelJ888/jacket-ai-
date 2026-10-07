@@ -76,6 +76,9 @@ export async function POST(request: Request) {
     sent = result.ok;
     await logMessage({ contactId: contact.id, channel: contact.channel, direction: 'out', sender: 'human', content: body.reply.trim(), status: result.ok ? 'sent' : 'failed' });
     patch.last_outbound_at = new Date().toISOString();
+    // Self-improvement loop: every real human reply becomes a style example for the AI.
+    const lastCustomer = await supabase.from('inbox_messages').select('content').eq('contact_id', contact.id).eq('direction', 'in').order('created_at', { ascending: false }).limit(1).maybeSingle();
+    await supabase.from('style_examples').insert({ kind: 'client', audience: 'client', prompt: lastCustomer.data?.content?.slice(0, 1000) || null, example: body.reply.trim().slice(0, 1000) });
   }
 
   const { error } = await updateContact(contact.id, patch);

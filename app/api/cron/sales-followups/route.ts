@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { isCronAuthorized } from '../../_lib/auth';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
+import { isShadowMode } from '../../_lib/ceo-control';
 import { sendChannelMessage } from '../../_lib/channels';
 import { addHours, logMessage, updateContact, type CrmContact } from '../../_lib/crm';
 import { escapeTelegramHtml, getSupabaseAdmin, isManilaDaytime, sendTelegramMessage } from '../../_lib/integrations';
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
   const summary = { followups: 0, dormant: 0, reviews: 0, skipped: 0 };
   const now = new Date();
 
-  if (isManilaDaytime()) {
+  if (isManilaDaytime() && !(await isShadowMode())) {
     const due = await supabase
       .from('crm_contacts')
       .select('*')

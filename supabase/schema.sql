@@ -548,3 +548,29 @@ revoke all on public.content_calendar from anon, authenticated;
 
 alter table public.style_examples add column if not exists audience text not null default 'client';
 alter table public.style_examples add column if not exists prompt text;
+-- Goal 4: CEO control plane (vacation mode, shadow mode, approval inbox)
+create table if not exists public.ceo_settings (
+  key text primary key,
+  value text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.ceo_settings enable row level security;
+revoke all on public.ceo_settings from anon, authenticated;
+
+create table if not exists public.approvals (
+  id uuid default gen_random_uuid() primary key,
+  kind text not null,
+  summary text not null,
+  payload jsonb not null default '{}'::jsonb,
+  amount numeric,
+  status text not null default 'PENDING' check (status in ('PENDING', 'APPROVED', 'REJECTED', 'EXPIRED')),
+  created_at timestamptz not null default now(),
+  decided_at timestamptz
+);
+alter table public.approvals enable row level security;
+create index if not exists approvals_status_idx on public.approvals (status, created_at desc);
+revoke all on public.approvals from anon, authenticated;
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('db-backups', 'db-backups', false, 52428800)
+on conflict (id) do nothing;

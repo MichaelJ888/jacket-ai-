@@ -4,6 +4,7 @@ import { generateText, isStepCount } from 'ai';
 
 import { type Channel, type CrmContact, addHours, getRecentMessages, logMessage, scoreMessage, updateContact, upsertContact } from './crm';
 import { publicBaseUrl, sendChannelMessage } from './channels';
+import { createApproval, isShadowMode } from './ceo-control';
 import { escapeTelegramHtml, getSupabaseAdmin, isManilaDaytime, recordLead, reportCriticalError, sendTelegramMessage } from './integrations';
 import { FIRST_MESSAGE_ADDENDUM, MJIC_SYSTEM_PROMPT, SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 import { mjicQuoteTool } from './sales-tools';
@@ -20,10 +21,12 @@ CHANNEL MODE (live social-media / messaging inbox)
 - Plain text ONLY: no markdown, no bold, no headings, no bullet symbols other than "-", no image embeds (photos are attached separately by the system).
 - Short Taglish messages, 1 to 4 short paragraphs, warm and respectful ("po", "Sir/Ma'am"). Always end with ONE clear next step or question that moves the sale forward.
 - Never invent prices, dates, stock, discounts or guarantees. Use the quote tool for numbers. If asked for something outside policy (special discount, custom terms, exact delivery date not in your instructions), say you will confirm with the boss and update them shortly.
+- Match the customer's language: English, Tagalog or Taglish. Keep Taglish by default.
 - Do not volunteer that you are an AI, and never claim to be a specific named human. If someone sincerely asks whether they are talking to a bot or a real person, say you will hand them over to the team for a personal reply.
 `;
 
 const ESCALATION_PATTERN = /(refund|reklamo|complain|complaint|scam|estafa|lawyer|abogado|kasuhan|demanda|chargeback|bawi ang pera|return my money)/i;
+const NEGOTIATION_PATTERN = /(discount|tawad|mura pa|special price|bawas|installment|hulugan|credit terms|net 30|rush order|bulk order)/i;
 const IDENTITY_PATTERN = /(are you (a )?(bot|ai|robot|real person|human)|bot ka ba|robot ka ba|totoong tao|real person ba|ai ba)/i;
 
 export type InboundInput = {
@@ -42,6 +45,12 @@ export type InboundResult = { handled: boolean; reply: string | null; sent: bool
 
 function model() {
   return process.env.GEMINI_API_KEY ? google('gemini-3.6-flash') : anthropic('claude-sonnet-4-5');
+}
+
+// Failover: if the primary model errors, retry once on the other provider when its key exists.
+function fallbackModel() {
+  if (process.env.GEMINI_API_KEY && process.env.ANTHROPIC_API_KEY) return anthropic('claude-sonnet-4-5');
+  return null;
 }
 
 function cleanForChat(text: string) {
@@ -133,7 +142,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
 
   if (escalate) {
     await updateContact(contact.id, { ai_paused: true });
-    void notifyCeo([`🚨 <b>NEEDS YOU — ${label}</b>`, escapeTelegramHtml(text.slice(0, 400)), 'AI is paused on this contact. Resume with POST /api/crm {action:"resume"}.']);
+    void notifyCeo([`🚨 <b>NEEDS YOU — ${label}</b>`, escapeTelegramHtml(text.slice(0, 400)), 'AI is paused on this contact. Reply via POST /api/crm {id, reply}, or set ai_paused:false to resume.']);
   }
 
   let reply = holding;
@@ -144,13 +153,20 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
       const isFirst = history.filter((message) => message.direction === 'out').length === 0;
       const messages = history.map((message) => ({ role: message.direction === 'in' ? ('user' as const) : ('assistant' as const), content: message.content }));
       if (!messages.length || messages[messages.length - 1].role !== 'user') messages.push({ role: 'user', content: text });
-      const result = await generateText({
-        model: model(),
-        system: await buildSystem(isFirst),
+      const system = await buildSystem(isFirst);
+      const run = (chosen: ReturnType<typeof model>) => generateText({
+        model: chosen,
+        system,
         messages,
         tools: { calculateMJICQuote: mjicQuoteTool },
         stopWhen: isStepCount(3),
-        abortSignal: AbortSignal.timeout(40000),
+        abortSignal: AbortSignal.timeout(25000),
+      });
+      const backup = fallbackModel();
+      const result = await run(model()).catch((primaryError) => {
+        if (!backup) throw primaryError;
+        console.error('primary model failed, using fallback:', primaryError);
+        return run(backup);
       });
       reply = cleanForChat(result.text);
       quoted = result.steps.some((step) => step.toolCalls?.some((call) => call.toolName === 'calculateMJICQuote'));
@@ -162,6 +178,24 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   if (!reply) {
     void notifyCeo([`<b>AI could not reply — ${label}</b>`, escapeTelegramHtml(text.slice(0, 300)), 'Please answer manually.']);
     return { ...empty, handled: true };
+  }
+
+  // Special terms are the CEO's call: park the AI draft behind an Approve/Reject button and send only a holding line.
+  if (!holding && NEGOTIATION_PATTERN.test(text)) {
+    await createApproval({
+      kind: 'special-terms',
+      summary: `${contact.name || contact.external_id} (${input.channel}) asked: "${text.slice(0, 300)}"\nAI draft: ${reply.slice(0, 400)}\nApprove = send the AI draft as is. Reject = you reply personally.`,
+      action: { type: 'send_reply', contactId: contact.id, channel: input.channel, externalId: input.externalId, text: reply },
+    });
+    await updateContact(contact.id, { ai_paused: true });
+    reply = 'Noted po. Kino-confirm ko lang po sa aming boss ang request ninyo at babalikan namin kayo agad.';
+  }
+
+  if (await isShadowMode()) {
+    await logMessage({ contactId: contact.id, channel: input.channel, direction: 'out', sender: 'ai', content: reply, status: 'draft' });
+    await updateContact(contact.id, { next_followup_at: null });
+    void notifyCeo([`<b>SHADOW MODE draft - ${label}</b>`, `Customer: ${escapeTelegramHtml(text.slice(0, 300))}`, `AI would send:\n${escapeTelegramHtml(reply.slice(0, 700))}`]);
+    return { handled: true, reply: null, sent: false, escalated: escalate, duplicate: false };
   }
 
   const isFirstReply = (await getRecentMessages(contact.id, 30)).filter((message) => message.direction === 'out').length === 0;
