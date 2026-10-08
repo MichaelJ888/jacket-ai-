@@ -77,3 +77,5 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 | `/api/media/generate-ad` | CRON_SECRET | Now secured |
 
 Env: optional `ADMIN_PASSWORD` (separate admin login).
+
+| /api/cron/improvement-scout | CRON_SECRET | Weekly (Wed 11am Manila) GitHub scan; shortlists permissive-licence repos into repo_candidates and alerts CEO. Optional env GITHUB_TOKEN for higher rate limits. |

@@ -23,3 +23,6 @@ Goal: get the best and cheapest implementation of each capability by reusing pro
 | PDF quotes | `pdf-lib` (MIT) |
 | Word Q&A import | `mammoth` (BSD-2) |
 | Images | `sharp` (Apache-2.0) |
+
+## Automated scouting
+The weekly improvement-scout cron searches GitHub for each need in pp/api/_lib/scout.ts (SCOUT_NEEDS), keeps active repos (pushed within 12 months, 50+ stars), marks permissive licences as candidate and others as eference-only, and alerts the CEO. Adoption always goes through the gates above.

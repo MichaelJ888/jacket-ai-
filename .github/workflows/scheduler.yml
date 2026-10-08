@@ -9,6 +9,7 @@ on:
     - cron: '0 0 * * *'     # CEO daily briefing 8am Manila
     - cron: '0 19 * * 0'    # weekly backup, Monday 3am Manila
     - cron: '0 2 1 * *'     # monthly repo watch
+    - cron: '0 3 * * 3'     # weekly improvement scout (GitHub scan)
     - cron: '0 1 * * 1'     # weekly forecast + pricing advice, Monday 9am Manila
   workflow_dispatch: {}
 
@@ -101,4 +102,13 @@ jobs:
       - name: Monthly open-source repo watch
         run: |
           curl -sf --max-time 90 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/repo-watch" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+
+  improvement-scout:
+    if: github.event.schedule == '0 3 * * 3' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Weekly GitHub improvement scout
+        run: |
+          curl -sf --max-time 90 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/improvement-scout" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
