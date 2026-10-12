@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isAdminAuthorized } from '../../_lib/auth';
 import { z } from 'zod';
 
 export const runtime = 'nodejs';
@@ -217,6 +218,7 @@ function parseWorkOrder(body: unknown): { data?: WorkOrder; error?: string } {
 }
 
 export async function POST(request: Request) {
+  if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await request.json();
     const parsed = parseWorkOrder(body);

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isAdminAuthorized } from '../_lib/auth';
 import {
   clockInStaff,
   clockOutStaff,
@@ -20,6 +21,7 @@ function normalizeStaffName(value: unknown) {
 }
 
 export async function POST(req: Request) {
+  if (!isAdminAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json();
     const action = typeof body.action === 'string' ? body.action : '';

@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
+import { rateLimitResponse } from '../_lib/rate-limit';
 import { resolveApproval } from '../_lib/ceo-control';
+import { addSubconJob, completeSubconJob, handleAttendanceMessage, isAttendanceChat, logSewerOutput, markPayrollPaid } from '../_lib/payroll';
 import {
   clockInStaff,
   clockOutStaff,
@@ -35,6 +37,10 @@ function formatMinutes(totalMinutes: number) {
 }
 
 export async function POST(req: Request) {
+  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (webhookSecret && req.headers.get('x-telegram-bot-api-secret-token') !== webhookSecret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await rateLimitResponse(req, 'telegram-webhook', 120, 60);
+  if (limited) return limited;
   try {
     const update = await req.json();
     const callback = update?.callback_query;
@@ -103,6 +109,12 @@ export async function POST(req: Request) {
 
     if (!chatId || !text) return NextResponse.json({ ok: true });
 
+    if (isAttendanceChat(chatId)) {
+      const attendanceReply = await handleAttendanceMessage(text, message.from);
+      if (attendanceReply) await sendTelegramDirectMessage(String(chatId), attendanceReply);
+      return NextResponse.json({ ok: true });
+    }
+
     if (!allowedChatId(chatId)) {
       if (chatType === 'private') await handlePrivateStaffMessage(String(chatId), text);
       return NextResponse.json({ ok: true });
@@ -115,6 +127,8 @@ export async function POST(req: Request) {
 
     if (/^pickup$/i.test(command)) {
       reply = await handlePickupCommand(nameValue || '', freeText);
+    } else if (/^(piece|subcon)$/i.test(command) || (/^payroll$/i.test(command) && /^paid$/i.test(nameValue || ''))) {
+      reply = await handlePayrollCommand(command.toLowerCase(), [nameValue, ...restWords].filter(Boolean));
     } else if (/^in$/i.test(command)) {
       reply = staffName ? formatClockResult('IN', staffName, await clockInStaff(staffName)) : 'Use: IN Jonathan or IN Linda';
     } else if (/^out$/i.test(command)) {
@@ -137,6 +151,30 @@ export async function POST(req: Request) {
     await reportCriticalError('telegram-webhook', error);
     return NextResponse.json({ ok: true });
   }
+}
+
+async function handlePayrollCommand(command: string, args: string[]) {
+  if (command === 'payroll') return (await markPayrollPaid(args[1] || '')).message;
+  if (command === 'piece') {
+    // PIECE <worker> <qty> <rate> [item]
+    const [worker, qty, rate, ...item] = args;
+    if (!worker || !(Number(qty) > 0) || !(Number(rate) >= 0)) return 'Use: PIECE <sewer> <qty> <rate-per-piece> [item]';
+    const result = await logSewerOutput({ workerName: worker, quantity: Number(qty), rate: Number(rate), item: item.join(' ') });
+    return result.error ? `Piece error: ${result.error}` : `Logged ${qty} pcs x P${rate} for ${worker}.`;
+  }
+  // SUBCON ADD <name> <amount> [job-ref] | SUBCON DONE <job-ref-or-id>
+  if (/^add$/i.test(args[0])) {
+    const [, name, amount, ...ref] = args;
+    if (!name || !(Number(amount) > 0)) return 'Use: SUBCON ADD <name> <amount> [job-ref]';
+    const result = await addSubconJob({ subconName: name, amount: Number(amount), jobRef: ref.join(' ') || undefined });
+    return result.error ? `Subcon error: ${result.error}` : `Subcon job added for ${name}: P${amount}. Send SUBCON DONE ${ref.join(' ') || String(result.data?.id).slice(0, 8)} when finished to generate their payroll.`;
+  }
+  if (/^done$/i.test(args[0]) && args[1]) {
+    const outcome = await completeSubconJob(args.slice(1).join(' '));
+    if (outcome.error) return `Subcon error: ${outcome.error}`;
+    return outcome.result?.created ? 'Subcon payroll generated - see the payroll message above.' : 'That job was already completed.';
+  }
+  return 'Use: SUBCON ADD <name> <amount> [job-ref] or SUBCON DONE <job-ref>';
 }
 
 async function handleLinkCommand(staffName: StaffName) {

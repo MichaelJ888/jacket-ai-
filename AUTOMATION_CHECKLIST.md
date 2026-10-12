@@ -62,11 +62,13 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - Crons (GitHub Actions): `cron/watchdog` (45 min: health + bottlenecks), `cron/ceo-digest` (daily 8am Manila, weekly scorecard on Mondays), `cron/backup` (weekly JSON to private `db-backups` bucket, keeps 8).
 - Special-terms requests (discount, installment, bulk, rush) go to an approval; the AI sends only a holding line.
 - Model failover: Gemini -> Anthropic when `ANTHROPIC_API_KEY` is set.
+- `/api/chat` routes general FAQs to Gemini Flash and quote/order-detail requests to Claude Sonnet; quote requests require `ANTHROPIC_API_KEY`.
 
 ## Batch: BOM, quotes, fraud, insights, digitizer (admin-protected)
 | Route | Auth | Purpose |
 | --- | --- | --- |
 | `/admin` (page) | ADMIN_PASSWORD or CRON_SECRET | Material prices, selling prices, Teach the AI (.docx/.txt), overview |
+| `/admin/video-mockups` (page) | Admin token/password (validated via `/api/admin/prices`) | Browser-local 8-second WebM mockup; customer images stay on the device |
 | `/api/admin/prices`, `/api/admin/price-book`, `/api/admin/overview`, `/api/admin/voice` | Bearer admin | Admin APIs |
 | `/api/costing` (+ `/api/costing/po`) | open (costing) / admin (PO) | Per-order BOM from admin prices; draft supplier POs |
 | `/api/quote-pdf` | Bearer admin | Branded PDF quote, private `quotes` bucket |
@@ -79,3 +81,15 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 Env: optional `ADMIN_PASSWORD` (separate admin login).
 
 | /api/cron/improvement-scout | CRON_SECRET | Weekly (Wed 11am Manila) GitHub scan; shortlists permissive-licence repos into repo_candidates and alerts CEO. Optional env GITHUB_TOKEN for higher rate limits. |
+
+## Auth tokens & rate limiting (hardening)
+- `CRON_SECRET` — Vercel native crons only (Vercel sends it automatically). `SCHEDULER_TOKEN` — GitHub Actions scheduler (set it as a repo secret AND a Vercel env var). Both accepted by cron routes only.
+- `ADMIN_TOKEN` / `ADMIN_PASSWORD` — admin UI + admin writes (`/api/admin/*`, `/api/orders`, `/api/crm`, `/api/voice`, `/api/content/plan`, `/api/costing*`, `/api/logistics`, `/api/operations*`, `/api/dashboard/financials`). `CRON_SECRET` no longer works there.
+- `MEMORY_TOKEN` — `/api/memory/summary` (admin tokens also accepted).
+- `TELEGRAM_WEBHOOK_SECRET` — if set, `/api/telegram-webhook` requires the matching `X-Telegram-Bot-Api-Secret-Token` (re-run Telegram `setWebhook` with `secret_token`).
+- All guards fail closed when no token is configured. Rate limits (Postgres `rate_limit_hit`, fail-open): chat 20/min, leads 5/5min, payment-verify 6/5min, telegram-notify 5/5min, proofs 30/5min, telegram-webhook 120/min, per IP.
+
+## Cloud pull-request validation
+- `.github/workflows/ci.yml` runs `npm ci`, lint, tests, and `next build --webpack` on pull requests. It needs no application secrets, does not deploy, and does not let an agent change code.
+- To make it a merge gate, configure the target branch's GitHub ruleset/branch protection to require one approving review and the `CI / Validate` status check. Workflow runs alone do not enforce either rule.
+- The workflow uses GitHub-hosted runners and caches npm/Next.js build data. AI reviewer/model calls are intentionally not enabled; add them only after selecting a provider, budget, and token permissions.

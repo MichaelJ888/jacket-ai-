@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server';
+import { isCronAuthorized } from '../../_lib/auth';
 import { getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
 
 const ARCHIVE_AFTER_MONTHS = 6;
 const BATCH_SIZE = 500;
 
 function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // allow while CRON_SECRET is not yet configured, for initial setup/testing
-  return req.headers.get('authorization') === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 // Daily Vercel cron (see vercel.json): copies agent_memory_events rows older than
@@ -18,6 +17,8 @@ export async function GET(req: Request) {
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
+
+  await supabase.from('rate_limits').delete().lt('window_start', new Date(Date.now() - 24 * 3600 * 1000).toISOString());
 
   const cutoff = new Date();
   cutoff.setMonth(cutoff.getMonth() - ARCHIVE_AFTER_MONTHS);

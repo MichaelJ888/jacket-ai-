@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
+import { isAdminAuthorized } from '../_lib/auth';
 import { approveDispatch } from '../_lib/dispatch';
 import { escapeTelegramHtml, getSupabaseAdmin, reportCriticalError, sendTelegramMessage } from '../_lib/integrations';
 
 export async function POST(req: Request) {
+  if (!isAdminAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json();
     const action = String(body.action || '');

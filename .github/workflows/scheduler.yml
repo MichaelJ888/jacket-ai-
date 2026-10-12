@@ -1,4 +1,4 @@
-﻿name: External scheduler (Vercel Hobby cron workaround)
+name: External scheduler (Vercel Hobby cron workaround)
 
 # Vercel Hobby tier only runs native crons once/day (see vercel.json).
 # These routes need more frequent calls, so GitHub Actions plays external scheduler.
@@ -11,6 +11,7 @@ on:
     - cron: '0 2 1 * *'     # monthly repo watch
     - cron: '0 3 * * 3'     # weekly improvement scout (GitHub scan)
     - cron: '0 1 * * 1'     # weekly forecast + pricing advice, Monday 9am Manila
+    - cron: '0 10 * * *'    # payroll: Saturday sewers, 1st/16th employees (6pm Manila)
   workflow_dispatch: {}
 
 jobs:
@@ -21,7 +22,7 @@ jobs:
       - name: Call embroidery pickup alerts route
         run: |
           curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/embroidery-pickup-alerts" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   staff-task-watch:
     if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
@@ -30,7 +31,7 @@ jobs:
       - name: Call staff-reminders watch-mode route
         run: |
           curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/staff-reminders?type=watch" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   retry-queue:
     if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
@@ -39,7 +40,7 @@ jobs:
       - name: Process outbound retry queue
         run: |
           curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/retry-queue" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   sales-followups:
     if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
@@ -48,7 +49,7 @@ jobs:
       - name: Run sales follow-ups and post-sale outreach
         run: |
           curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/sales-followups" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   content-publisher:
     if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
@@ -57,7 +58,7 @@ jobs:
       - name: Advance videos and publish due social posts
         run: |
           curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   watchdog:
     if: github.event.schedule == '*/45 * * * *' || github.event_name == 'workflow_dispatch'
@@ -66,7 +67,7 @@ jobs:
       - name: Uptime and bottleneck watchdog
         run: |
           curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/watchdog" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   ceo-digest:
     if: github.event.schedule == '0 0 * * *' || github.event_name == 'workflow_dispatch'
@@ -75,7 +76,7 @@ jobs:
       - name: Send CEO briefing
         run: |
           curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/ceo-digest" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   backup:
     if: github.event.schedule == '0 19 * * 0' || github.event_name == 'workflow_dispatch'
@@ -84,7 +85,7 @@ jobs:
       - name: Weekly database backup
         run: |
           curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/backup" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   insights:
     if: github.event.schedule == '0 1 * * 1' || github.event_name == 'workflow_dispatch'
@@ -93,7 +94,7 @@ jobs:
       - name: Weekly forecast and pricing advice
         run: |
           curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/insights" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   repo-watch:
     if: github.event.schedule == '0 2 1 * *' || github.event_name == 'workflow_dispatch'
@@ -102,7 +103,7 @@ jobs:
       - name: Monthly open-source repo watch
         run: |
           curl -sf --max-time 90 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/repo-watch" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   improvement-scout:
     if: github.event.schedule == '0 3 * * 3' || github.event_name == 'workflow_dispatch'
@@ -111,4 +112,22 @@ jobs:
       - name: Weekly GitHub improvement scout
         run: |
           curl -sf --max-time 90 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/improvement-scout" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  swarm-worker:
+    if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Advance background agent-swarm jobs
+        run: |
+          curl -sf --max-time 70 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/swarm-worker" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  payroll:
+    if: github.event.schedule == '0 10 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate due payroll (sewers Saturday, employees 1st/16th)
+        run: |
+          curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/payroll" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"

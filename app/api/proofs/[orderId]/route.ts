@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimitResponse } from "../../_lib/rate-limit";
 
 import { buildProofApprovalState } from "../../../proofs/[orderId]/proof-logic";
 
@@ -19,6 +20,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ ord
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ orderId: string }> }) {
+  const limited = await rateLimitResponse(request, 'proofs', 30, 300);
+  if (limited) return limited;
   const { orderId } = await params;
   const body = await request.json();
 

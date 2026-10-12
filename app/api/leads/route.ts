@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { rateLimitResponse } from '../_lib/rate-limit';
 import { recordLead } from '../_lib/integrations';
 
 export async function POST(req: Request) {
+  const limited = await rateLimitResponse(req, 'leads', 5, 300);
+  if (limited) return limited;
   try {
     const body = await req.json();
     const result = await recordLead({

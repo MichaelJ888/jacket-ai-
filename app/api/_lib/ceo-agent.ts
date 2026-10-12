@@ -1,6 +1,8 @@
-﻿import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText, isStepCount, tool } from 'ai';
+import { withModelFallback } from './llm-pool';
 import { z } from 'zod';
+import { after } from 'next/server';
+import { advanceSwarmJob, createSwarmJob } from './swarm-jobs';
 import { autonomyLimitPhp, isShadowMode, isVacationMode, setSetting } from './ceo-control';
 
 import {
@@ -27,8 +29,6 @@ import {
   sendTelegramMessage,
 } from './integrations';
 
-const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
-const MODEL_ID = () => process.env.CEO_MODEL || 'gemini-3.6-flash';
 const HISTORY_LIMIT = 12;
 
 const SYSTEM_PROMPT = `You are the CEO's chief-of-staff AI for MJIC, a Philippine uniform/jacket/embroidery business. You talk ONLY with the CEO (the boss) in warm, concise Taglish. You run the business 24/7 for him.
@@ -208,6 +208,25 @@ function buildTools() {
       execute: async ({ kind, example }) => saveStyleExample(kind, example),
     }),
 
+    delegate_to_swarm: tool({
+      description: 'Hand a BIG parallelizable job (audit all orders/leads for issues, research many suppliers, review a large batch of items) to a team of AI agents: a lead splits it, workers do the parts, skeptics verify, a merger reports. Runs in the background and the result is sent to the CEO on Telegram in a few minutes. Costs real LLM tokens, so do NOT use for simple questions you can answer with the other tools. Default 24 agents, max 100.',
+      inputSchema: z.object({
+        goal: z.string().min(10).describe('The full job, self-contained.'),
+        context: z.string().optional().describe('Facts/data the agents need (they cannot call tools).'),
+        max_agents: z.number().int().min(3).max(100).optional(),
+      }),
+      execute: async ({ goal, context, max_agents }) => {
+        const job = await createSwarmJob(goal, context, max_agents);
+        if ('error' in job) return job;
+        try {
+          after(() => advanceSwarmJob(job.job_id).catch(() => undefined));
+        } catch {
+          // after() unavailable outside a request scope; the 5-minute scheduler picks the job up.
+        }
+        return { ...job, note: 'Started. Result will arrive on Telegram when finished (usually a few minutes).' };
+      },
+    }),
+
     set_operating_mode: tool({
       description: 'Switch the autopilot. shadow_mode on = AI only drafts customer replies and sends them to the CEO instead of the customer (dry run). vacation_mode on = CEO away; daily digest becomes detailed and risky items still need approval. autonomy_limit_php = peso amount above which the AI must ask. Call with no changes to just read current settings.',
       inputSchema: z.object({
@@ -237,14 +256,17 @@ export async function runCeoAgent(userText: string, audio?: { data: Uint8Array; 
     ? [{ type: 'text' as const, text: userText || 'Transcribe this voice note from the CEO and act on it.' }, { type: 'file' as const, mediaType: audio.mediaType, data: audio.data }]
     : userText;
 
-  const result = await generateText({
-    model: google(MODEL_ID()),
-    system: `${SYSTEM_PROMPT}\nToday (Asia/Manila): ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.`,
-    messages: [...history, { role: 'user', content: userContent }],
-    tools: buildTools(),
-    stopWhen: isStepCount(8),
-    abortSignal: AbortSignal.timeout(50000),
-  });
+  const result = await withModelFallback({ tier: 'strong', tools: true, budgetMs: 52000, attemptMs: 26000 }, (model, attemptMs) =>
+    generateText({
+      model,
+      system: `${SYSTEM_PROMPT}\nToday (Asia/Manila): ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.`,
+      messages: [...history, { role: 'user', content: userContent }],
+      tools: buildTools(),
+      stopWhen: isStepCount(8),
+      maxRetries: 0,
+      abortSignal: AbortSignal.timeout(attemptMs),
+    }),
+  );
 
   const reply = result.text.trim() || 'Done po, Boss.';
   if (supabase) {

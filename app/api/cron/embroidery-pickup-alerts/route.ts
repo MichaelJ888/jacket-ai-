@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isCronAuthorized } from '../../_lib/auth';
 import {
   claimEmbroideryPickupAlert,
   escapeTelegramHtml,
@@ -8,11 +9,7 @@ import {
 } from '../../_lib/integrations';
 
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return NextResponse.json({ error: 'CRON_SECRET is not configured' }, { status: 503 });
-  if (req.headers.get('authorization') !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const now = new Date();
   const due = await listDueEmbroideryPickupAlerts(now);

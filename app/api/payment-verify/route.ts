@@ -1,4 +1,5 @@
-﻿import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { rateLimitResponse } from '../_lib/rate-limit';
 import { generateText } from 'ai';
 import { NextResponse } from 'next/server';
 import { assessReceiptRisk } from '../_lib/fraud';
@@ -7,11 +8,14 @@ import { getSupabaseAdmin, reportCriticalError, sendTelegramMessage } from '../_
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 export async function POST(req: Request) {
+  const limited = await rateLimitResponse(req, 'payment-verify', 6, 300);
+  if (limited) return limited;
   try {
     const body = await req.json();
     const image = typeof body.image === 'string' ? body.image : '';
     const expectedAmount = Number(body.expectedAmount);
     const conversationId = typeof body.conversationId === 'string' ? body.conversationId : null;
+    const orderId = typeof body.orderId === 'string' && /^[0-9a-f-]{36}$/i.test(body.orderId) ? body.orderId : null;
 
     if (!/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=]+$/.test(image) || !Number.isFinite(expectedAmount) || expectedAmount <= 0) {
       return NextResponse.json({ error: 'A valid payment image and expected amount are required.' }, { status: 400 });
@@ -60,6 +64,7 @@ export async function POST(req: Request) {
         notes: parsed.notes || null,
         fraud_score: risk.score,
         fraud_flags: risk.flags,
+        order_id: orderId,
       }).select().single();
       if (error) console.error('Payment verification insert failed:', error.message);
       verificationId = verification?.id || null;

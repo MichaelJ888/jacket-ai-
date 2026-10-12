@@ -1,15 +1,12 @@
 import { NextResponse } from 'next/server';
+import { isMemoryAuthorized } from '../../_lib/auth';
 import { getSupabaseAdmin } from '../../_lib/integrations';
 
 const SCOPES = ['note', 'decision', 'issue', 'attempt', 'fix'] as const;
 
-// Read-only view into public.agent_memory_events, gated with the same CRON_SECRET used by cron routes.
+// Read-only view into public.agent_memory_events, gated by MEMORY_TOKEN (or an admin token).
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return NextResponse.json({ error: 'CRON_SECRET is not configured' }, { status: 503 });
-  if (req.headers.get('authorization') !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!isMemoryAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });

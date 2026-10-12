@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import { rateLimitResponse } from '../_lib/rate-limit';
 import { escapeTelegramHtml, sendTelegramMessage } from '../_lib/integrations';
 
 export async function POST(req: Request) {
+  const limited = await rateLimitResponse(req, 'telegram-notify', 5, 300);
+  if (limited) return limited;
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 

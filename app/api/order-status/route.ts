@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { confirmDeposit, holdOrder } from '../_lib/order-lifecycle';
 import { deductInventoryForOrder, escapeTelegramHtml, getSupabaseAdmin, reportCriticalError, sendTelegramMessage } from '../_lib/integrations';
 
 export async function POST(req: Request) {
   try {
     const secret = process.env.PAYMENT_WEBHOOK_SECRET;
-    if (secret && req.headers.get('x-payment-webhook-secret') !== secret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!secret || req.headers.get('x-payment-webhook-secret') !== secret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const body = await req.json();
     const verificationId = typeof body.verificationId === 'string' ? body.verificationId : '';
     const status = body.status === 'VERIFIED' ? 'VERIFIED' : 'REJECTED';
@@ -28,8 +29,18 @@ export async function POST(req: Request) {
         }
       }
     }
+    const orderId = typeof body.orderId === 'string' ? body.orderId : (data?.order_id as string | null);
+    let lifecycle: Awaited<ReturnType<typeof confirmDeposit>> | null = null;
+    if (orderId) {
+      if (status === 'VERIFIED') {
+        lifecycle = await confirmDeposit(orderId, verificationId);
+        if (lifecycle.ok) messageLines.push(`Order stage: <b>${lifecycle.stage}</b> · POs drafted: ${lifecycle.drafted?.length ?? 0}`);
+      } else {
+        await holdOrder(orderId, `Payment rejected: ${body.notes || 'no reason given'}`);
+      }
+    }
     await sendTelegramMessage(messageLines.join('\n'));
-    return NextResponse.json({ success: true, verification: data, orderStatus, inventory });
+    return NextResponse.json({ success: true, verification: data, orderStatus, inventory, lifecycle });
   } catch (error) {
     await reportCriticalError('order-status', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Order status update failed' }, { status: 400 });

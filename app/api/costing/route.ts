@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import { isAdminAuthorized } from '../_lib/auth';
 import { computeBom, draftPurchaseOrders, loadPrices } from '../_lib/bom';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../_lib/integrations';
 
@@ -7,6 +8,7 @@ export const dynamic = 'force-dynamic';
 // Per-order BOM + costing. Prices come from the admin price table (request *UnitCost fields override).
 // Set draftPurchaseOrders: true to auto-draft supplier POs (PENDING_APPROVAL) from the BOM.
 export async function POST(req: Request) {
+  if (!isAdminAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json();
     const prices = await loadPrices();

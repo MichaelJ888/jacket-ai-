@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isCronAuthorized } from '../../_lib/auth';
 import {
   escapeTelegramHtml,
   getSupabaseAdmin,
@@ -56,13 +57,10 @@ async function bookLalamove(dispatch: {
 }
 
 // Processes due rows in outbound_request_queue. Scheduled every 45 min by the GitHub Actions
-// retry-queue job (Vercel Hobby native crons are daily-only). Auth: same CRON_SECRET bearer
-// pattern as the other cron routes — open when the env var is unset (local dev convenience).
+// retry-queue job (Vercel Hobby native crons are daily-only). Auth: cron bearer token (fails closed)
+// like the other cron routes.
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (secret && req.headers.get('authorization') !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
 

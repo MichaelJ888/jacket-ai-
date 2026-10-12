@@ -1916,7 +1916,7 @@ function mjApp(){
       brandName: "CUSTOMIZED JACKETS", brandTagline: "AND MORE", logoImage: "",
       heroEyebrow: "We build brands through", heroTitle: "CUSTOMIZED JACKETS AND MORE",
       heroDescription: "Since 2004, Michael Jeffrey International Company has manufactured varsity jackets, corporate uniforms, and branded giveaways for enterprises, government offices, and organizations across the Philippines and abroad — from a 20-piece pilot order to full nationwide rollouts.",
-      heroImg1: "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=82", heroImg2: "https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=82", heroImg3: "https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=900&q=82",
+      heroImg1: "/images/site/hero1.jpg", heroImg2: "/images/site/hero2.jpg", heroImg3: "/images/site/hero3.jpg",
       explainerVideoUrl: "/mjic-demo-presentation.html", explainerVideoType: "youtube", ealaPhoto: "",
       facebook: "", instagram: "", tiktok: "", youtube: ""
     }),
@@ -1951,9 +1951,9 @@ function mjApp(){
     mediaIndex:0, newGalleryLink:{}, expandedGalleryId:null,
     newCrmOrder:{client:'', contact:'', details:'', qty:null, deadline:'', fabric:'', urgency:'Medium'},
     fabrics: safeLS.get('mji_fabrics', [
-      {name:'Microfiber', class:'Class B', description:'Lightweight, smooth, quick-drying polyester. Our most popular jacket shell.', bestFor:'Varsity jackets, windbreakers, corporate jackets', img:'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=80', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Maroon',hex:'#6B1F2C'},{name:'Green',hex:'#1E6B3C'},{name:'Gray',hex:'#77797C'},{name:'White',hex:'#F2F2F0'}]},
-      {name:'Michael Angelo', class:'Class B', description:'Soft-hand woven polyester with a subtle sheen and good body.', bestFor:'Corporate jackets, executive uniforms', img:'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=900&q=80', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Charcoal',hex:'#3A3D42'},{name:'Maroon',hex:'#6B1F2C'},{name:'Royal Blue',hex:'#1E4FBF'}]},
-      {name:'Diamond Ripstop', class:'Class B', description:'Diamond-grid weave that resists tearing and spreading damage.', bestFor:'Coveralls, security and military uniforms, workwear', img:'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Khaki',hex:'#9A8B66'},{name:'Olive Green',hex:'#4B5320'},{name:'Gray',hex:'#77797C'}]},
+      {name:'Microfiber', class:'Class B', description:'Lightweight, smooth, quick-drying polyester. Our most popular jacket shell.', bestFor:'Varsity jackets, windbreakers, corporate jackets', img:'/images/site/microfiber.jpg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Maroon',hex:'#6B1F2C'},{name:'Green',hex:'#1E6B3C'},{name:'Gray',hex:'#77797C'},{name:'White',hex:'#F2F2F0'}]},
+      {name:'Michael Angelo', class:'Class B', description:'Soft-hand woven polyester with a subtle sheen and good body.', bestFor:'Corporate jackets, executive uniforms', img:'/images/site/corporate.jpg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Charcoal',hex:'#3A3D42'},{name:'Maroon',hex:'#6B1F2C'},{name:'Royal Blue',hex:'#1E4FBF'}]},
+      {name:'Diamond Ripstop', class:'Class B', description:'Diamond-grid weave that resists tearing and spreading damage.', bestFor:'Coveralls, security and military uniforms, workwear', img:'/images/site/softshell.jpg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Khaki',hex:'#9A8B66'},{name:'Olive Green',hex:'#4B5320'},{name:'Gray',hex:'#77797C'}]},
       {name:'Honeycomb / Pique', class:'Class B', description:'Textured knit with visible mesh structure — breathable and stretchy.', bestFor:'Corporate polo shirts, school PE uniforms', img:'', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'White',hex:'#F2F2F0'},{name:'Red',hex:'#B61B25'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Green',hex:'#1E6B3C'}]},
       {name:'Dri-Fit / Performance Knit', class:'Class A', description:'Moisture-wicking knit that pulls sweat away from the skin.', bestFor:'Field teams, sports uniforms, outdoor staff polos', img:'', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Gray',hex:'#77797C'}]},
       {name:'Oxford / Broadcloth', class:'Class A', description:'Crisp woven cotton-blend with a clean, formal finish.', bestFor:'Corporate long-sleeve uniforms, executive shirts', img:'', video:'', colors:[{name:'White',hex:'#F2F2F0'},{name:'Light Blue',hex:'#A7C4DC'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Gray',hex:'#77797C'}]},
@@ -2089,19 +2089,25 @@ function mjApp(){
 
     defaultProducts(){
       const productImages = {
-        varsity1:'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=82',
-        varsity2:'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=82',
-        varsity3:'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=900&q=82',
-        exec1:'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=82',
-        wind1:'https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?auto=format&fit=crop&w=900&q=82',
-        wind2:'https://images.unsplash.com/photo-1544966503-7cc5ac882d5f?auto=format&fit=crop&w=900&q=82',
-        bomber1:'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=82',
-        bomber2:'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=82',
-        polo1:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=82',
-        scrub1:'https://images.unsplash.com/photo-1584982751601-97dcc096659c?auto=format&fit=crop&w=900&q=82',
-        tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82',
-        coverall1:'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=82'
-      };
+varsity1:'/images/site/varsity-letterman.jpg',
+varsity2:'/images/site/varsity-collegiate.jpg',
+varsity3:'/images/site/varsity-satin.jpg',
+exec1:'/images/site/softshell.jpg',
+exec2:'/images/site/padded.jpg',
+exec3:'/images/site/corporate.jpg',
+wind1:'/images/site/windbreaker.jpg',
+wind2:'/images/site/windbreaker-hood.jpg',
+hivis1:'/images/site/hivis.jpg',
+hivis2:'/images/site/hivis.jpg',
+bomber1:'/images/site/sublimation-racing.jpg',
+bomber2:'/images/site/sublimation-org.jpg',
+scrub1:'/images/site/scrub.jpg',
+scrub2:'/images/site/labgown.jpg',
+coverall1:'/images/site/coverall.jpg',
+polo3:'/images/site/coverall.jpg',
+polo1:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=82',
+tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82'
+};
       const img = (seed) => productImages[seed] || productImages.exec1;
       const P = (id,title,category,moq,leadTime,desc,seed) => ({id,title,category,moq,leadTime,description:desc,img:img(seed)});
       return [
@@ -2165,16 +2171,19 @@ function mjApp(){
       if(storedProducts){
         this.products.forEach(product=>{
           const replacement = defaultProducts.find(defaultProduct=> defaultProduct.id===product.id);
-          if(replacement && typeof product.img==='string' && product.img.includes('picsum.photos')) product.img = replacement.img;
+          if(replacement && typeof product.img==='string' && /picsum\.photos|images\.unsplash\.com/.test(product.img) && !/unsplash/.test(replacement.img)) product.img = replacement.img;
         });
         this.saveProducts();
       } else this.saveProducts();
-      if(typeof this.siteSettings.heroImg1==='string' && this.siteSettings.heroImg1.includes('picsum.photos')){
-        this.siteSettings.heroImg1 = 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=82';
-        this.siteSettings.heroImg2 = 'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=82';
-        this.siteSettings.heroImg3 = 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=900&q=82';
+      if(['heroImg1','heroImg2','heroImg3'].some(k=>/picsum\.photos|images\.unsplash\.com/.test(this.siteSettings[k]||''))){
+        this.siteSettings.heroImg1 = '/images/site/hero1.jpg';
+        this.siteSettings.heroImg2 = '/images/site/hero2.jpg';
+        this.siteSettings.heroImg3 = '/images/site/hero3.jpg';
         safeLS.set('mji_site_settings', this.siteSettings);
       }
+      const fabricPhotos = {'Microfiber':'microfiber','Michael Angelo':'corporate','Diamond Ripstop':'softshell'};
+      this.fabrics.forEach(f=>{ if(fabricPhotos[f.name] && /images\.unsplash\.com/.test(f.img||'')) f.img = '/images/site/'+fabricPhotos[f.name]+'.jpg'; });
+      this.saveFabrics();
       this.chatLog = [{from:'bot', text:"Hi! I'm the MJ auto-assistant. Ask me about MOQ, pricing tiers, fabrics, lead time, delivery, or payment options."}];
 
       // Honest visitor counter — counts visits FROM THIS BROWSER ONLY (localStorage is per-device,
@@ -2390,13 +2399,13 @@ function mjApp(){
 
     fabricImage(name){
       const images = {
-        'Microfiber':'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=80',
-        'Michael Angelo':'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=900&q=80',
-        'Diamond Ripstop':'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=900&q=80',
-        'Cotton Fleece':'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=80',
-        'Varsity Satin':'https://images.unsplash.com/photo-1551028719-00167b16eac5?auto=format&fit=crop&w=900&q=80'
+        'Microfiber':'/images/site/microfiber.jpg',
+        'Michael Angelo':'/images/site/corporate.jpg',
+        'Diamond Ripstop':'/images/site/softshell.jpg',
+        'Cotton Fleece':'/images/site/fleece.jpg',
+        'Varsity Satin':'/images/site/varsity-satin.jpg'
       };
-      return images[name] || 'https://images.unsplash.com/photo-1598033129183-c4f50c736f10?auto=format&fit=crop&w=900&q=80';
+      return images[name] || '/images/site/varsity-letterman.jpg';
     },
 
     pickFabric(fabric, color){
@@ -3049,7 +3058,7 @@ function mjApp(){
 
       this.products.push({
         id: Date.now(), title:n.title, category:n.category, moq:n.moq||20,
-        img: n.img || 'https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?auto=format&fit=crop&w=900&q=82',
+        img: n.img || '/images/site/varsity-letterman.jpg',
         description: n.description || '', leadTime:n.leadTime||'10–14 business days'
       });
       this.saveProducts();
@@ -3282,5 +3291,6 @@ function fictionalLiveOrders() {
   </div>
   <button @click="showToast = false" class="text-slate-400 hover:text-slate-600 ml-auto">✕</button>
 </div>
+<script src="/live-ticker.js" defer></script>
 </body>
 </html>

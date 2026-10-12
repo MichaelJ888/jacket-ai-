@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { isCronAuthorized } from '../_lib/auth';
+import { isAdminAuthorized } from '../_lib/auth';
 import { sendChannelMessage } from '../_lib/channels';
 import { logMessage, updateContact, type CrmContact } from '../_lib/crm';
 import { getSupabaseAdmin } from '../_lib/integrations';
@@ -11,7 +11,7 @@ const STAGES = ['new', 'engaged', 'quoted', 'negotiating', 'won', 'lost', 'dorma
 
 // GET ?id=<contact>  -> contact + conversation;  GET ?stage=quoted -> list;  GET -> pipeline counts + hottest leads.
 export async function GET(request: Request) {
-  if (!isCronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
   const params = new URL(request.url).searchParams;
@@ -43,7 +43,7 @@ export async function GET(request: Request) {
 
 // POST { id, stage?, tags?, ai_paused?, delivered?, reply?, order_value? }
 export async function POST(request: Request) {
-  if (!isCronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
 

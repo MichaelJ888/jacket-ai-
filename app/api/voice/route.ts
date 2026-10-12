@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { isCronAuthorized } from '../_lib/auth';
+import { isAdminAuthorized } from '../_lib/auth';
 import { getSupabaseAdmin } from '../_lib/integrations';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,7 @@ const AUDIENCES = ['client', 'employee', 'supplier'];
 
 // Bulk-teach the AI how the CEO answers. Body: { audience, examples: [{ prompt?, reply }] } or { audience, text } (blank-line separated).
 export async function POST(request: Request) {
-  if (!isCronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
 
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (!isCronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
   const counts: Record<string, number> = {};

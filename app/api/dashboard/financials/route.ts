@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isAdminAuthorized } from '../../_lib/auth';
 
 import { getSupabaseAdmin } from '../../_lib/integrations';
 import { buildFinancialDashboard, type FinancialProjectInput } from '../../../dashboard/financials/financial-logic';
@@ -8,7 +9,8 @@ function toNumber(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-export async function GET() {
+export async function GET(req: Request) {
+  if (!isAdminAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });

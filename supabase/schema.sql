@@ -386,6 +386,24 @@ create table if not exists public.ceo_conversations (
 );
 alter table public.ceo_conversations enable row level security;
 
+create table if not exists public.swarm_jobs (
+  id uuid default gen_random_uuid() primary key,
+  goal text not null,
+  context text,
+  max_agents integer not null default 24,
+  status text not null default 'RUNNING' check (status in ('RUNNING', 'DONE', 'FAILED')),
+  state jsonb,
+  report text,
+  slices integer not null default 0,
+  locked_until timestamptz,
+  last_error text,
+  created_at timestamptz default now(),
+  completed_at timestamptz
+);
+create index if not exists swarm_jobs_status_idx on public.swarm_jobs (status, created_at);
+alter table public.swarm_jobs enable row level security;
+revoke all on public.swarm_jobs from anon, authenticated;
+
 create table if not exists public.ledger_entries (
   id uuid default gen_random_uuid() primary key,
   entry_date date not null default ((now() at time zone 'Asia/Manila')::date),
@@ -648,3 +666,135 @@ insert into public.repo_candidates (url, purpose, license, status, notes) values
   ('https://github.com/inkstitch/inkstitch', 'Digitizing algorithms reference', 'GPL-3.0', 'reference-only', 'Do not copy code'),
   ('https://github.com/Embroidermodder/libembroidery', 'Format reference', 'Zlib', 'reference-only', 'Format ideas')
 on conflict (url) do nothing;
+
+-- Order lifecycle: deposit -> POs -> production stages -> delivery -> post-sale
+create table if not exists public.orders (
+  id uuid default gen_random_uuid() primary key,
+  order_number text unique not null,
+  costing_id uuid references public.project_costings(id),
+  contact_id uuid references public.crm_contacts(id),
+  client_name text,
+  project_name text,
+  contact_phone text,
+  delivery_address text,
+  quantity numeric,
+  total_amount numeric not null default 0,
+  deposit_amount numeric not null default 0,
+  stage text not null default 'AWAITING_DEPOSIT',
+  deposit_verification_id uuid references public.payment_verifications(id),
+  po_drafted_at timestamptz,
+  dispatch_id uuid,
+  delivered_at timestamptz,
+  aftercare_notified_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create table if not exists public.order_events (
+  id uuid default gen_random_uuid() primary key,
+  order_id uuid not null references public.orders(id) on delete cascade,
+  from_stage text,
+  to_stage text not null,
+  note text,
+  created_at timestamptz default now()
+);
+
+alter table public.orders enable row level security;
+alter table public.order_events enable row level security;
+create index if not exists orders_stage_idx on public.orders (stage, created_at desc);
+create index if not exists order_events_order_idx on public.order_events (order_id, created_at);
+revoke all on public.orders from anon, authenticated;
+revoke all on public.order_events from anon, authenticated;
+
+alter table public.purchase_orders add column if not exists order_id uuid references public.orders(id);
+alter table public.payment_verifications add column if not exists order_id uuid references public.orders(id);
+alter table public.dispatch_requests add column if not exists order_id uuid references public.orders(id);
+
+-- Rate limiting (fixed window, atomic upsert) -------------------------------
+create table if not exists public.rate_limits (
+  key text primary key,
+  window_start timestamptz not null default now(),
+  hits integer not null default 0
+);
+alter table public.rate_limits enable row level security;
+revoke all on public.rate_limits from anon, authenticated;
+
+create or replace function public.rate_limit_hit(p_key text, p_window_seconds integer, p_max integer)
+returns table (limited boolean, retry_after integer)
+language plpgsql security definer set search_path = public as $$
+declare
+  v_hits integer;
+  v_start timestamptz;
+begin
+  insert into public.rate_limits as r (key, window_start, hits)
+  values (p_key, now(), 1)
+  on conflict (key) do update set
+    window_start = case when r.window_start < now() - make_interval(secs => p_window_seconds) then now() else r.window_start end,
+    hits = case when r.window_start < now() - make_interval(secs => p_window_seconds) then 1 else r.hits + 1 end
+  returning r.hits, r.window_start into v_hits, v_start;
+  limited := v_hits > p_max;
+  retry_after := greatest(1, ceil(extract(epoch from (v_start + make_interval(secs => p_window_seconds) - now())))::integer);
+  return next;
+end $$;
+revoke all on function public.rate_limit_hit(text, integer, integer) from public, anon, authenticated;
+grant execute on function public.rate_limit_hit(text, integer, integer) to service_role;
+
+-- ---------------- Payroll (employees semi-monthly, sewers weekly, subcons per project) ----------------
+create table if not exists public.payroll_workers (
+  id uuid default gen_random_uuid() primary key,
+  name text unique not null,
+  kind text not null default 'employee' check (kind in ('employee', 'sewer', 'subcon')),
+  monthly_salary numeric,
+  per_minute_rate numeric,
+  telegram_user_id text unique,
+  aliases text[] not null default '{}',
+  active boolean not null default true,
+  created_at timestamptz default now()
+);
+
+create table if not exists public.sewer_output (
+  id uuid default gen_random_uuid() primary key,
+  worker_name text not null,
+  work_date date not null default ((now() at time zone 'Asia/Manila')::date),
+  item text,
+  quantity numeric not null check (quantity > 0),
+  rate numeric not null check (rate >= 0),
+  amount numeric generated always as (quantity * rate) stored,
+  created_at timestamptz default now()
+);
+create index if not exists sewer_output_idx on public.sewer_output (worker_name, work_date);
+
+create table if not exists public.subcon_jobs (
+  id uuid default gen_random_uuid() primary key,
+  subcon_name text not null,
+  job_ref text,
+  order_id uuid,
+  description text,
+  amount numeric not null check (amount > 0),
+  status text not null default 'OPEN' check (status in ('OPEN', 'DONE')),
+  completed_at timestamptz,
+  created_at timestamptz default now()
+);
+create index if not exists subcon_jobs_order_idx on public.subcon_jobs (order_id);
+
+create table if not exists public.payroll_runs (
+  id uuid default gen_random_uuid() primary key,
+  kind text not null check (kind in ('employee', 'sewer', 'subcon')),
+  period_start date not null,
+  period_end date not null,
+  subject_key text not null default '',
+  label text not null,
+  status text not null default 'DRAFT' check (status in ('DRAFT', 'PAID')),
+  total numeric not null default 0,
+  lines jsonb not null default '[]'::jsonb,
+  notes text[] not null default '{}',
+  paid_at timestamptz,
+  created_at timestamptz default now(),
+  unique (kind, period_start, period_end, subject_key)
+);
+
+alter table public.payroll_workers enable row level security;
+alter table public.sewer_output enable row level security;
+alter table public.subcon_jobs enable row level security;
+alter table public.payroll_runs enable row level security;
+revoke all on public.payroll_workers, public.sewer_output, public.subcon_jobs, public.payroll_runs from anon, authenticated;

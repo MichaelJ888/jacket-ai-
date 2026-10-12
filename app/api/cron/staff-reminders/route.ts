@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isCronAuthorized } from '../../_lib/auth';
 import {
   composeBossStyleMessage,
   getStaffProfile,
@@ -13,9 +14,7 @@ import {
 const STAFF_NAMES = ['Jonathan', 'Linda'];
 
 function isAuthorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // allow while CRON_SECRET is not yet configured, for initial setup/testing
-  return req.headers.get('authorization') === `Bearer ${secret}`;
+  return isCronAuthorized(req);
 }
 
 export async function GET(req: Request) {

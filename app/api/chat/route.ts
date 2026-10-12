@@ -1,6 +1,9 @@
 import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { rateLimitResponse } from '../_lib/rate-limit';
 import { isStepCount, streamText } from 'ai';
+import { markFailure, pickModel } from '../_lib/llm-pool';
+import { INJECTION_GUARD_ADDENDUM, detectPromptInjection, redactSecrets, sanitizeChatMessages } from '../_lib/chat-guard';
+import { shouldUseQuoteModel } from '../_lib/chat-model-router';
 import { escapeTelegramHtml, recordChatMessage, sendTelegramMessage } from '../_lib/integrations';
 import { FIRST_MESSAGE_ADDENDUM, MJIC_SYSTEM_PROMPT } from '../_lib/mjic-prompt';
 import { mjicQuoteTool } from '../_lib/sales-tools';
@@ -8,30 +11,39 @@ import { mjicQuoteTool } from '../_lib/sales-tools';
 const anthropic = createAnthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || '',
 });
-const google = createGoogleGenerativeAI({
-  apiKey: process.env.GEMINI_API_KEY || '',
-});
 
 export const maxDuration = 30;
 
 export async function POST(req: Request) {
+  const limited = await rateLimitResponse(req, 'chat', 20, 60);
+  if (limited) return limited;
   try {
     const body = await req.json();
-    const messages = Array.isArray(body.messages) ? body.messages : [];
+    const messages = sanitizeChatMessages(body.messages);
+    if (!messages.length || messages[messages.length - 1].role !== 'user') {
+      return Response.json({ error: 'A user message is required.' }, { status: 400 });
+    }
     const conversationId = typeof body.conversationId === 'string' ? body.conversationId : crypto.randomUUID();
+    const useQuoteModel = shouldUseQuoteModel(messages);
+
+    if (useQuoteModel && !process.env.ANTHROPIC_API_KEY) {
+      return Response.json({ error: 'Quote requests require ANTHROPIC_API_KEY to be configured.' }, { status: 503 });
+    }
 
     const lastMessage = messages[messages.length - 1];
     if (lastMessage?.role === 'user' && typeof lastMessage.content === 'string' && lastMessage.content) {
-      await recordChatMessage({ role: 'user', content: lastMessage.content, conversationId });
+      const safeContent = redactSecrets(lastMessage.content);
+      const flagged = detectPromptInjection(lastMessage.content);
+      await recordChatMessage({ role: 'user', content: safeContent, conversationId });
       void sendTelegramMessage([
-        '<b>MJIC AI CHAT INQUIRY</b>',
+        flagged ? '<b>MJIC AI CHAT INQUIRY ⚠️ possible prompt injection</b>' : '<b>MJIC AI CHAT INQUIRY</b>',
         `<b>Conversation:</b> <code>${escapeTelegramHtml(conversationId)}</code>`,
-        `<b>Message:</b> ${escapeTelegramHtml(lastMessage.content)}`,
+        `<b>Message:</b> ${escapeTelegramHtml(safeContent)}`,
       ].join('\n'));
     }
 
     const isFirstCustomerMessage = messages.filter((message: { role?: string }) => message?.role === 'user').length <= 1;
-    const systemPrompt = isFirstCustomerMessage ? `${MJIC_SYSTEM_PROMPT}${FIRST_MESSAGE_ADDENDUM}` : MJIC_SYSTEM_PROMPT;
+    const systemPrompt = `${isFirstCustomerMessage ? `${MJIC_SYSTEM_PROMPT}${FIRST_MESSAGE_ADDENDUM}` : MJIC_SYSTEM_PROMPT}${INJECTION_GUARD_ADDENDUM}`;
 
     // Cache the (large, mostly static) system prompt on Anthropic's side so repeat
     // requests re-read it from cache instead of paying full input-token price every turn.
@@ -42,12 +54,19 @@ export async function POST(req: Request) {
       providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
     };
 
+    const pooled = useQuoteModel ? null : pickModel('strong', true);
+
     const result = streamText({
-      model: process.env.GEMINI_API_KEY
-        ? google('gemini-3.6-flash')
-        : anthropic('claude-sonnet-4-5'),
+      model: useQuoteModel
+        ? anthropic('claude-sonnet-4-5')
+        : pooled
+          ? pooled.model
+          : anthropic('claude-sonnet-4-5'),
       messages: [systemMessage, ...messages],
       stopWhen: isStepCount(3),
+      onError: ({ error }) => {
+        if (pooled) markFailure(pooled.id, error); // next customer is routed to a healthy model
+      },
       onFinish: async ({ text }) => {
         if (text) await recordChatMessage({ role: 'assistant', content: text, conversationId });
       },

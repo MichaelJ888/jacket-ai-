@@ -108,7 +108,10 @@ export default function AdminPage() {
     <main className="mx-auto max-w-5xl p-6 text-zinc-900">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">MJIC Admin</h1>
-        <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
+        <div className="flex items-center gap-4">
+          <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
+          <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
+        </div>
       </div>
       <nav className="mb-4 flex gap-2">
         {([["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["overview", "Overview"]] as const).map(([id, label]) => (

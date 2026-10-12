@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isAdminAuthorized } from '../../_lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -193,6 +194,7 @@ function manilaDate() {
 }
 
 export async function POST(request: Request) {
+  if (!isAdminAuthorized(request)) return Response.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const result = checklistSchema.safeParse(await request.json());
     if (!result.success) {

@@ -83,6 +83,13 @@ export async function GET(request: Request) {
       await updateContact(contact.id, { review_requested_at: now.toISOString(), ...(ok ? { last_outbound_at: now.toISOString() } : {}) });
       if (ok) summary.reviews += 1;
     }
+    // Delivered orders with no CRM contact can't get an automated message — nudge staff for a personal follow-up.
+    const manual = await supabase.from('orders').select('id, order_number, client_name').is('contact_id', null).is('aftercare_notified_at', null).not('delivered_at', 'is', null).lte('delivered_at', new Date(now.getTime() - 24 * HOURS).toISOString()).limit(5);
+    for (const order of manual.data || []) {
+      void sendTelegramMessage(`<b>Post-sale follow-up due</b>: ${escapeTelegramHtml(`${order.order_number} · ${order.client_name || 'customer'}`)} was delivered 24h+ ago. Please check satisfaction and ask for a review/reorder.`);
+      await supabase.from('orders').update({ aftercare_notified_at: now.toISOString() }).eq('id', order.id);
+      summary.reviews += 1;
+    }
   }
 
   await recordHeartbeat('sales-followups', 'ok', summary);
