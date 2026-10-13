@@ -157,7 +157,7 @@ function FeaturesSection() {
       >
         <h2 className="text-4xl font-bold mb-4">Why Choose Us</h2>
         <p className="text-xl text-gray-600">
-          Three reasons we're different
+          Three reasons we&apos;re different
         </p>
       </motion.div>
 
@@ -213,7 +213,7 @@ function TestimonialSection() {
           }}
           className="text-3xl md:text-4xl font-light italic mb-8"
         >
-          "This changed everything about how we work"
+          &ldquo;This changed everything about how we work&rdquo;
         </motion.blockquote>
 
         <motion.p

@@ -116,10 +116,10 @@
   var orders = buildOrders();
 
   function load() {
-    try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s.n === 'number') return s; } catch (e) {}
+    try { var s = JSON.parse(localStorage.getItem(KEY)); if (s && typeof s.n === 'number') return s; } catch {}
     return { n: 0, muted: false };
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch {} }
   var state = load();
 
   // Soft two-note chime; browsers only allow audio after a user gesture, so it arms on first interaction.
@@ -129,7 +129,7 @@
     try {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (AC) audioCtx = new AC();
-    } catch (e) {}
+    } catch {}
   }
   ['pointerdown', 'keydown', 'touchstart'].forEach(function (ev) {
     window.addEventListener(ev, armAudio, { once: true, passive: true });
@@ -152,7 +152,7 @@
         o.start(now + i * 0.12);
         o.stop(now + i * 0.12 + 0.5);
       });
-    } catch (e) {}
+    } catch {}
   }
 
   var css = document.createElement('style');

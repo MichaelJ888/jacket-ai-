@@ -1,0 +1,78 @@
+name: Deploy
+
+# Autopilot: validate -> deploy to production -> smoke test -> auto-rollback + Telegram alert on failure.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VERCEL_TEAM_ID: ${{ secrets.VERCEL_ORG_ID }}
+  APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+  MANYCHAT_WEBHOOK_SECRET: ${{ secrets.MANYCHAT_WEBHOOK_SECRET }}
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # next.config.ts ignores TS/eslint errors at build time, so gate here.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Tests
+        run: npm test
+
+      - name: Remember last good production deployment
+        id: previous
+        run: |
+          url=$(curl -sf -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&teamId=$VERCEL_TEAM_ID&target=production&state=READY&limit=1" \
+            | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).deployments?.[0]?.url||''))")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Re-apply production protection setting
+        run: node scripts/smoke.mjs --heal-only
+
+      - name: Deploy to Vercel production
+        run: npx vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+
+      - name: Smoke test
+        id: smoke
+        run: node scripts/smoke.mjs
+
+      - name: Roll back on failure
+        if: failure() && steps.smoke.outcome == 'failure' && steps.previous.outputs.url != ''
+        run: npx vercel rollback "${{ steps.previous.outputs.url }}" --yes --token "$VERCEL_TOKEN"
+
+      - name: Notify Telegram
+        if: always()
+        run: |
+          status="${{ job.status }}"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=Deploy ${status} (${GITHUB_SHA::7}) - ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" || true

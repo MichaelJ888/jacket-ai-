@@ -22,6 +22,7 @@ const REQUIRED_ENV = [
 ];
 
 const OPTIONAL_ENV = [
+  'VERCEL_TOKEN',
   'META_PAGE_ACCESS_TOKEN',
   'META_PAGE_ID',
   'META_IG_USER_ID',

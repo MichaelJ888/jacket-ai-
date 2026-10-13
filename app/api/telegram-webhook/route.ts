@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+﻿import { NextResponse, after } from 'next/server';
+import { runCeoAgent } from '../_lib/ceo-agent';
 import { rateLimitResponse } from '../_lib/rate-limit';
 import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
@@ -22,6 +23,8 @@ import {
   setEmbroideryPickupCommitment,
   sendTelegramDirectMessage,
 } from '../_lib/integrations';
+
+export const maxDuration = 60;
 
 const STAFF = ['Jonathan', 'Linda'] as const;
 type StaffName = (typeof STAFF)[number];
@@ -146,7 +149,7 @@ export async function POST(req: Request) {
     const [command, nameValue, ...restWords] = text.split(/\s+/);
     const staffName = nameValue ? normalizeStaffName(nameValue) : null;
     const freeText = restWords.join(' ').trim();
-    let reply = 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm.';
+    let reply = '';
 
     if (/^pickup$/i.test(command)) {
       reply = await handlePickupCommand(nameValue || '', freeText);
@@ -165,6 +168,27 @@ export async function POST(req: Request) {
       reply = staffName && freeText ? await handleTaskCommand(staffName, freeText, priority === 'task' ? 'normal' : priority) : `Use: ${command.toUpperCase()} Jonathan <bilin text>`;
     } else if (/^start$/i.test(command)) {
       reply = 'MJIC Ops Bot ready. Use IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, or PICKUP <job-id> YYYY-MM-DD HH:mm.';
+    }
+
+    if (!reply) {
+      const ceoUserId = process.env.TELEGRAM_CEO_USER_ID;
+      if (ceoUserId && String(message.from?.id) !== ceoUserId) {
+        await sendTelegramDirectMessage(String(chatId), 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm.');
+        return NextResponse.json({ ok: true });
+      }
+      const ceoText = text.replace(/@\w*bot\b/gi, '').trim() || text;
+      after(async () => {
+        let answer: string;
+        try {
+          answer = await runCeoAgent(ceoText);
+        } catch (error) {
+          console.error('CEO agent failed:', error);
+          await reportCriticalError('telegram-ceo-agent', error);
+          answer = 'Sorry Boss, busy ang AI models ngayon. Subukan ulit in a minute. (Commands: IN/OUT/PAYROLL/TASK/PICKUP still work.)';
+        }
+        await sendTelegramDirectMessage(String(chatId), answer.slice(0, 4000));
+      });
+      return NextResponse.json({ ok: true });
     }
 
     await sendTelegramDirectMessage(String(chatId), reply);

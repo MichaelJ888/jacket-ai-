@@ -4,6 +4,7 @@ import { isCronAuthorized } from '../../_lib/auth';
 import { createApproval, expireOldApprovals } from '../../_lib/ceo-control';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { composeBossStyleMessage, escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
+import { ensureProductionPublic } from '../../_lib/vercel-protection';
 import { hindsightRecall } from '../../_lib/hindsight.ts';
 import type { Channel } from '../../_lib/crm';
 
@@ -17,6 +18,10 @@ export async function GET(request: Request) {
   if (!isCronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   const problems: string[] = [];
+
+  const protection = await ensureProductionPublic();
+  if (protection.status === 'healed') problems.push(`self-healed: Vercel Deployment Protection had drifted (${protection.detail}); production is public again`);
+  else if (protection.status === 'error') problems.push(`vercel protection check failed (${protection.detail})`);
 
   try {
     const response = await fetch(`${new URL(request.url).origin}/api/health`, { signal: AbortSignal.timeout(20000), cache: 'no-store' });
