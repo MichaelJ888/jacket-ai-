@@ -1,5 +1,6 @@
 import { runSwarm, type SwarmState } from './swarm';
 import { createPoolRunner } from './swarm-runner';
+import { hindsightRetain } from './hindsight.ts';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from './integrations';
 
 // CEO-initiated swarms are capped well below the engine's 1,000 ceiling: each agent is a paid LLM call.
@@ -76,6 +77,7 @@ async function advanceOnce(jobId: string): Promise<Outcome> {
       const report = result.state.report ?? '(empty report)';
       await supabase.from('swarm_jobs').update({ status: 'DONE', state: result.state, report, slices, locked_until: null, completed_at: new Date().toISOString() }).eq('id', jobId);
       await sendTelegramMessage(`<b>Swarm done</b> (${result.state.agentsUsed} agents)\n<i>${escapeTelegramHtml(job.goal.slice(0, 120))}</i>\n\n${escapeTelegramHtml(report.slice(0, 3500))}`);
+      void hindsightRetain(`Swarm goal: "${job.goal}". Key findings: ${report.slice(0, 800)}`, { scope: 'decision', location: `swarm:${jobId}` });
       return 'done';
     }
     if (slices >= MAX_SLICES) throw new Error(`Gave up after ${MAX_SLICES} slices`);

@@ -1,6 +1,6 @@
-﻿import mammoth from 'mammoth';
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../../_lib/auth';
+import { documentToText, MAX_DOC_BYTES } from '../../_lib/doc-to-text';
 import { getSupabaseAdmin } from '../../_lib/integrations';
 import { parseQaText } from '../../_lib/voice-import';
 
@@ -23,9 +23,13 @@ export async function POST(request: Request) {
     audience = String(form.get('audience') || 'client');
     const file = form.get('file');
     if (file instanceof File && file.size > 0) {
-      if (file.size > 8 * 1024 * 1024) return NextResponse.json({ error: 'File too large (8MB max)' }, { status: 413 });
+      if (file.size > MAX_DOC_BYTES) return NextResponse.json({ error: 'File too large (8MB max)' }, { status: 413 });
       const buffer = Buffer.from(await file.arrayBuffer());
-      text = /\.docx$/i.test(file.name) ? (await mammoth.extractRawText({ buffer })).value : buffer.toString('utf8');
+      try {
+        text = await documentToText(file.name, buffer);
+      } catch {
+        return NextResponse.json({ error: 'Could not read that file. Use .docx, .pdf, .xlsx or .txt.' }, { status: 400 });
+      }
     }
     text = `${text}\n\n${String(form.get('text') || '')}`.trim();
   } else {

@@ -1,9 +1,11 @@
 ﻿import { NextResponse } from 'next/server';
 
 import { isCronAuthorized } from '../../_lib/auth';
-import { expireOldApprovals } from '../../_lib/ceo-control';
+import { createApproval, expireOldApprovals } from '../../_lib/ceo-control';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
-import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
+import { composeBossStyleMessage, escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
+import { hindsightRecall } from '../../_lib/hindsight.ts';
+import type { Channel } from '../../_lib/crm';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -39,6 +41,90 @@ export async function GET(request: Request) {
     if (stuckDispatch.count) problems.push(`bottleneck: ${stuckDispatch.count} delivery request(s) stuck over 12h`);
     if (oldApprovals.count) problems.push(`${oldApprovals.count} approval(s) waiting for you over 6h`);
     if (silent.count) problems.push(`${silent.count} customer(s) waiting for your personal reply over 4h`);
+
+    // Auto Self-Healing & Solution Proposing:
+    // 1. If customers are waiting with AI paused, draft a solution for the CEO with 1-tap Approve/Reject
+    if (silent.count && silent.count > 0) {
+      const { data: pausedContacts } = await supabase
+        .from('crm_contacts')
+        .select('id, channel, external_id, name, phone')
+        .eq('ai_paused', true)
+        .lt('last_inbound_at', hours(4))
+        .gt('last_inbound_at', hours(48))
+        .limit(2);
+
+      const { data: pendingApprovals } = await supabase
+        .from('approvals')
+        .select('payload')
+        .eq('status', 'PENDING')
+        .eq('kind', 'customer_reply');
+
+      const existingContactIds = new Set(
+        (pendingApprovals || []).map((a) => (a.payload as { contactId?: string })?.contactId).filter(Boolean),
+      );
+
+      for (const contact of pausedContacts || []) {
+        if (!existingContactIds.has(contact.id)) {
+          const { data: lastMsg } = await supabase
+            .from('inbox_messages')
+            .select('content')
+            .eq('contact_id', contact.id)
+            .eq('direction', 'in')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const clientName = contact.name || 'po';
+          const draft = await composeBossStyleMessage(
+            `Hi ${clientName}, pasensya na sa delay po! Checking this with our production team right now, update kita agad today.`,
+          );
+
+          await createApproval({
+            kind: 'customer_reply',
+            summary: `Customer ${contact.name || contact.phone || 'Client'} (${contact.channel}) has been waiting >4h.\nMessage: "${lastMsg?.content?.slice(0, 120) || 'Follow up'}"\nProposed reply: "${draft}"`,
+            action: {
+              type: 'send_reply',
+              contactId: contact.id,
+              channel: contact.channel as Channel,
+              externalId: contact.external_id,
+              text: draft,
+            },
+          });
+        }
+      }
+    }
+
+    // 2. If dispatches failed, offer 1-tap re-booking approval
+    if (stuckDispatch.count && stuckDispatch.count > 0) {
+      const { data: failedDispatches } = await supabase
+        .from('dispatch_requests')
+        .select('id, project_name, delivery_address')
+        .eq('status', 'BOOKING_FAILED')
+        .limit(2);
+
+      const { data: pendingDispatchApprovals } = await supabase
+        .from('approvals')
+        .select('payload')
+        .eq('status', 'PENDING')
+        .eq('kind', 'retry_dispatch');
+
+      const existingDispIds = new Set(
+        (pendingDispatchApprovals || []).map((a) => (a.payload as { dispatchId?: string })?.dispatchId).filter(Boolean),
+      );
+
+      for (const disp of failedDispatches || []) {
+        if (!existingDispIds.has(disp.id)) {
+          await createApproval({
+            kind: 'retry_dispatch',
+            summary: `Delivery to ${disp.delivery_address || 'client'} for project ${disp.project_name || 'MJIC'} failed booking. Tap Approve to re-book.`,
+            action: {
+              type: 'retry_dispatch',
+              dispatchId: disp.id,
+            },
+          });
+        }
+      }
+    }
   }
 
   const expired = await expireOldApprovals(48);
@@ -50,7 +136,16 @@ export async function GET(request: Request) {
     const sameSet = (previous?.details as { key?: string } | null)?.key === key;
     const recent = previous?.last_alert_at && Date.now() - new Date(previous.last_alert_at).getTime() < ALERT_COOLDOWN_MS;
     if (!(sameSet && recent)) {
-      await sendTelegramMessage(`<b>WATCHDOG</b>\n- ${problems.map(escapeTelegramHtml).join('\n- ')}`);
+      // Check memory for known fixes
+      let memoryNote = '';
+      try {
+        const recalled = await hindsightRecall(problems[0], { limit: 1, scope: 'fix' });
+        if (recalled.length) memoryNote = `\n<i>💡 Memory Fix: ${escapeTelegramHtml(recalled[0])}</i>`;
+      } catch {
+        // Non-blocking
+      }
+
+      await sendTelegramMessage(`<b>WATCHDOG</b>\n- ${problems.map(escapeTelegramHtml).join('\n- ')}${memoryNote}`);
       await supabase.from('job_heartbeats').upsert({ job: 'watchdog', last_run_at: new Date().toISOString(), last_status: 'alert', last_alert_at: new Date().toISOString(), details: { key, problems } });
       alerted = true;
     }

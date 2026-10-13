@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import { rateLimitResponse } from '../_lib/rate-limit';
 import { resolveApproval } from '../_lib/ceo-control';
+import { approveDispatch } from '../_lib/dispatch';
 import { addSubconJob, completeSubconJob, handleAttendanceMessage, isAttendanceChat, logSewerOutput, markPayrollPaid } from '../_lib/payroll';
 import {
   clockInStaff,
@@ -14,6 +15,7 @@ import {
   getPayrollSummary,
   getStaffByChatId,
   getStaffProfile,
+  getSupabaseAdmin,
   linkStaffTelegramChat,
   removeTelegramInlineKeyboard,
   reportCriticalError,
@@ -96,6 +98,27 @@ export async function POST(req: Request) {
           await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
         }
         await sendTelegramDirectMessage(String(callbackChatId), response);
+        return NextResponse.json({ ok: true });
+      }
+
+      const dispMatch = callbackData.match(/^disp:(approve|reject):([\da-f-]{36})$/i);
+      if (callbackId && dispMatch) {
+        const [, action, dispatchId] = dispMatch;
+        let response = '';
+        if (action.toLowerCase() === 'approve') {
+          const outcome = await approveDispatch(dispatchId);
+          response = outcome.ok ? `Dispatch approved: ${outcome.message}` : `Dispatch booking failed: ${outcome.message}`;
+        } else {
+          const supabase = getSupabaseAdmin();
+          await supabase?.from('dispatch_requests').update({ status: 'CANCELLED' }).eq('id', dispatchId);
+          response = 'Dispatch cancelled by CEO.';
+        }
+        await answerTelegramCallbackQuery(String(callbackId), response.slice(0, 180));
+        if (callback.message?.message_id) {
+          await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+        }
+        await sendTelegramDirectMessage(String(callbackChatId), response);
+        return NextResponse.json({ ok: true });
       } else if (callbackId) {
         await answerTelegramCallbackQuery(String(callbackId), 'This approval is no longer available.');
       }

@@ -1,5 +1,8 @@
 import { sendChannelMessage } from './channels';
 import { logMessage, updateContact, type Channel } from './crm';
+import { approveDispatch } from './dispatch';
+import { type CronJob } from './ceo-policy';
+import { createCodeChangeIssue, runCronJob } from './ceo-exec';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from './integrations';
 
 export type Mode = 'live' | 'shadow';
@@ -36,6 +39,9 @@ export async function autonomyLimitPhp() {
 export type ApprovalAction =
   | { type: 'resume_ai'; contactId: string }
   | { type: 'send_reply'; contactId: string; channel: Channel; externalId: string; text: string }
+  | { type: 'retry_dispatch'; dispatchId: string }
+  | { type: 'run_cron'; job: CronJob }
+  | { type: 'code_change'; title: string; body: string }
   | { type: 'note' };
 
 export async function createApproval(input: { kind: string; summary: string; action: ApprovalAction; amount?: number }) {
@@ -76,6 +82,18 @@ export async function resolveApproval(id: string, approve: boolean): Promise<str
     const result = await sendChannelMessage(action.channel, action.externalId, action.text);
     await logMessage({ contactId: action.contactId, channel: action.channel, direction: 'out', sender: 'human', content: action.text, status: result.ok ? 'sent' : 'failed' });
     return result.ok ? 'Approved and sent to the customer.' : `Approved, but sending failed: ${result.reason}`;
+  }
+  if (action.type === 'retry_dispatch') {
+    const result = await approveDispatch(action.dispatchId);
+    return result.ok ? `Approved. Dispatch re-booked: ${result.message}` : `Approved, but re-booking failed: ${result.message}`;
+  }
+  if (action.type === 'run_cron') {
+    const result = await runCronJob(action.job);
+    return result.ok ? `Approved. ${action.job} ran (HTTP ${result.status}).` : `Approved, but ${action.job} failed: ${result.body}`;
+  }
+  if (action.type === 'code_change') {
+    const result = await createCodeChangeIssue(action.title, action.body);
+    return result.ok ? `Approved. Code-change request opened: ${result.url}. A PR will follow; CI runs and you merge.` : `Approved, but could not open the request: ${result.reason}`;
   }
   return `Approved (${data.kind}).`;
 }

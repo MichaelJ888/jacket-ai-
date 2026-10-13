@@ -8,6 +8,7 @@ import { createApproval, isShadowMode } from './ceo-control';
 import { escapeTelegramHtml, getSupabaseAdmin, isManilaDaytime, recordLead, reportCriticalError, sendTelegramMessage } from './integrations';
 import { FIRST_MESSAGE_ADDENDUM, MJIC_SYSTEM_PROMPT, SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 import { mjicQuoteTool } from './sales-tools';
+import { brandAddendum } from './page-brands';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -39,6 +40,7 @@ export type InboundInput = {
   messageId?: string;
   commentId?: string;
   imageUrls?: string[];
+  brand?: string;
 };
 
 export type InboundResult = { handled: boolean; reply: string | null; sent: boolean; escalated: boolean; duplicate: boolean };
@@ -72,8 +74,8 @@ async function styleBlock(audience: string) {
   return `\n\nHOW THE BOSS REALLY WRITES (copy this voice, vocabulary, length and level of formality; these are real examples):\n${lines.join('\n---\n')}`;
 }
 
-async function buildSystem(isFirst: boolean, audience = 'client') {
-  return `${MJIC_SYSTEM_PROMPT}${isFirst ? FIRST_MESSAGE_ADDENDUM : ''}${CLOSER_ADDENDUM}${await styleBlock(audience)}`;
+async function buildSystem(isFirst: boolean, audience = 'client', brand?: string) {
+  return `${MJIC_SYSTEM_PROMPT}${isFirst ? FIRST_MESSAGE_ADDENDUM : ''}${CLOSER_ADDENDUM}${brandAddendum(brand)}${await styleBlock(audience)}`;
 }
 
 function galleryUrls(count = 5) {
@@ -153,7 +155,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
       const isFirst = history.filter((message) => message.direction === 'out').length === 0;
       const messages = history.map((message) => ({ role: message.direction === 'in' ? ('user' as const) : ('assistant' as const), content: message.content }));
       if (!messages.length || messages[messages.length - 1].role !== 'user') messages.push({ role: 'user', content: text });
-      const system = await buildSystem(isFirst);
+      const system = await buildSystem(isFirst, 'client', input.brand);
       const run = (chosen: ReturnType<typeof model>) => generateText({
         model: chosen,
         system,

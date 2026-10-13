@@ -56,13 +56,18 @@ export async function POST(req: Request) {
 
     const pooled = useQuoteModel ? null : pickModel('strong', true);
 
+    // Cheapest-per-inquiry: Haiku handles the quote tool-call fine at ~1/3 of Sonnet's price.
+    // Override with CHAT_QUOTE_MODEL=claude-sonnet-4-5 if quality ever needs it.
+    const quoteModelId = process.env.CHAT_QUOTE_MODEL || 'claude-haiku-4-5';
     const result = streamText({
       model: useQuoteModel
-        ? anthropic('claude-sonnet-4-5')
+        ? anthropic(quoteModelId)
         : pooled
           ? pooled.model
-          : anthropic('claude-sonnet-4-5'),
-      messages: [systemMessage, ...messages],
+          : anthropic(quoteModelId),
+      // Only the last 12 turns are sent: input tokens grow every turn otherwise.
+      messages: [systemMessage, ...messages.slice(-12)],
+      maxOutputTokens: 600,
       stopWhen: isStepCount(3),
       onError: ({ error }) => {
         if (pooled) markFailure(pooled.id, error); // next customer is routed to a healthy model

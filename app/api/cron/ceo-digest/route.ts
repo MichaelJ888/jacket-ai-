@@ -66,6 +66,19 @@ export async function GET(request: Request) {
   if (overdue) attention.push(`${overdue} overdue staff task(s)`);
   if (stock.length) attention.push(`Low stock: ${stock.slice(0, 6).join(', ')}`);
   if (errors) attention.push(`${errors} critical system error(s) in 24h`);
+  // Informational only: quiet Pages are normal and are never flagged as expired, broken or needing attention.
+  const pageActivity = await safely('digest:pages', async () => {
+    const { data } = await supabase.from('crm_contacts').select('external_id, last_inbound_at').eq('channel', 'manychat').like('external_id', '%:%').not('last_inbound_at', 'is', null).order('last_inbound_at', { ascending: false }).limit(1000);
+    const pages = new Map<string, { last: string; recent: number }>();
+    for (const row of data || []) {
+      const page = String(row.external_id).split(':')[0];
+      const entry = pages.get(page) || { last: row.last_inbound_at as string, recent: 0 };
+      if ((row.last_inbound_at as string) >= since) entry.recent += 1;
+      pages.set(page, entry);
+    }
+    return [...pages].map(([page, entry]) => `${page}: ${entry.recent} active contact(s) in 24h, last message ${new Date(entry.last).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila' })}`);
+  }, [] as string[]);
+  if (pageActivity.length) lines.push(`\n<b>Page activity (info only)</b>\n${pageActivity.map(escapeTelegramHtml).join('\n')}`);
   lines.push(attention.length ? `\n<b>Needs attention</b>\n- ${attention.map(escapeTelegramHtml).join('\n- ')}` : '\nNothing needs your attention.');
 
   if (weekly) {

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { handleInboundMessage } from '../../_lib/sales-closer';
 import { recordLead } from '../../_lib/integrations';
+import { getPageBrand } from '../../_lib/page-brands';
+import { sanitizePageKey } from '../../_lib/ceo-policy';
 
 export const maxDuration = 30;
 
@@ -12,6 +14,12 @@ function isAuthorized(req: Request) {
   return headerSecret === secret || authorization === `Bearer ${secret}`;
 }
 
+// Identifies which MJIC Page/ManyChat workspace sent the request (body page_identifier, ?page=, or x-mjic-page header).
+function pageIdentifier(req: Request, payload: Record<string, unknown>) {
+  const raw = payload.page_identifier || payload.pageIdentifier || new URL(req.url).searchParams.get('page') || req.headers.get('x-mjic-page') || '';
+  return sanitizePageKey(String(raw));
+}
+
 // ManyChat "External Request" expects a v2 dynamic-content body, so the AI reply is returned inline
 // and ManyChat delivers it on whichever channel (IG / FB / WhatsApp / TikTok) the contact came from.
 export async function POST(req: Request) {
@@ -19,6 +27,7 @@ export async function POST(req: Request) {
 
   try {
     const payload = await req.json();
+    const page = pageIdentifier(req, payload);
     const customFields = payload.custom_fields || payload.customFields || {};
     const name = payload.name || payload.first_name || payload.firstName || customFields.name || '';
     const contact = payload.phone || payload.email || payload.user_id || payload.userId || '';
@@ -29,18 +38,20 @@ export async function POST(req: Request) {
     }
 
     if (!message || !contact) {
-      await recordLead({ name, contact, message: message || 'ManyChat lead event', source: 'manychat-webhook', details: payload });
+      await recordLead({ name, contact, message: message || 'ManyChat lead event', source: page ? `manychat-webhook:${page}` : 'manychat-webhook', details: payload });
       return NextResponse.json({ received: true });
     }
 
     const result = await Promise.race([
       handleInboundMessage({
         channel: 'manychat',
-        externalId: String(payload.user_id || payload.userId || contact),
+        // Prefixed per Page so IDs from different ManyChat workspaces never collide in the CRM.
+        externalId: `${page ? `${page}:` : ''}${String(payload.user_id || payload.userId || contact)}`,
         name: String(name || ''),
         phone: payload.phone ? String(payload.phone) : undefined,
         email: payload.email ? String(payload.email) : undefined,
         text: String(message),
+        brand: await getPageBrand(page),
         messageId: payload.message_id ? `manychat:${payload.message_id}` : undefined,
       }),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 8500)),
