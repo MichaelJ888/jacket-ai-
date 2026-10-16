@@ -143,7 +143,7 @@ export async function POST(req: Request) {
 
     if (picked.media || picked.rejected) {
       // Voice notes and photos are CEO-only; everyone else's media is ignored.
-      const ceoOnly = allowedChatId(chatId) && !isAttendanceChat(chatId) && (!process.env.TELEGRAM_CEO_USER_ID || String(message.from?.id) === process.env.TELEGRAM_CEO_USER_ID);
+      const ceoOnly = allowedChatId(chatId) && !isAttendanceChat(chatId) && (!!process.env.TELEGRAM_CEO_USER_ID && String(message.from?.id) === process.env.TELEGRAM_CEO_USER_ID);
       if (!ceoOnly) return NextResponse.json({ ok: true });
       if (picked.rejected) {
         await sendTelegramDirectMessage(String(chatId), picked.rejected);
@@ -206,7 +206,7 @@ export async function POST(req: Request) {
 
     if (!reply) {
       const ceoUserId = process.env.TELEGRAM_CEO_USER_ID;
-      if (ceoUserId && String(message.from?.id) !== ceoUserId) {
+      if (!ceoUserId || String(message.from?.id) !== ceoUserId) {
         await sendTelegramDirectMessage(String(chatId), 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm.');
         return NextResponse.json({ ok: true });
       }

@@ -35,8 +35,9 @@ const OPTIONAL_ENV = [
 
 // Jobs expected to check in, with the max age (minutes) before they count as stale.
 const JOB_MAX_AGE_MIN: Record<string, number> = {
-  'sales-followups': 120,
-  'content-publisher': 120,
+  // GitHub Actions schedules routinely drift 3-4h, so thresholds must tolerate that.
+  'sales-followups': 360,
+  'content-publisher': 360,
 };
 
 type Check = { ok: boolean; detail?: string };
