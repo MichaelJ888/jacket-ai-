@@ -20,7 +20,7 @@ export async function runCronJob(job: CronJob): Promise<{ ok: boolean; status: n
 // Opens a labelled GitHub issue so the coding agent / a developer prepares a PR. Nothing is merged or deployed here:
 // CI (lint, test, build) runs on the PR and the CEO merges it.
 export async function createCodeChangeIssue(title: string, body: string): Promise<{ ok: boolean; url?: string; reason?: string }> {
-  const token = process.env.GITHUB_TOKEN;
+  const token = process.env.GITHUB_TOKEN || process.env.GITHUB_PAT;
   const repo = process.env.GITHUB_REPO || 'MichaelJ888/jacket-ai-';
   if (!token) return { ok: false, reason: 'GITHUB_TOKEN is not set (needs a fine-grained token with Issues: write on the repo)' };
   try {

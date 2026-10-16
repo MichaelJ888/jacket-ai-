@@ -4,6 +4,7 @@ import { cronRisk, evaluateGuard, sanitizePageKey } from './ceo-policy.ts';
 
 test('cron whitelist classifies risk and refuses unknown jobs', () => {
   assert.equal(cronRisk('ceo-digest'), 'auto');
+  assert.equal(cronRisk('consultant'), 'auto');
   assert.equal(cronRisk('payroll'), 'approval');
   assert.equal(cronRisk('memory-archive'), 'approval');
   assert.equal(cronRisk('rm-rf'), null);

@@ -1,5 +1,8 @@
 ﻿import { NextResponse, after } from 'next/server';
 import { runCeoAgent } from '../_lib/ceo-agent';
+import { compactConversationIfNeeded } from '../_lib/ceo-memory';
+import { pickTelegramMedia } from '../_lib/telegram-logic';
+import { claimTelegramUpdate, downloadTelegramMedia, startTyping } from '../_lib/telegram-media';
 import { rateLimitResponse } from '../_lib/rate-limit';
 import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
@@ -131,9 +134,40 @@ export async function POST(req: Request) {
     const message = update?.message;
     const chatId = message?.chat?.id;
     const chatType = message?.chat?.type;
-    const text = typeof message?.text === 'string' ? message.text.trim() : '';
+    const caption = typeof message?.caption === 'string' ? message.caption.trim() : '';
+    const text = (typeof message?.text === 'string' ? message.text.trim() : '') || caption;
+    const picked = message ? pickTelegramMedia(message) : { media: null };
 
-    if (!chatId || !text) return NextResponse.json({ ok: true });
+    if (!chatId || (!text && !picked.media && !picked.rejected)) return NextResponse.json({ ok: true });
+    if (update?.update_id !== undefined && !(await claimTelegramUpdate(update.update_id))) return NextResponse.json({ ok: true });
+
+    if (picked.media || picked.rejected) {
+      // Voice notes and photos are CEO-only; everyone else's media is ignored.
+      const ceoOnly = allowedChatId(chatId) && !isAttendanceChat(chatId) && (!process.env.TELEGRAM_CEO_USER_ID || String(message.from?.id) === process.env.TELEGRAM_CEO_USER_ID);
+      if (!ceoOnly) return NextResponse.json({ ok: true });
+      if (picked.rejected) {
+        await sendTelegramDirectMessage(String(chatId), picked.rejected);
+        return NextResponse.json({ ok: true });
+      }
+      const media = picked.media!;
+      after(async () => {
+        const stopTyping = startTyping(String(chatId));
+        let answer: string;
+        try {
+          const file = await downloadTelegramMedia(media);
+          answer = file ? await runCeoAgent(text, file) : 'Hindi ko ma-download yung file, Boss. Subukan ulit.';
+        } catch (error) {
+          console.error('CEO media failed:', error);
+          await reportCriticalError('telegram-ceo-media', error);
+          answer = 'Sorry Boss, hindi ko naproseso yung voice/photo. Paki-type na lang muna o subukan ulit.';
+        } finally {
+          stopTyping();
+        }
+        await sendTelegramDirectMessage(String(chatId), answer.slice(0, 4000));
+        await compactConversationIfNeeded().catch(() => undefined);
+      });
+      return NextResponse.json({ ok: true });
+    }
 
     if (isAttendanceChat(chatId)) {
       const attendanceReply = await handleAttendanceMessage(text, message.from);
@@ -178,6 +212,7 @@ export async function POST(req: Request) {
       }
       const ceoText = text.replace(/@\w*bot\b/gi, '').trim() || text;
       after(async () => {
+        const stopTyping = startTyping(String(chatId));
         let answer: string;
         try {
           answer = await runCeoAgent(ceoText);
@@ -185,8 +220,11 @@ export async function POST(req: Request) {
           console.error('CEO agent failed:', error);
           await reportCriticalError('telegram-ceo-agent', error);
           answer = 'Sorry Boss, busy ang AI models ngayon. Subukan ulit in a minute. (Commands: IN/OUT/PAYROLL/TASK/PICKUP still work.)';
+        } finally {
+          stopTyping();
         }
         await sendTelegramDirectMessage(String(chatId), answer.slice(0, 4000));
+        await compactConversationIfNeeded().catch(() => undefined);
       });
       return NextResponse.json({ ok: true });
     }

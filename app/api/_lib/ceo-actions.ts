@@ -92,6 +92,22 @@ export function buildActionTools() {
       }),
     }),
 
+    propose_improvement: tool({
+      description: 'Propose an improvement to the business or the AI system as a structured idea. It goes to the CEO as a one-tap Approve/Reject; on approval a GitHub issue opens for the coding agent (pull request, CI, CEO merges). Nothing deploys automatically. Always gather evidence first (system_introspection, query_business_data).',
+      inputSchema: z.object({
+        title: z.string().min(5).max(120),
+        problem: z.string().min(10).max(1200).describe('What is wrong or missing, with the evidence/numbers.'),
+        proposal: z.string().min(10).max(1800).describe('Exactly what to build or change.'),
+        expected_impact: z.string().min(5).max(400).describe('Peso or time impact.'),
+        effort: z.enum(['low', 'medium', 'high']),
+      }),
+      execute: async (input) => guarded('propose_improvement', input, async () => {
+        const body = `Problem:\n${input.problem}\n\nProposal:\n${input.proposal}\n\nExpected impact: ${input.expected_impact}\nEffort: ${input.effort}`;
+        const approval = await createApproval({ kind: 'improvement', summary: `Improvement idea: ${input.title}\nImpact: ${input.expected_impact}\nEffort: ${input.effort}`, action: { type: 'code_change', title: input.title, body } });
+        return { status: 'awaiting_ceo_approval', approval_id: approval.id };
+      }),
+    }),
+
     kill_switch: tool({
       description: 'Emergency stop. ON freezes every action tool (read-only tools still work) until turned OFF. Use immediately if anything looks wrong.',
       inputSchema: z.object({ state: z.enum(['on', 'off']) }),

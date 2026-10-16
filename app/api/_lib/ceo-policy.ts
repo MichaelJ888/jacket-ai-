@@ -11,6 +11,7 @@ export const CRON_JOBS = {
   'embroidery-pickup-alerts': 'auto',
   'content-plan': 'auto',
   insights: 'auto',
+  consultant: 'auto',
   'improvement-scout': 'auto',
   'repo-watch': 'auto',
   'swarm-worker': 'auto',

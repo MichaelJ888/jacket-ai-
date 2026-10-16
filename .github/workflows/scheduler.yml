@@ -11,6 +11,7 @@ on:
     - cron: '0 2 1 * *'     # monthly repo watch
     - cron: '0 3 * * 3'     # weekly improvement scout (GitHub scan)
     - cron: '0 1 * * 1'     # weekly forecast + pricing advice, Monday 9am Manila
+    - cron: '30 1 * * 1'    # weekly AI consultant report, Monday 9:30am Manila
     - cron: '0 10 * * *'    # payroll: Saturday sewers, 1st/16th employees (6pm Manila)
   workflow_dispatch: {}
 
@@ -94,6 +95,15 @@ jobs:
       - name: Weekly forecast and pricing advice
         run: |
           curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/insights" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  consultant:
+    if: github.event.schedule == '30 1 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Weekly AI consultant report
+        run: |
+          curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/consultant" \
             -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   repo-watch:

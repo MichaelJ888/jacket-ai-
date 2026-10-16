@@ -798,3 +798,22 @@ alter table public.sewer_output enable row level security;
 alter table public.subcon_jobs enable row level security;
 alter table public.payroll_runs enable row level security;
 revoke all on public.payroll_workers, public.sewer_output, public.subcon_jobs, public.payroll_runs from anon, authenticated;
+
+-- ===== Voice AI phone calls (Retell) =====
+create table if not exists public.voice_calls (
+  call_id text primary key,
+  direction text,
+  from_number text,
+  status text,
+  duration_seconds integer,
+  cost_usd numeric,
+  summary text,
+  sentiment text,
+  disconnection_reason text,
+  started_at timestamptz,
+  transcript text,
+  notified_at timestamptz,
+  created_at timestamptz default now()
+);
+create index if not exists voice_calls_started_idx on public.voice_calls (started_at desc);
+alter table public.voice_calls enable row level security;
