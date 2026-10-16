@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:push": "node scripts/apply-schema.mjs",
     "memory": "node scripts/memory.mjs",
+    "voice:setup": "node scripts/retell-setup.mjs",
     "bootstrap": "node scripts/bootstrap.mjs",
     "smoke": "node scripts/smoke.mjs",
     "test": "node --test \"app/**/*.test.ts\"",

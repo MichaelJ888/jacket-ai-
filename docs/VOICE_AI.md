@@ -14,6 +14,18 @@
 - `GET /api/voice-call/prompt` (admin auth) - returns the agent prompt (exact MJIC prices + voice rules) and the URLs to paste into Retell.
 - The CEO bot can read call data via `query_business_data` (`voice_calls`) and `system_introspection`.
 
+## One-command agent setup
+After you have `RETELL_API_KEY` (and `ADMIN_TOKEN`) in `.env.local`, run `npm run voice:setup`. It creates the Retell LLM + agent with the MJIC prompt, the 3 functions, a 5-minute call cap, 20s silence hangup, voicemail hangup, and the webhook URL. Re-run with `RETELL_LLM_ID` / `RETELL_AGENT_ID` set to update instead of create.
+
+## Carrier forwarding (missed / busy / unreachable only)
+On the business mobile (GSM codes; replace `NUMBER` with the Retell number in 09/+63 form your carrier accepts). Support varies by carrier and plan - test each code by calling from another phone:
+- No answer after 20s: `**61*NUMBER**20#` then call
+- Busy: `**67*NUMBER#` then call
+- Unreachable / phone off: `**62*NUMBER#` then call
+- Cancel all forwarding: `##002#` then call
+For a landline/PLDT/Globe At Home line, ask the provider to enable "call forward on busy / no answer"; codes differ (often `*92`/`*90`).
+After-hours-only handling is not possible with carrier codes; do it by turning on "forward all" (`**21*NUMBER#`) when closing and `##21#` when opening, or use your PBX schedule.
+
 ## Setup you must do (cannot be automated)
 1. Create a Retell account, buy/import a number. **Philippine (+63) numbers are usually not sold directly - use a SIP trunk or Twilio and verify coverage first.**
 2. Create an agent; paste `general_prompt` from `/api/voice-call/prompt`; add the three custom functions with URL `https://jacket-ai.vercel.app/api/voice-call/tools`.
