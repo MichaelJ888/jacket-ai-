@@ -14,7 +14,7 @@ export const maxDuration = 60;
 const HOURS = 3600 * 1000;
 
 async function send(contact: CrmContact, text: string) {
-  const result = await sendChannelMessage(contact.channel, contact.external_id, text);
+  const result = await sendChannelMessage(contact.channel, contact.external_id, text, { pageId: contact.page_id || undefined });
   await logMessage({ contactId: contact.id, channel: contact.channel, direction: 'out', sender: 'ai', content: text, status: result.ok ? 'sent' : 'failed' });
   return result.ok;
 }

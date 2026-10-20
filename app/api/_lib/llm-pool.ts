@@ -57,7 +57,14 @@ export function buildCandidates(env: Record<string, string | undefined> = proces
     ['groq', env.GROQ_API_KEY, 'https://api.groq.com/openai/v1', env.GROQ_MODEL || 'llama-3.3-70b-versatile'],
     ['cerebras', env.CEREBRAS_API_KEY, 'https://api.cerebras.ai/v1', env.CEREBRAS_MODEL || 'gpt-oss-120b'],
     ['openrouter', env.OPENROUTER_API_KEY, 'https://openrouter.ai/api/v1', env.OPENROUTER_MODEL || 'openai/gpt-oss-20b:free'],
-  ];
+        ['mistral', env.MISTRAL_API_KEY, 'https://api.mistral.ai/v1', env.MISTRAL_MODEL || 'mistral-small-latest'],
+        [
+          'cloudflare',
+          env.CLOUDFLARE_API_TOKEN && env.CLOUDFLARE_ACCOUNT_ID ? env.CLOUDFLARE_API_TOKEN : undefined,
+          `https://api.cloudflare.com/client/v4/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/ai/v1`,
+          env.CLOUDFLARE_MODEL || '@cf/openai/gpt-oss-120b',
+        ],
+      ];
   for (const [name, apiKey, baseURL, model] of compat) {
     if (!apiKey) continue;
     const provider = createOpenAI({ apiKey, baseURL });

@@ -8,7 +8,9 @@ import { createApproval, isShadowMode } from './ceo-control';
 import { escapeTelegramHtml, getSupabaseAdmin, isManilaDaytime, recordLead, reportCriticalError, sendTelegramMessage } from './integrations';
 import { FIRST_MESSAGE_ADDENDUM, MJIC_SYSTEM_PROMPT, SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 import { mjicQuoteTool } from './sales-tools';
-import { brandAddendum } from './page-brands';
+import { brandAddendum, getPageBrand } from './page-brands';
+import { sanitizePageKey } from './ceo-policy';
+import { getDiscoveredPageName } from './meta-pages';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -41,6 +43,7 @@ export type InboundInput = {
   commentId?: string;
   imageUrls?: string[];
   brand?: string;
+  pageId?: string;
 };
 
 export type InboundResult = { handled: boolean; reply: string | null; sent: boolean; escalated: boolean; duplicate: boolean };
@@ -155,7 +158,8 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
       const isFirst = history.filter((message) => message.direction === 'out').length === 0;
       const messages = history.map((message) => ({ role: message.direction === 'in' ? ('user' as const) : ('assistant' as const), content: message.content }));
       if (!messages.length || messages[messages.length - 1].role !== 'user') messages.push({ role: 'user', content: text });
-      const system = await buildSystem(isFirst, 'client', input.brand);
+      const brand = input.brand || (input.pageId ? (await getPageBrand(sanitizePageKey(input.pageId))) || (await getDiscoveredPageName(input.pageId)) : undefined);
+      const system = await buildSystem(isFirst, 'client', brand);
       const run = (chosen: ReturnType<typeof model>) => generateText({
         model: chosen,
         system,
@@ -203,6 +207,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   const isFirstReply = (await getRecentMessages(contact.id, 30)).filter((message) => message.direction === 'out').length === 0;
   const sendResult = await sendChannelMessage(input.channel, input.externalId, reply, {
     commentId: input.commentId,
+    pageId: input.pageId,
     images: isFirstReply && !holding ? galleryUrls() : [],
   });
 

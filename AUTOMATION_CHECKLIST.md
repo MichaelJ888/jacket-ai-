@@ -34,8 +34,8 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 | `MANYCHAT_WEBHOOK_SECRET` | ManyChat lead webhook auth | ✅ Already set on Vercel production |
 | `LALAMOVE_API_URL` / `LALAMOVE_API_TOKEN` | Live dispatch booking (`logistics` route) instead of manual-approval fallback | ❌ Not set — needs a Lalamove Open API partner account |
 | `EMBROIDERY_DIGITIZE_API_URL` / `EMBROIDERY_DIGITIZE_API_KEY` | Auto logo→DST digitizing instead of manual queue | ❌ Not set — needs Ink/Stitch self-hosted endpoint or EmbroideryIO account |
-| `META_APP_SECRET` | Meta (FB/IG/WhatsApp) webhook signature verification | ❌ `.env.local` has a placeholder value (`your-meta-app-secret`) — needs the real app secret from Meta for Developers |
-| `META_WEBHOOK_VERIFY_TOKEN` | Meta webhook handshake | ✅ Set on Vercel production, verified live (GET handshake echoes challenge correctly) — still need to enter this same value in Meta's dashboard once the app exists |
+| `META_APP_SECRET` | Meta (FB/IG/WhatsApp) webhook signature verification | ✅ Set on Vercel production + `.env.local`; used successfully to configure app-level Page webhook fields on 2026-10-20 |
+| `META_WEBHOOK_VERIFY_TOKEN` | Meta webhook handshake | ✅ Set on Vercel production and verified against the Meta app callback handshake on 2026-10-20 |
 | `APP_BASE_URL`, `CRON_SECRET` (as **GitHub Actions** repo secrets, separate from Vercel env) | External scheduler workflow | ✅ Set by user in GitHub repo settings 2026-09-28 — workflow will start firing on its next `*/5`/`*/45` min tick |
 
 `STABILITY_API_KEY` / `REPLICATE_API_KEY` were dead config (no route ever called them) — removed from `.env.local` 2026-10-04. Still set on Vercel production env, left for possible future embroidery/image-gen work (`npx vercel env rm <NAME> production` to purge there too).
@@ -54,7 +54,9 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - `/api/webhooks/meta`, `/api/webhooks/manychat`: inbound DMs/comments -> `_lib/sales-closer.ts` -> `crm_contacts` / `inbox_messages`.
 - `/api/crm`, `/api/voice`, `/api/content/plan`: Bearer `CRON_SECRET`. Pipeline view/human reply, voice ingestion (client/employee/supplier), content calendar.
 - Crons: `cron/sales-followups` + `cron/content-publisher` (GitHub Actions, 45 min), `cron/content-plan` (Vercel daily).
-- Optional env (features park as NEEDS_CREDENTIALS / undelivered until set): `META_PAGE_ACCESS_TOKEN`, `META_PAGE_ID`, `META_IG_USER_ID`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `YOUTUBE_CLIENT_ID/SECRET/REFRESH_TOKEN`, `TIKTOK_ACCESS_TOKEN`, `RESEND_API_KEY`, `RESEND_FROM`, `CONTENT_AUTO_APPROVE=1`, `CONTENT_VIDEOS_PER_WEEK`.
+- Meta Page Messenger setup: `META_PAGE_ACCESS_TOKEN` + `META_PAGE_ID` are set on Vercel production; Page `102703242681559` and app `4741182989447689` are subscribed to `messages`, `messaging_postbacks`, and `feed`, with production callback `https://jacket-ai.vercel.app/api/webhooks/meta` (verified 2026-10-20).
+- ManyChat live loop still needs its External Request flow configured in ManyChat: POST to `/api/webhooks/manychat`, send `MANYCHAT_WEBHOOK_SECRET` in `x-manychat-secret`, map the returned v2 `content.messages[0].text` into a Send Message step, then test with a controlled test contact and verify its CRM record/reply.
+- Optional integrations still requiring provider credentials/configuration: `META_IG_USER_ID`, `WHATSAPP_PHONE_NUMBER_ID` / `WHATSAPP_ACCESS_TOKEN`, `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` / `YOUTUBE_REFRESH_TOKEN`, `TIKTOK_ACCESS_TOKEN`, `RESEND_API_KEY` / `RESEND_FROM`, `LALAMOVE_API_URL` / `LALAMOVE_API_TOKEN`, `EMBROIDERY_DIGITIZE_API_URL` / `EMBROIDERY_DIGITIZE_API_KEY`, `RETELL_API_KEY`, `CONTENT_AUTO_APPROVE=1`, and `CONTENT_VIDEOS_PER_WEEK`.
 
 ## Goal 4/5 additions
 - `_lib/ceo-control.ts`: `ceo_settings` (shadow_mode, vacation_mode, autonomy_limit_php) + `approvals` inbox (Telegram `appr:yes|no:<id>` buttons handled in telegram-webhook). CEO toggles modes by chatting the Telegram bot (`set_operating_mode` tool).

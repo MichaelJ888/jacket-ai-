@@ -1,4 +1,5 @@
 import type { Channel } from './crm';
+import { getPageToken } from './meta-pages';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 const TIMEOUT_MS = 10000;
@@ -45,13 +46,13 @@ export async function sendChannelMessage(
   channel: Channel,
   externalId: string,
   text: string,
-  options: { images?: string[]; commentId?: string } = {},
+  options: { images?: string[]; commentId?: string; pageId?: string } = {},
 ): Promise<SendResult> {
   if (channel === 'manychat' || channel === 'website') return { ok: true, reason: 'delivered inline by the caller' };
 
   if (channel === 'facebook' || channel === 'instagram') {
-    const token = process.env.META_PAGE_ACCESS_TOKEN;
-    if (!token) return { ok: false, reason: 'META_PAGE_ACCESS_TOKEN is not set' };
+    const token = await getPageToken(options.pageId);
+    if (!token) return { ok: false, reason: 'No Page access token (set META_SYSTEM_USER_TOKEN, META_PAGE_TOKENS or META_PAGE_ACCESS_TOKEN)' };
     // A comment id is only valid for the first private reply; afterwards use the user id.
     const recipient = options.commentId ? { comment_id: options.commentId } : { id: externalId };
     const parts = chunk(text);
@@ -106,9 +107,9 @@ export async function sendChannelMessage(
 }
 
 // Public comment reply under a post (FB: /{id}/comments, IG: /{id}/replies).
-export async function replyToComment(platform: 'facebook' | 'instagram', commentId: string, text: string): Promise<SendResult> {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-  if (!token) return { ok: false, reason: 'META_PAGE_ACCESS_TOKEN is not set' };
+export async function replyToComment(platform: 'facebook' | 'instagram', commentId: string, text: string, pageId?: string): Promise<SendResult> {
+  const token = await getPageToken(pageId);
+  if (!token) return { ok: false, reason: 'No Page access token configured' };
   const path = platform === 'facebook' ? `/${commentId}/comments` : `/${commentId}/replies`;
   const result = await graphPost(path, { message: text }, token);
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };

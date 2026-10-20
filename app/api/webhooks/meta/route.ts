@@ -68,7 +68,8 @@ function collectJobs(payload: Payload) {
       const senderId = event.sender?.id;
       if (!message || message.is_echo || !senderId || senderId === entry.id) continue;
       const imageUrls = (message.attachments || []).filter((item) => item.type === 'image' && item.payload?.url).map((item) => item.payload!.url!);
-      jobs.push(() => handleInboundMessage({ channel: socialChannel, externalId: senderId, text: message.text || '', messageId: message.mid, imageUrls }));
+      const pageId = entry.id;
+      jobs.push(() => handleInboundMessage({ channel: socialChannel, pageId, externalId: senderId, text: message.text || '', messageId: message.mid, imageUrls }));
     }
 
     for (const change of entry.changes || []) {
@@ -98,8 +99,8 @@ function collectJobs(payload: Payload) {
         const text = value.message;
         const from = value.from;
         jobs.push(async () => {
-          const result = await handleInboundMessage({ channel: 'facebook', externalId: from.id!, name: from.name, text, messageId: `comment:${commentId}`, commentId });
-          if (result.handled && !result.duplicate) await replyToComment('facebook', commentId, 'Salamat po sa inyong comment! Na-message na po namin kayo para sa details at quotation.');
+          const result = await handleInboundMessage({ channel: 'facebook', pageId: entry.id, externalId: from.id!, name: from.name, text, messageId: `comment:${commentId}`, commentId });
+          if (result.handled && !result.duplicate) await replyToComment('facebook', commentId, 'Salamat po sa inyong comment! Na-message na po namin kayo para sa details at quotation.', entry.id);
         });
       }
 
@@ -109,8 +110,8 @@ function collectJobs(payload: Payload) {
         const text = value.text;
         const from = value.from;
         jobs.push(async () => {
-          const result = await handleInboundMessage({ channel: 'instagram', externalId: from.id!, name: from.username, text, messageId: `comment:${commentId}`, commentId });
-          if (result.handled && !result.duplicate) await replyToComment('instagram', commentId, 'Salamat po! Na-DM na po namin kayo para sa details at quotation.');
+          const result = await handleInboundMessage({ channel: 'instagram', pageId: entry.id, externalId: from.id!, name: from.username, text, messageId: `comment:${commentId}`, commentId });
+          if (result.handled && !result.duplicate) await replyToComment('instagram', commentId, 'Salamat po! Na-DM na po namin kayo para sa details at quotation.', entry.id);
         });
       }
     }

@@ -22,9 +22,10 @@ export type CrmContact = {
   last_outbound_at: string | null;
   delivered_at: string | null;
   review_requested_at: string | null;
+  page_id?: string | null;
 };
 
-export async function upsertContact(input: { channel: Channel; externalId: string; name?: string; phone?: string; email?: string }) {
+export async function upsertContact(input: { channel: Channel; externalId: string; name?: string; phone?: string; email?: string; pageId?: string }) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { contact: null, isNew: false, error: 'Supabase is not configured' };
 
@@ -35,6 +36,7 @@ export async function upsertContact(input: { channel: Channel; externalId: strin
     if (input.name && !existing.data.name) patch.name = input.name;
     if (input.phone && !existing.data.phone) patch.phone = input.phone;
     if (input.email && !existing.data.email) patch.email = input.email;
+    if (input.pageId && existing.data.page_id !== input.pageId) patch.page_id = input.pageId;
     if (Object.keys(patch).length) await supabase.from('crm_contacts').update(patch).eq('id', existing.data.id);
     return { contact: { ...existing.data, ...patch } as CrmContact, isNew: false, error: null };
   }
@@ -45,6 +47,7 @@ export async function upsertContact(input: { channel: Channel; externalId: strin
     name: input.name || null,
     phone: input.phone || null,
     email: input.email || null,
+    page_id: input.pageId || null,
   }).select('*').single();
   if (inserted.error) return { contact: null, isNew: false, error: inserted.error.message };
   return { contact: inserted.data as CrmContact, isNew: true, error: null };

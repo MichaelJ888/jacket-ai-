@@ -523,6 +523,7 @@ create table if not exists public.crm_contacts (
 );
 create index if not exists crm_contacts_followup_idx on public.crm_contacts (stage, next_followup_at);
 create index if not exists crm_contacts_updated_idx on public.crm_contacts (updated_at desc);
+alter table public.crm_contacts add column if not exists page_id text;
 alter table public.crm_contacts enable row level security;
 revoke all on public.crm_contacts from anon, authenticated;
 

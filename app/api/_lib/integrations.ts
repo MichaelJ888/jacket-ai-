@@ -665,11 +665,13 @@ export async function enqueueOutboundRequest(kind: string, payload: Record<strin
 // Best-effort by design: never throws, so it is safe to call from any catch block.
 export async function reportCriticalError(context: string, error: unknown, details?: Record<string, unknown>) {
   const message = error instanceof Error ? error.message : String(error);
+  // Transient LLM capacity spikes (all fallbacks exhausted) are degraded service, not a platform fault.
+  const transient = /high demand|overloaded|\b503\b|\b429\b|rate.?limit|quota|temporarily unavailable|timed?\s*out|operation was aborted/i.test(message);
   try {
     const supabase = getSupabaseAdmin();
     if (supabase) {
       const { error: insertError } = await supabase.from('system_logs').insert({
-        severity: 'critical',
+        severity: transient ? 'warning' : 'critical',
         context,
         message: message.slice(0, 1000),
         details: details || null,
@@ -679,6 +681,7 @@ export async function reportCriticalError(context: string, error: unknown, detai
   } catch (logError) {
     console.error('system_logs insert threw:', logError);
   }
+  if (transient) return;
   const detailLines = details
     ? Object.entries(details).map(([key, value]) => `${escapeTelegramHtml(key)}: ${escapeTelegramHtml(String(value))}`).join('\n')
     : '';
