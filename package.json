@@ -13,6 +13,7 @@
     "voice:setup": "node scripts/retell-setup.mjs",
     "bootstrap": "node scripts/bootstrap.mjs",
     "smoke": "node scripts/smoke.mjs",
+    "meta:heal": "node scripts/meta-heal.mjs",
     "test": "node --test \"app/**/*.test.ts\"",
     "test:e2e": "playwright test"
   },
