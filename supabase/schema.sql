@@ -818,3 +818,33 @@ create table if not exists public.voice_calls (
 );
 create index if not exists voice_calls_started_idx on public.voice_calls (started_at desc);
 alter table public.voice_calls enable row level security;
+
+-- Ideas the improvement scout extracts from vetted repos. Long-term memory of what we could copy (as ideas, never code) into MJIC.
+create table if not exists public.repo_ideas (
+  id uuid primary key default gen_random_uuid(),
+  repo_url text not null,
+  license text,
+  idea text not null,
+  mjic_application text,
+  effort text,
+  status text not null default 'proposed',
+  created_at timestamptz not null default now(),
+  unique (repo_url, idea)
+);
+alter table public.repo_ideas enable row level security;
+revoke all on public.repo_ideas from anon, authenticated;
+
+-- Coding jobs the CEO sends from Telegram (/dev ...). The VS Code AI chat claims them via scripts/devq.mjs and reports back to Telegram.
+create table if not exists public.dev_tasks (
+  id uuid primary key default gen_random_uuid(),
+  task text not null,
+  status text not null default 'queued' check (status in ('queued', 'claimed', 'done', 'failed')),
+  result text,
+  telegram_update_id bigint unique,
+  created_at timestamptz not null default now(),
+  claimed_at timestamptz,
+  completed_at timestamptz
+);
+create index if not exists dev_tasks_status_idx on public.dev_tasks (status, created_at);
+alter table public.dev_tasks enable row level security;
+revoke all on public.dev_tasks from anon, authenticated;

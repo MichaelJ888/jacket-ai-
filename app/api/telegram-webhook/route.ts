@@ -1,5 +1,7 @@
 ﻿import { NextResponse, after } from 'next/server';
 import { runCeoAgent } from '../_lib/ceo-agent';
+import { devQueueCommand, queueDevTask } from '../_lib/dev-queue';
+import { routeCeoMessage } from '../_lib/dev-queue-logic';
 import { compactConversationIfNeeded } from '../_lib/ceo-memory';
 import { pickTelegramMedia } from '../_lib/telegram-logic';
 import { claimTelegramUpdate, downloadTelegramMedia, startTyping } from '../_lib/telegram-media';
@@ -211,6 +213,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
       const ceoText = text.replace(/@\w*bot\b/gi, '').trim() || text;
+      const route = routeCeoMessage(ceoText);
+      if (route.kind === 'command' || route.kind === 'dev') {
+        const reply = route.kind === 'dev' ? await queueDevTask(route.task, route.explicit, update?.update_id) : await devQueueCommand(route.name);
+        await sendTelegramDirectMessage(String(chatId), reply.slice(0, 4000));
+        return NextResponse.json({ ok: true });
+      }
       after(async () => {
         const stopTyping = startTyping(String(chatId));
         let answer: string;

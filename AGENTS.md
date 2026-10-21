@@ -40,6 +40,9 @@ Next.js 16 (App Router) + React 19 + Tailwind 4 + Supabase app automating MJIC's
 - [.github/agents/mjic-automation-engineer.agent.md](.github/agents/mjic-automation-engineer.agent.md) — specialized agent for automation/API/schema/deploy work.
 - [README.md](README.md) — stock create-next-app boilerplate (low value).
 
+## Telegram → VS Code dev queue
+The CEO sends coding jobs from Telegram (`/dev <task>`, or code-looking messages; `/biz` forces business chat; `/queue`, `/ideas` list state). They land in `dev_tasks`. SESSION START: run `npm run devq -- list`; if jobs are queued, run `npm run devq -- next`, do the work, then `npm run devq -- done <id> "what changed"` (or `fail`), which notifies the CEO on Telegram. Never run destructive/irreversible actions from a queued job without confirming first. `npm run devq -- watch` polls while a terminal is open.
+
 <!-- >>> projectmem bridge >>> -->
 ## Agent memory (MANDATORY) — cloud-hosted, no local MCP process
 
