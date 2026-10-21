@@ -53,7 +53,7 @@ async function extractIdeas(repoUrl: string, license: string, purpose: string, h
 
 export type ScoutIdeaReport = Idea & { repo: string; license: string };
 
-const PERMISSIVE = new Set(['MIT', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', 'ISC', 'Zlib', 'Unlicense', '0BSD']);
+export const PERMISSIVE = new Set(['MIT', 'BSD-2-Clause', 'BSD-3-Clause', 'Apache-2.0', 'ISC', 'Zlib', 'Unlicense', '0BSD']);
 
 type GhRepo = { html_url: string; stargazers_count: number; pushed_at: string; archived: boolean; fork: boolean; description: string | null; license: { spdx_id?: string } | null };
 
@@ -69,7 +69,7 @@ export async function runScout(maxPerNeed = 3) {
   const failures: string[] = [];
   const ideas: ScoutIdeaReport[] = [];
   // Rotate result pages so repeated runs reach older / less-starred repos, not only the same top hits.
-  const page = 1 + (Math.floor(Date.now() / (8 * 3600_000)) % 5);
+  const page = 1 + (Math.floor(Date.now() / (30 * 60_000)) % 5);
   let extractions = 0;
   const startedAt = Date.now();
   for (const need of SCOUT_NEEDS) {
@@ -90,7 +90,7 @@ export async function runScout(maxPerNeed = 3) {
         kept += 1;
         await supabase.from('repo_candidates').insert({ url: repo.html_url, purpose: need.purpose, license, stars: repo.stargazers_count, last_push: repo.pushed_at, status, notes: (repo.description || '').slice(0, 300) });
         if (status === 'candidate') added.push(`${repo.html_url} (${license}, ${repo.stargazers_count}?) - ${need.purpose}`);
-        if (extractions < 5 && Date.now() - startedAt < 30_000) try { extractions += 1; ideas.push(...(await extractIdeas(repo.html_url, license, need.purpose, headers)).map((item) => ({ ...item, repo: repo.html_url, license }))); } catch (error) { console.error('Idea extraction failed:', repo.html_url, error instanceof Error ? error.message : error); }
+        if (extractions < 3 && Date.now() - startedAt < 30_000) try { extractions += 1; ideas.push(...(await extractIdeas(repo.html_url, license, need.purpose, headers)).map((item) => ({ ...item, repo: repo.html_url, license }))); } catch (error) { console.error('Idea extraction failed:', repo.html_url, error instanceof Error ? error.message : error); }
       }
       await new Promise((resolve) => setTimeout(resolve, 2500)); // stay under the unauthenticated search rate limit
     } catch (error) {
