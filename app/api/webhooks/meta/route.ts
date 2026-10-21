@@ -100,7 +100,7 @@ function collectJobs(payload: Payload) {
         const from = value.from;
         jobs.push(async () => {
           const result = await handleInboundMessage({ channel: 'facebook', pageId: entry.id, externalId: from.id!, name: from.name, text, messageId: `comment:${commentId}`, commentId });
-          if (result.handled && !result.duplicate) await replyToComment('facebook', commentId, 'Salamat po sa inyong comment! Na-message na po namin kayo para sa details at quotation.', entry.id);
+          if (result.handled && !result.duplicate) await replyToComment('facebook', commentId, publicCommentText(result, 'Salamat po sa inyong comment! Na-message na po namin kayo para sa details at quotation.'), entry.id);
         });
       }
 
@@ -111,7 +111,7 @@ function collectJobs(payload: Payload) {
         const from = value.from;
         jobs.push(async () => {
           const result = await handleInboundMessage({ channel: 'instagram', pageId: entry.id, externalId: from.id!, name: from.username, text, messageId: `comment:${commentId}`, commentId });
-          if (result.handled && !result.duplicate) await replyToComment('instagram', commentId, 'Salamat po! Na-DM na po namin kayo para sa details at quotation.', entry.id);
+          if (result.handled && !result.duplicate) await replyToComment('instagram', commentId, publicCommentText(result, 'Salamat po! Na-DM na po namin kayo para sa details at quotation.'), entry.id);
         });
       }
     }
@@ -119,6 +119,12 @@ function collectJobs(payload: Payload) {
   return jobs;
 }
 
+// If the private reply could not be delivered, answer publicly so the commenter is never ignored.
+function publicCommentText(result: { sent: boolean; reply: string | null }, sentText: string) {
+  if (result.sent || !result.reply) return sentText;
+  const answer = result.reply.replace(/\s+/g, ' ').trim().slice(0, 420);
+  return `${answer}\n\nPara sa quotation, i-message lang po kami sa page na ito. Salamat po!`;
+}
 export async function POST(req: Request) {
   const rawBody = await req.text();
   if (!verifyMetaSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
