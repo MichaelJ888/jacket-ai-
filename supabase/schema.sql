@@ -862,3 +862,31 @@ create table if not exists public.meta_connections (
 );
 alter table public.meta_connections enable row level security;
 revoke all on public.meta_connections from anon, authenticated;
+
+-- Buyers (tenants). Identity = their Facebook account ("Continue with Facebook" = sign-up + login + connect), so no passwords or email service.
+create table if not exists public.tenants (
+  id uuid primary key default gen_random_uuid(),
+  fb_user_id text not null unique,
+  name text,
+  email text,
+  plan text not null default 'free',
+  created_at timestamptz not null default now(),
+  last_login_at timestamptz not null default now()
+);
+alter table public.tenants enable row level security;
+revoke all on public.tenants from anon, authenticated;
+
+alter table public.meta_connections add column if not exists tenant_id uuid references public.tenants (id) on delete cascade;
+create index if not exists meta_connections_tenant_idx on public.meta_connections (tenant_id);
+
+-- "I can't log in yet" requests while the Meta app is in Development Mode; the CEO is pinged on Telegram to add the person as a Tester.
+create table if not exists public.access_requests (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  contact text not null,
+  note text,
+  status text not null default 'new',
+  created_at timestamptz not null default now()
+);
+alter table public.access_requests enable row level security;
+revoke all on public.access_requests from anon, authenticated;

@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { describeError, parseOAuthMessage, rolesUrl, wizardStep } from './connect-logic.ts';
+import { describeError, parseOAuthMessage, wizardStep } from './connect-logic.ts';
 
 test('only same-origin oauth messages are accepted', () => {
   const ok = { type: 'mjic-meta-oauth', meta: 'connected', pages: '2', failed: '1' };
-  assert.deepEqual(parseOAuthMessage(ok, 'https://a.test', 'https://a.test'), { status: 'connected', pages: 2, failed: 1 });
+  assert.deepEqual(parseOAuthMessage(ok, 'https://a.test', 'https://a.test'), { status: 'connected', pages: 2, failed: 1, skipped: 0, limit: false });
   assert.equal(parseOAuthMessage(ok, 'https://evil.test', 'https://a.test'), null);
   assert.equal(parseOAuthMessage({ type: 'other' }, 'https://a.test', 'https://a.test'), null);
   assert.equal(parseOAuthMessage('x', 'https://a.test', 'https://a.test'), null);
@@ -21,6 +21,6 @@ test('wizard step progression', () => {
 });
 
 test('helpers', () => {
-  assert.equal(rolesUrl('42'), 'https://developers.facebook.com/apps/42/roles/roles/');
+  assert.equal(describeError('Permission was denied').includes('accept all'), true);
   assert.match(describeError('No Facebook Pages were granted.'), /choose at least one Page/);
 });

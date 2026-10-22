@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
-import { isAdminAuthorized } from '../../../_lib/auth';
+import { rateLimitResponse } from '../../../_lib/rate-limit';
 import { publicBaseUrl } from '../../../_lib/channels';
 import { buildAuthorizeUrl, createOAuthState, META_CTX_COOKIE, META_NONCE_COOKIE, metaOAuthConfig, oauthRedirectUri, parseOAuthContext } from '../../../_lib/meta-oauth';
 
 export const dynamic = 'force-dynamic';
 
-// POST (admin bearer) { context?: 'popup' | 'connect' | 'admin' }: returns the Facebook login URL and plants the CSRF nonce + return-context cookies.
+// Public on purpose: this is the "Continue with Facebook" button for buyers. The signed state + nonce cookie protect the callback.
+// POST { context?: 'popup' | 'connect' | 'admin' } returns the Facebook login URL and plants the CSRF nonce + return-context cookies.
 export async function POST(request: Request) {
-  if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const limited = await rateLimitResponse(request, 'meta-oauth-start', 30, 600);
+  if (limited) return limited;
   const config = metaOAuthConfig();
-  if (!config) return NextResponse.json({ error: 'META_APP_ID and META_APP_SECRET must be set.' }, { status: 503 });
+  if (!config) return NextResponse.json({ error: 'Facebook connection is not configured yet.' }, { status: 503 });
 
   const body = (await request.json().catch(() => ({}))) as { context?: string };
   const { state, nonce } = createOAuthState(config.appSecret);

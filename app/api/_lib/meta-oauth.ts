@@ -144,40 +144,59 @@ export async function subscribePageToWebhooks(pageId: string, pageToken: string)
   }
 }
 
-// Saves every Page the user granted and auto-subscribes it to the shared webhook.
-export async function connectPagesFromUserToken(userToken: string, userId?: string): Promise<ConnectedPage[]> {
+export type FacebookProfile = { id: string; name?: string; email?: string };
+
+export async function fetchFacebookProfile(userToken: string) {
+  return graphGet<FacebookProfile>('/me', { fields: 'id,name,email' }, userToken);
+}
+
+export type SkippedPage = { id: string; name: string | null; reason: 'other_account' | 'plan_limit' };
+
+// Saves the Pages the user granted (within their plan) under their tenant and auto-subscribes each to the shared webhook.
+export async function connectPagesFromUserToken(userToken: string, tenant: { id: string; plan: string }): Promise<{ connected: ConnectedPage[]; skipped: SkippedPage[] }> {
   const pages = await fetchManagedPages(userToken);
   if (!pages.length) throw new Error('No Facebook Pages were granted. Select at least one Page in the Facebook dialog.');
+  const { pageLimit, planConnect } = await import('./tenant-logic');
   const supabase = await getSupabaseAdmin();
-  const saved: ConnectedPage[] = [];
-  for (const page of pages) {
+
+  const { data: ownedRows } = await supabase.from('meta_connections').select('page_id').eq('tenant_id', tenant.id);
+  const { data: existingRows } = await supabase.from('meta_connections').select('page_id,tenant_id').in('page_id', pages.map((page) => page.id));
+  const foreignIds = ((existingRows || []) as Array<{ page_id: string; tenant_id: string | null }>)
+    .filter((row) => row.tenant_id && row.tenant_id !== tenant.id)
+    .map((row) => row.page_id);
+  const plan = planConnect(pageLimit(tenant.plan), ((ownedRows || []) as Array<{ page_id: string }>).map((row) => row.page_id), foreignIds, pages.map((page) => page.id));
+
+  const connected: ConnectedPage[] = [];
+  for (const page of pages.filter((item) => plan.allowed.includes(item.id))) {
     const sub = await subscribePageToWebhooks(page.id, page.access_token!);
     const row = {
       page_id: page.id,
       page_name: page.name ?? null,
       page_access_token: page.access_token!,
       ig_user_id: page.instagram_business_account?.id ?? null,
-      connected_by: userId ?? null,
+      tenant_id: tenant.id,
       webhook_subscribed: sub.ok,
       subscribe_error: sub.ok ? null : sub.error ?? null,
       connected_at: new Date().toISOString(),
     };
     const { error } = await supabase.from('meta_connections').upsert(row, { onConflict: 'page_id' });
     if (error) throw new Error(`Saving Page ${page.id} failed: ${error.message}`);
-    saved.push({ page_id: row.page_id, page_name: row.page_name, ig_user_id: row.ig_user_id, webhook_subscribed: row.webhook_subscribed, subscribe_error: row.subscribe_error, connected_at: row.connected_at });
+    connected.push({ page_id: row.page_id, page_name: row.page_name, ig_user_id: row.ig_user_id, webhook_subscribed: row.webhook_subscribed, subscribe_error: row.subscribe_error, connected_at: row.connected_at });
   }
-  return saved;
+  const names = new Map(pages.map((page) => [page.id, page.name ?? null]));
+  return { connected, skipped: plan.skipped.map((item) => ({ ...item, name: names.get(item.id) ?? null })) };
 }
 
-export async function listConnections(): Promise<ConnectedPage[]> {
-  const { data, error } = await (await getSupabaseAdmin())
+export async function listConnections(tenantId?: string): Promise<ConnectedPage[]> {
+  let query = (await getSupabaseAdmin())
     .from('meta_connections')
     .select('page_id,page_name,ig_user_id,webhook_subscribed,subscribe_error,connected_at')
     .order('connected_at', { ascending: false });
+  if (tenantId) query = query.eq('tenant_id', tenantId);
+  const { data, error } = await query;
   if (error) throw new Error(error.message);
   return (data || []) as ConnectedPage[];
 }
-
 export async function getConnectionToken(pageId: string): Promise<string | undefined> {
   try {
     const { data } = await (await getSupabaseAdmin()).from('meta_connections').select('page_access_token').eq('page_id', pageId).maybeSingle();

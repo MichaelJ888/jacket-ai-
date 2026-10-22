@@ -1,15 +1,14 @@
-export type OAuthMessage = { status: 'connected'; pages: number; failed: number } | { status: 'error'; reason: string };
+export type OAuthMessage = { status: 'connected'; pages: number; failed: number; skipped: number; limit: boolean } | { status: 'error'; reason: string };
 
 // Only accept the callback's postMessage from our own origin.
 export function parseOAuthMessage(data: unknown, origin: string, expectedOrigin: string): OAuthMessage | null {
   if (origin !== expectedOrigin || !data || typeof data !== 'object') return null;
   const message = data as Record<string, unknown>;
   if (message.type !== 'mjic-meta-oauth') return null;
-  if (message.meta === 'connected') return { status: 'connected', pages: Number(message.pages) || 0, failed: Number(message.failed) || 0 };
+  if (message.meta === 'connected') return { status: 'connected', pages: Number(message.pages) || 0, failed: Number(message.failed) || 0, skipped: Number(message.skipped) || 0, limit: message.limit === '1' || message.limit === 1 };
   return { status: 'error', reason: typeof message.reason === 'string' && message.reason ? message.reason : 'Connection failed' };
 }
 
-export const rolesUrl = (appId?: string) => (appId ? `https://developers.facebook.com/apps/${encodeURIComponent(appId)}/roles/roles/` : 'https://developers.facebook.com/apps/');
 
 export type WizardPage = { page_id: string; webhook_subscribed: boolean };
 export type WizardStep = 1 | 2 | 3 | 4;

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useCallback, useEffect, useState } from "react";
 
@@ -21,6 +21,9 @@ export default function AdminPage() {
   const [tab, setTab] = useState<"prices" | "book" | "teach" | "overview" | "connect">("prices");
   const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
   const [oauthConfigured, setOauthConfigured] = useState(true);
+  const [setup, setSetup] = useState<Array<{ id: string; label: string; ok: boolean; manual?: boolean; hint?: string; link?: string }>>([]);
+  const [tenants, setTenants] = useState<Array<{ id: string; name: string | null; email: string | null; plan: string }>>([]);
+  const [plans, setPlans] = useState<string[]>([]);
   const [prices, setPrices] = useState<Price[]>([]);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [message, setMessage] = useState("");
@@ -45,7 +48,21 @@ export default function AdminPage() {
   const loadPages = useCallback(async (auth = token) => {
     const r = await call("/api/meta/connections", {}, auth);
     if (r.ok) { setPages(r.data.pages); setOauthConfigured(r.data.oauthConfigured); }
+    const [s, t] = await Promise.all([call("/api/admin/meta-setup", {}, auth), call("/api/admin/tenants", {}, auth)]);
+    if (s.ok) setSetup(s.data.checks);
+    if (t.ok) { setTenants(t.data.tenants); setPlans(Object.keys(t.data.plans)); }
   }, [call, token]);
+
+  async function registerCallbacks() {
+    const r = await call("/api/admin/meta-setup", { method: "POST" });
+    if (r.ok) { setSetup(r.data.checks); setMessage(r.data.registered.ok ? "Callbacks registered." : `Could not register: ${r.data.registered.error}`); }
+  }
+
+  async function changePlan(id: string, plan: string) {
+    const r = await call("/api/admin/tenants", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, plan }) });
+    setMessage(r.ok ? "Plan updated." : r.data.error || "Failed.");
+    void loadPages();
+  }
 
   async function connectMeta() {
     const r = await call("/api/meta/oauth/start", { method: "POST" });
@@ -153,7 +170,26 @@ export default function AdminPage() {
           <p className="mb-3 text-sm text-zinc-600">One click: log in to Facebook, pick your Pages, and we save the long-lived Page token and subscribe the webhook automatically.</p>
           <button className="rounded bg-blue-600 px-6 py-3 text-base font-semibold text-white disabled:opacity-50" disabled={!oauthConfigured} onClick={connectMeta}>Connect Facebook / Instagram</button>
           {!oauthConfigured && <p className="mt-2 text-sm text-red-600">META_APP_ID and META_APP_SECRET are not set on the server.</p>}
-          <ul className="mt-4 space-y-2">
+          <h3 className="mb-1 mt-5 text-sm font-semibold">Meta setup doctor</h3>
+          <ul className="space-y-1 text-sm">
+            {setup.map((c) => (
+              <li key={c.id}>
+                {c.manual ? "☐" : c.ok ? "✅" : "❌"} {c.label}
+                {c.hint && !c.ok ? <span className="block pl-6 text-xs text-zinc-600">{c.hint}{c.link ? <> <a className="underline" href={c.link} target="_blank" rel="noreferrer">Open</a></> : null}</span> : null}
+              </li>
+            ))}
+          </ul>
+          <button className="mt-2 rounded bg-zinc-900 px-3 py-1 text-sm text-white" onClick={registerCallbacks}>Register callbacks</button>
+          <h3 className="mb-1 mt-5 text-sm font-semibold">Buyers</h3>
+          <ul className="space-y-1 text-sm">
+            {tenants.map((t) => (
+              <li key={t.id} className="flex items-center justify-between rounded border border-zinc-200 p-2">
+                <span>{t.name || "(no name)"} <span className="text-xs text-zinc-500">{t.email}</span></span>
+                <select className="rounded border border-zinc-300 px-1 text-xs" value={t.plan} onChange={(e) => void changePlan(t.id, e.target.value)}>{plans.map((p) => <option key={p} value={p}>{p}</option>)}</select>
+              </li>
+            ))}
+            {!tenants.length && <li className="text-xs text-zinc-500">No buyers yet.</li>}
+          </ul>          <ul className="mt-4 space-y-2">
             {pages.map((page) => (
               <li key={page.page_id} className="flex items-center justify-between rounded border border-zinc-200 p-3 text-sm">
                 <span>

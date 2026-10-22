@@ -2,119 +2,131 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { describeError, parseOAuthMessage, rolesUrl, wizardStep } from "./connect-logic";
+import { describeError, parseOAuthMessage, wizardStep } from "./connect-logic";
 
+type Tenant = { name: string | null; email: string | null; plan: string; pageLimit: number };
 type Page = { page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null };
 type Check = { id: string; label: string; ok: boolean; hint?: string };
 type Health = { healthy: boolean; checks: Check[] };
 
 const STEPS = ["Log in to Facebook", "Choose your Pages", "Webhook check", "Done"];
+const json = { "Content-Type": "application/json" };
 
 export default function ConnectPage() {
-  const [token, setToken] = useState("");
-  const [authed, setAuthed] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
-  const [appId, setAppId] = useState<string | undefined>();
   const [configured, setConfigured] = useState(true);
   const [health, setHealth] = useState<Record<string, Health>>({});
   const [connecting, setConnecting] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
+  const [request, setRequest] = useState({ name: "", contact: "", note: "" });
+  const [requested, setRequested] = useState(false);
 
-  const call = useCallback(async (path: string, init: RequestInit = {}, auth = token) => {
-    const response = await fetch(path, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${auth}` }, cache: "no-store" });
-    return { ok: response.ok, data: await response.json().catch(() => ({})) };
-  }, [token]);
+  const checkHealth = useCallback(async (pageId: string, resubscribe = false) => {
+    const r = await fetch(resubscribe ? "/api/meta/connections/health" : `/api/meta/connections/health?pageId=${encodeURIComponent(pageId)}`, resubscribe ? { method: "POST", headers: json, body: JSON.stringify({ pageId }) } : { cache: "no-store" });
+    if (!r.ok) return;
+    const data = await r.json();
+    setHealth((current) => ({ ...current, [pageId]: { healthy: data.healthy, checks: data.checks } }));
+  }, []);
 
-  const checkHealth = useCallback(async (pageId: string, auth = token, resubscribe = false) => {
-    const r = resubscribe
-      ? await call("/api/meta/connections/health", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pageId }) }, auth)
-      : await call(`/api/meta/connections/health?pageId=${encodeURIComponent(pageId)}`, {}, auth);
-    if (r.ok) setHealth((current) => ({ ...current, [pageId]: { healthy: r.data.healthy, checks: r.data.checks } }));
-  }, [call, token]);
+  const load = useCallback(async () => {
+    const session = await (await fetch("/api/meta/session", { cache: "no-store" })).json().catch(() => ({}));
+    setConfigured(session.oauthConfigured !== false);
+    setTenant(session.tenant || null);
+    if (session.tenant) {
+      const r = await fetch("/api/meta/connections", { cache: "no-store" });
+      if (r.ok) {
+        const data = await r.json();
+        setPages(data.pages);
+        await Promise.all((data.pages as Page[]).map((page) => checkHealth(page.page_id)));
+      }
+    } else setPages([]);
+    setLoaded(true);
+  }, [checkHealth]);
 
-  const load = useCallback(async (auth = token) => {
-    const r = await call("/api/meta/connections", {}, auth);
-    if (!r.ok) return false;
-    setPages(r.data.pages);
-    setAppId(r.data.appId || undefined);
-    setConfigured(r.data.oauthConfigured);
-    await Promise.all((r.data.pages as Page[]).map((page) => checkHealth(page.page_id, auth)));
-    return true;
-  }, [call, checkHealth, token]);
-
-  const handleResult = useCallback((result: ReturnType<typeof parseOAuthMessage>, auth: string) => {
+  const handleResult = useCallback((result: ReturnType<typeof parseOAuthMessage>) => {
     if (!result) return;
     setConnecting(false);
     if (result.status === "connected") {
-      setNotice({ kind: "ok", text: `Connected ${result.pages} Page(s).${result.failed ? ` ${result.failed} could not subscribe the webhook - use Re-subscribe.` : ""}` });
-      void load(auth);
+      const extra = [
+        result.failed ? `${result.failed} could not subscribe the webhook - use Re-subscribe.` : "",
+        result.limit ? "Some Pages were not added because your plan's Page limit is reached." : "",
+        result.skipped && !result.limit ? "Some Pages already belong to another account." : "",
+      ].filter(Boolean).join(" ");
+      setNotice({ kind: "ok", text: `Connected ${result.pages} Page(s). ${extra}`.trim() });
     } else setNotice({ kind: "error", text: describeError(result.reason) });
+    void load();
   }, [load]);
 
   useEffect(() => {
-    void (async () => {
-      const saved = sessionStorage.getItem("mjic_admin");
-      if (saved && (await load(saved))) { setToken(saved); setAuthed(true); }
-      const params = new URLSearchParams(window.location.search);
-      if (params.get("meta")) {
-        handleResult(parseOAuthMessage({ type: "mjic-meta-oauth", ...Object.fromEntries(params) }, window.location.origin, window.location.origin), saved || "");
-        window.history.replaceState(null, "", "/dashboard/connect");
-      }
-    })();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("meta")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      handleResult(parseOAuthMessage({ type: "mjic-meta-oauth", ...Object.fromEntries(params) }, window.location.origin, window.location.origin));
+      window.history.replaceState(null, "", "/dashboard/connect");
+    } else void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    const listener = (event: MessageEvent) => handleResult(parseOAuthMessage(event.data, event.origin, window.location.origin), token);
+    const listener = (event: MessageEvent) => handleResult(parseOAuthMessage(event.data, event.origin, window.location.origin));
     window.addEventListener("message", listener);
     return () => window.removeEventListener("message", listener);
-  }, [handleResult, token]);
-
-  async function login() {
-    if (await load(token)) { sessionStorage.setItem("mjic_admin", token); setAuthed(true); setNotice(null); }
-    else setNotice({ kind: "error", text: "Wrong password." });
-  }
+  }, [handleResult]);
 
   async function connect() {
     setNotice(null);
     // Open synchronously so the browser doesn't treat the popup as unsolicited.
     const popup = window.open("about:blank", "mjic-fb-login", "width=640,height=760");
-    const r = await call("/api/meta/oauth/start", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ context: popup ? "popup" : "connect" }) });
-    if (!r.ok || !r.data.url) {
+    const r = await fetch("/api/meta/oauth/start", { method: "POST", headers: json, body: JSON.stringify({ context: popup ? "popup" : "connect" }) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.url) {
       popup?.close();
-      setNotice({ kind: "error", text: r.data.error || "Could not start Facebook login." });
+      setNotice({ kind: "error", text: data.error || "Could not start Facebook login." });
       return;
     }
     setConnecting(true);
     if (popup) {
-      popup.location.href = r.data.url;
+      popup.location.href = data.url;
       const timer = window.setInterval(() => { if (popup.closed) { window.clearInterval(timer); setConnecting(false); void load(); } }, 800);
-    } else window.location.href = r.data.url;
+    } else window.location.href = data.url;
   }
 
   async function disconnect(pageId: string) {
-    const r = await call(`/api/meta/connections?pageId=${encodeURIComponent(pageId)}`, { method: "DELETE" });
-    setNotice(r.ok ? { kind: "ok", text: "Page disconnected." } : { kind: "error", text: r.data.error || "Failed to disconnect." });
+    const r = await fetch(`/api/meta/connections?pageId=${encodeURIComponent(pageId)}`, { method: "DELETE" });
+    setNotice(r.ok ? { kind: "ok", text: "Page disconnected." } : { kind: "error", text: "Failed to disconnect." });
     void load();
+  }
+
+  async function signOut() {
+    await fetch("/api/meta/session", { method: "DELETE" });
+    setNotice(null);
+    void load();
+  }
+
+  async function sendRequest() {
+    const r = await fetch("/api/meta/access-request", { method: "POST", headers: json, body: JSON.stringify(request) });
+    const data = await r.json().catch(() => ({}));
+    if (r.ok) setRequested(true);
+    else setNotice({ kind: "error", text: data.error || "Could not send your request." });
   }
 
   const step = useMemo(() => wizardStep(pages, connecting, Object.fromEntries(Object.entries(health).map(([id, h]) => [id, h.healthy]))), [pages, connecting, health]);
 
-  if (!authed) {
-    return (
-      <main className="mx-auto max-w-sm p-6 text-zinc-900">
-        <h1 className="mb-3 text-xl font-bold">Connect Facebook / Instagram</h1>
-        <input className="w-full rounded border border-zinc-300 px-2 py-1" type="password" placeholder="Admin password" value={token} onChange={(e) => setToken(e.target.value)} onKeyDown={(e) => e.key === "Enter" && void login()} />
-        <button className="mt-2 rounded bg-zinc-900 px-3 py-1 text-sm text-white" onClick={() => void login()}>Sign in</button>
-        {notice && <p className="mt-3 text-sm text-red-600">{notice.text}</p>}
-      </main>
-    );
-  }
+  if (!loaded) return <main className="mx-auto max-w-2xl p-6 text-sm text-zinc-500">Loading...</main>;
 
   return (
     <main className="mx-auto max-w-2xl p-6 text-zinc-900">
-      <h1 className="text-2xl font-bold">Connect your Facebook / Instagram</h1>
-      <p className="mt-1 text-sm text-zinc-600">Log in once. We save the Page access and turn on messaging automatically - no tokens, no webhook URLs.</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Connect your Facebook / Instagram</h1>
+          <p className="mt-1 text-sm text-zinc-600">One click. We save your Page access and turn on messaging automatically - no tokens, no webhook URLs.</p>
+        </div>
+        {tenant && <button className="text-xs underline" onClick={() => void signOut()}>Sign out</button>}
+      </div>
+
+      {tenant && <p className="mt-3 text-sm">Hi <strong>{tenant.name || "there"}</strong> - plan <strong className="capitalize">{tenant.plan}</strong> ({pages.length}/{tenant.pageLimit} Pages used)</p>}
 
       <ol className="my-5 flex gap-2 text-xs">
         {STEPS.map((label, index) => (
@@ -125,9 +137,9 @@ export default function ConnectPage() {
       {notice && <p className={`mb-3 rounded p-2 text-sm ${notice.kind === "ok" ? "bg-green-100" : "bg-red-100"}`}>{notice.text}</p>}
 
       <button className="w-full rounded bg-blue-600 px-6 py-4 text-lg font-semibold text-white disabled:opacity-50" disabled={!configured || connecting} onClick={() => void connect()}>
-        {connecting ? "Waiting for Facebook..." : "Connect via Facebook Login"}
+        {connecting ? "Waiting for Facebook..." : tenant ? "Connect another Page" : "Continue with Facebook"}
       </button>
-      {!configured && <p className="mt-2 text-sm text-red-600">The Meta app is not configured on the server (META_APP_ID / META_APP_SECRET).</p>}
+      {!configured && <p className="mt-2 text-sm text-red-600">Facebook connection is not available yet. Please contact support.</p>}
 
       <ul className="mt-6 space-y-3">
         {pages.map((page) => {
@@ -135,7 +147,7 @@ export default function ConnectPage() {
           return (
             <li key={page.page_id} className="rounded border border-zinc-200 p-3 text-sm">
               <div className="flex items-center justify-between">
-                <strong>{page.page_name || page.page_id}</strong>
+                <strong>{page.page_name || page.page_id}{page.ig_user_id ? <span className="ml-2 rounded bg-pink-100 px-2 py-0.5 text-xs font-normal">Instagram linked</span> : null}</strong>
                 <span className={`rounded px-2 py-0.5 text-xs ${h ? (h.healthy ? "bg-green-100" : "bg-red-100") : "bg-zinc-100"}`}>{h ? (h.healthy ? "Healthy" : "Needs attention") : "Checking..."}</span>
               </div>
               <ul className="mt-2 space-y-1">
@@ -147,25 +159,30 @@ export default function ConnectPage() {
               </ul>
               <div className="mt-2 flex gap-4 text-xs">
                 <button className="underline" onClick={() => void checkHealth(page.page_id)}>Re-check</button>
-                <button className="underline" onClick={() => void checkHealth(page.page_id, token, true)}>Re-subscribe</button>
+                <button className="underline" onClick={() => void checkHealth(page.page_id, true)}>Re-subscribe</button>
                 <button className="text-red-600 underline" onClick={() => void disconnect(page.page_id)}>Disconnect</button>
               </div>
             </li>
           );
         })}
-        {!pages.length && <li className="text-sm text-zinc-500">No Pages connected yet.</li>}
+        {tenant && !pages.length && <li className="text-sm text-zinc-500">No Pages connected yet.</li>}
       </ul>
 
-      <details className="mt-8 rounded border border-amber-300 bg-amber-50 p-3 text-sm">
-        <summary className="cursor-pointer font-medium">Can&apos;t log in? Development Mode guide</summary>
-        <p className="mt-2">Until Meta approves the app (App Review + Business Verification) only people with a role on the app can connect. Add them as Testers:</p>
-        <ol className="ml-5 mt-2 list-decimal space-y-1">
-          <li>Open the <a className="underline" href={rolesUrl(appId)} target="_blank" rel="noreferrer">app Roles page</a> and choose Add People - Tester.</li>
-          <li>The person accepts the invite at <a className="underline" href="https://developers.facebook.com/requests" target="_blank" rel="noreferrer">developers.facebook.com/requests</a>.</li>
-          <li>Come back here and press Connect.</li>
-        </ol>
-        <p className="mt-2 text-xs text-zinc-600">Going Live needs: privacy URL, data-deletion URL, Business Verification, and approval of pages_messaging, pages_manage_metadata and instagram_manage_messages.</p>
-      </details>
+      {!tenant && (
+        <details className="mt-8 rounded border border-amber-300 bg-amber-50 p-3 text-sm">
+          <summary className="cursor-pointer font-medium">Facebook says &quot;App not available&quot; or won&apos;t let you in?</summary>
+          <p className="mt-2">Our app is still waiting for Meta&apos;s final approval, so new accounts are let in by hand. Leave your details and we&apos;ll add you right away - you&apos;ll get a Facebook invite to accept, then just press the button above.</p>
+          {requested ? (
+            <p className="mt-3 rounded bg-green-100 p-2">Thanks! We&apos;ve been notified and will add you shortly.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              <input className="w-full rounded border border-zinc-300 bg-white px-2 py-1" placeholder="Your name" value={request.name} onChange={(e) => setRequest({ ...request, name: e.target.value })} />
+              <input className="w-full rounded border border-zinc-300 bg-white px-2 py-1" placeholder="Email or profile link of your Facebook account" value={request.contact} onChange={(e) => setRequest({ ...request, contact: e.target.value })} />
+              <button className="rounded bg-zinc-900 px-3 py-1 text-white" onClick={() => void sendRequest()}>Request access</button>
+            </div>
+          )}
+        </details>
+      )}
     </main>
   );
 }
