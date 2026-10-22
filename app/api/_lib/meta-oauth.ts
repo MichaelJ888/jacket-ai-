@@ -12,7 +12,6 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 
 export const META_OAUTH_SCOPES = [
   'public_profile',
-  'email',
   'pages_show_list',
   'pages_messaging',
   'pages_manage_metadata',

@@ -10,11 +10,13 @@ import {
   getSupabaseAdmin,
   sendTelegramMessage,
 } from './integrations';
+import { getPageToken } from './meta-pages';
 import { SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const VIDEO_MODEL = 'google/veo-3.1-fast-generate-001';
 type Platform = 'facebook' | 'instagram' | 'youtube' | 'tiktok';
+const MISSED_SLOT_MS = 36 * 3600 * 1000;
 
 type CalendarRow = {
   id: string;
@@ -110,7 +112,7 @@ export async function planContent(days = 7) {
   return { created: error ? 0 : rows.length, error: error?.message || null };
 }
 
-async function startVideos(limit: number) {
+async function startVideos(limit: number, errors: string[]) {
   const supabase = getSupabaseAdmin();
   if (!supabase || !process.env.AI_GATEWAY_API_KEY) return 0;
   const { data } = await supabase.from('content_calendar').select('id, video_prompt, scheduled_at').eq('status', 'AWAITING_VIDEO').is('media_generation_id', null).lte('scheduled_at', new Date(Date.now() + 3 * 86400000).toISOString()).order('scheduled_at');
@@ -131,6 +133,7 @@ async function startVideos(limit: number) {
       }
     } catch (error) {
       console.error('auto video start failed:', error);
+      errors.push(error instanceof Error ? error.message.slice(0, 300) : String(error));
     }
   }
   return started;
@@ -183,6 +186,23 @@ function fullCaption(row: CalendarRow) {
 
 class MissingCredentials extends Error {}
 
+// MJIC's own Page/IG account. The token comes from the same resolver the inbox bot uses (DB OAuth token, System User
+// discovery, then legacy env), so a rotated or logged-out env token no longer breaks posting.
+async function mjicMetaAccount(needInstagram: boolean) {
+  const pageId = process.env.META_PAGE_ID;
+  if (!pageId) throw new MissingCredentials('META_PAGE_ID');
+  const token = (await getPageToken(pageId)) || process.env.META_PAGE_ACCESS_TOKEN;
+  if (!token) throw new MissingCredentials('a Page access token (connect the Page in Admin > Connect Facebook / Instagram)');
+  if (!needInstagram) return { pageId, token, igId: null as string | null };
+  let igId: string | null | undefined = process.env.META_IG_USER_ID;
+  if (!igId) {
+    const info = await fetch(`${GRAPH}/${pageId}?fields=instagram_business_account`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) }).then((response) => response.json()).catch(() => ({}));
+    igId = (info as { instagram_business_account?: { id?: string } }).instagram_business_account?.id;
+  }
+  if (!igId) throw new MissingCredentials('an Instagram Business account linked to the Facebook Page');
+  return { pageId, token, igId };
+}
+
 async function resolveMedia(row: CalendarRow): Promise<{ url: string | null; storagePath: string | null }> {
   if (row.media_type !== 'video') return { url: row.media_url, storagePath: null };
   if (!row.media_generation_id) return { url: null, storagePath: null };
@@ -194,9 +214,7 @@ async function resolveMedia(row: CalendarRow): Promise<{ url: string | null; sto
 }
 
 async function publishFacebook(row: CalendarRow, mediaUrl: string | null) {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-  const pageId = process.env.META_PAGE_ID;
-  if (!token || !pageId) throw new MissingCredentials('META_PAGE_ACCESS_TOKEN / META_PAGE_ID');
+  const { token, pageId } = await mjicMetaAccount(false);
   const caption = fullCaption(row);
   const result = row.media_type === 'video' && mediaUrl
     ? await graphPost(`/${pageId}/videos`, { file_url: mediaUrl, description: caption }, token)
@@ -209,9 +227,7 @@ async function publishFacebook(row: CalendarRow, mediaUrl: string | null) {
 }
 
 async function publishInstagram(row: CalendarRow, mediaUrl: string | null) {
-  const token = process.env.META_PAGE_ACCESS_TOKEN;
-  const igId = process.env.META_IG_USER_ID;
-  if (!token || !igId) throw new MissingCredentials('META_PAGE_ACCESS_TOKEN / META_IG_USER_ID');
+  const { token, igId } = await mjicMetaAccount(true);
   if (!mediaUrl) throw new Error('Instagram needs an image or video URL');
   const container = await graphPost(`/${igId}/media`, row.media_type === 'video'
     ? { media_type: 'REELS', video_url: mediaUrl, caption: fullCaption(row) }
@@ -291,8 +307,12 @@ export async function runContentPipeline(origin: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { error: 'Supabase is not configured' };
 
+  // A slot that was missed by more than a day is dropped instead of flooding the page when posting resumes.
+  await supabase.from('content_calendar').update({ status: 'SKIPPED', error: 'missed slot' }).in('status', ['READY', 'NEEDS_CREDENTIALS']).lt('scheduled_at', new Date(Date.now() - MISSED_SLOT_MS).toISOString());
+
   const videoLimit = Number(process.env.CONTENT_MAX_VIDEOS_PER_RUN || 1);
-  const videosStarted = await startVideos(videoLimit);
+  const videoErrors: string[] = [];
+  const videosStarted = await startVideos(videoLimit, videoErrors);
   await advanceVideos(origin);
 
   const { data } = await supabase
@@ -304,7 +324,7 @@ export async function runContentPipeline(origin: string) {
     .order('scheduled_at')
     .limit(4);
 
-  const summary = { videosStarted, published: 0, failed: 0, needsCredentials: [] as string[] };
+  const summary = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [] as string[] };
   for (const row of (data || []) as CalendarRow[]) {
     try {
       const media = await resolveMedia(row);
@@ -341,11 +361,20 @@ export async function requeueCredentialBlocked() {
   const supabase = getSupabaseAdmin();
   if (!supabase) return 0;
   const available: Platform[] = [];
-  if (process.env.META_PAGE_ACCESS_TOKEN && process.env.META_PAGE_ID) available.push('facebook');
-  if (process.env.META_PAGE_ACCESS_TOKEN && process.env.META_IG_USER_ID) available.push('instagram');
+  try {
+    await mjicMetaAccount(false);
+    available.push('facebook');
+    await mjicMetaAccount(true);
+    available.push('instagram');
+  } catch {
+    // Whatever is missing stays parked.
+  }
   if (process.env.YOUTUBE_REFRESH_TOKEN) available.push('youtube');
   if (process.env.TIKTOK_ACCESS_TOKEN) available.push('tiktok');
   if (!available.length) return 0;
-  const { data } = await supabase.from('content_calendar').update({ status: 'READY', error: null }).eq('status', 'NEEDS_CREDENTIALS').in('platform', available).select('id');
-  return data?.length || 0;
+  // Posts parked or failed because of a dead credential come back, but only if their slot is still recent.
+  const recent = new Date(Date.now() - MISSED_SLOT_MS).toISOString();
+  const parked = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'NEEDS_CREDENTIALS').in('platform', available).gte('scheduled_at', recent).select('id');
+  const tokenFailed = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'FAILED').in('platform', available).ilike('error', '%access token%').gte('scheduled_at', recent).select('id');
+  return (parked.data?.length || 0) + (tokenFailed.data?.length || 0);
 }

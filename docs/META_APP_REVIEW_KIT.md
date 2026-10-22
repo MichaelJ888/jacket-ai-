@@ -19,7 +19,7 @@ Meta does not allow App Review, Business Verification or the OAuth Redirect URI 
 | `pages_read_engagement` | Needed to read Page comments/posts delivered by the feed webhook so we can reply privately to commenters. |
 | `instagram_basic` | Identify the Instagram Business account linked to the connected Page. |
 | `instagram_manage_messages` | Reply to Instagram DMs received by the connected business account with the same AI assistant. |
-| `email`, `public_profile` | Standard Login: create the customer's account and show their name. |
+| `public_profile` | Standard Login: create the customer's account and show their name. |
 
 ## Screencast script (2-3 min, English captions)
 1. Open `https://jacket-ai.vercel.app/dashboard/connect`; click **Continue with Facebook**.
