@@ -20,4 +20,5 @@ test('authorize url carries scopes, state and redirect', () => {
   assert.equal(url.searchParams.get('redirect_uri'), 'https://x.test/api/meta/oauth/callback');
   assert.equal(url.searchParams.get('state'), 'st');
   assert.equal(url.searchParams.get('scope'), META_OAUTH_SCOPES.join(','));
+  assert.ok(META_OAUTH_SCOPES.includes('email') && META_OAUTH_SCOPES.includes('public_profile'));
 });
