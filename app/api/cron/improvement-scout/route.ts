@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+import { recordHeartbeat } from '../../_lib/ceo-finance';
+import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
 import { PERMISSIVE, runScout } from '../../_lib/scout';
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
     );
     await sendTelegramMessage(`<b>IMPROVEMENT SCOUT</b> - ${result.ideas.length} bagong ideya${queued ? `, ${queued} na-queue para sa VS Code AI` : ''}\n${lines.join('\n')}\n\nI-type ang <code>/ideas</code> para sa listahan. Para ipagawa: <code>/dev i-apply ang idea na ...</code>`);
   }
-  return NextResponse.json({ success: true, added: result.added, ideasSaved: result.ideasSaved, queued, failures: result.failures, error: result.error });
+  await recordHeartbeat('improvement-scout', result.error ? 'degraded' : 'ok', { added: result.added }); return NextResponse.json({ success: true, added: result.added, ideasSaved: result.ideasSaved, queued, failures: result.failures, error: result.error });
 }
 
 // Auto-integration path: only low-effort ideas from permissive-licence repos, max 1 per run, and only while the queue is short.

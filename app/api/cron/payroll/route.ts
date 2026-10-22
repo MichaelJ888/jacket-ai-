@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+import { recordHeartbeat } from '../../_lib/ceo-finance';
+import { NextResponse } from 'next/server';
 
 import { isCronAuthorized } from '../../_lib/auth';
 import { reportCriticalError } from '../../_lib/integrations';
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const kind = new URL(request.url).searchParams.get('kind');
   try {
     const results = await runDuePayroll({ force: kind === 'sewer' || kind === 'employee' ? kind : undefined });
-    return NextResponse.json({ success: true, results });
+    await recordHeartbeat('payroll', 'ok'); return NextResponse.json({ success: true, results });
   } catch (error) {
     await reportCriticalError('cron-payroll', error);
     return NextResponse.json({ error: 'Payroll run failed' }, { status: 500 });

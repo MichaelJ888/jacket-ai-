@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+import { recordHeartbeat } from '../../_lib/ceo-finance';
+import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { demandForecast, pricingAdvice } from '../../_lib/insights';
 import { escapeTelegramHtml, sendTelegramMessage } from '../../_lib/integrations';
@@ -18,5 +19,5 @@ export async function GET(request: Request) {
   const surges = pricing.filter((row) => row.demandSignal.startsWith('SURGE'));
   if (surges.length) lines.push('<b>Demand surge</b>', ...surges.map((row) => `• ${row.style}: consider a rush/peak surcharge`));
   if (lines.length) await sendTelegramMessage(`<b>WEEKLY FORECAST &amp; PRICING ADVICE</b>\n${lines.join('\n')}`);
-  return NextResponse.json({ success: true, forecast, pricing, notified: lines.length > 0 });
+  await recordHeartbeat('insights', 'ok'); return NextResponse.json({ success: true, forecast, pricing, notified: lines.length > 0 });
 }

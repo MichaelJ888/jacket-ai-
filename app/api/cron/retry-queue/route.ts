@@ -1,3 +1,4 @@
+import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import {
@@ -119,5 +120,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return NextResponse.json({ success: true, processed: (due || []).length, succeeded, rescheduled, failed });
+  await recordHeartbeat('retry-queue', failed ? 'degraded' : 'ok', { failed }); return NextResponse.json({ success: true, processed: (due || []).length, succeeded, rescheduled, failed });
 }

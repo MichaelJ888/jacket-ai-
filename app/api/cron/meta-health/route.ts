@@ -1,3 +1,4 @@
+import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { escapeTelegramHtml, sendTelegramMessage } from '../../_lib/integrations';
@@ -20,7 +21,7 @@ export async function GET(req: Request) {
       }
     }
     if (broken.length) await sendTelegramMessage(`⚠️ <b>Meta connection needs attention</b>\n${broken.join('\n')}\nOpen /dashboard/connect and press Re-subscribe or reconnect.`);
-    return NextResponse.json({ checked: pages.length, broken: broken.length });
+    await recordHeartbeat('meta-health', broken.length ? 'degraded' : 'ok', { checked: pages.length, broken: broken.length }); return NextResponse.json({ checked: pages.length, broken: broken.length });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Failed' }, { status: 500 });
   }

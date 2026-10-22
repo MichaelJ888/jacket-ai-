@@ -1,4 +1,5 @@
-﻿import { NextResponse } from 'next/server';
+import { recordHeartbeat } from '../../_lib/ceo-finance';
+import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
 
@@ -28,5 +29,5 @@ export async function GET(request: Request) {
     }
   }
   if (alerts.length) await sendTelegramMessage(`<b>REPO WATCH</b>\n${alerts.map((line) => `• ${escapeTelegramHtml(line)}`).join('\n')}`);
-  return NextResponse.json({ success: true, checked: repos?.length || 0, alerts });
+  await recordHeartbeat('repo-watch', 'ok'); return NextResponse.json({ success: true, checked: repos?.length || 0, alerts });
 }

@@ -1,3 +1,4 @@
+import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
@@ -65,5 +66,5 @@ export async function GET(req: Request) {
     void sendTelegramMessage(`🗄️ Memory retention: archived ${archived} agent_memory_events row(s) older than ${ARCHIVE_AFTER_MONTHS} months.`);
   }
 
-  return NextResponse.json({ success: true, archived, cutoff: cutoffIso });
+  await recordHeartbeat('memory-archive', 'ok', { archived }); return NextResponse.json({ success: true, archived, cutoff: cutoffIso });
 }

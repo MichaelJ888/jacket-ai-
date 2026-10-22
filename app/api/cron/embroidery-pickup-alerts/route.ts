@@ -1,3 +1,4 @@
+import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import {
@@ -40,5 +41,5 @@ export async function GET(req: Request) {
     sent += 1;
   }
 
-  return NextResponse.json({ success: true, checked: due.data.length, sent });
+  await recordHeartbeat('embroidery-pickup-alerts', 'ok', { sent }); return NextResponse.json({ success: true, checked: due.data.length, sent });
 }

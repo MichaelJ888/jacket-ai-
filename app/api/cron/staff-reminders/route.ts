@@ -1,3 +1,4 @@
+import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import {
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
       sentCount += 1;
     }
     if (sentCount) void sendTelegramMessage(`✅ Sent morning task reminders to ${sentCount} staff member(s).`);
-    return NextResponse.json({ success: true, type, sent: sentCount });
+    await recordHeartbeat('staff-reminders', 'ok', { type, sent: sentCount }); return NextResponse.json({ success: true, type, sent: sentCount });
   }
 
   const dueTasks = await listDueWatchTasks();
@@ -56,5 +57,5 @@ export async function GET(req: Request) {
     sentCount += 1;
   }
   if (sentCount) void sendTelegramMessage(`🔔 Sent ${sentCount} urgent/emergency staff reminder(s).`);
-  return NextResponse.json({ success: true, type, sent: sentCount });
+  await recordHeartbeat('staff-reminders', 'ok', { type, sent: sentCount }); return NextResponse.json({ success: true, type, sent: sentCount });
 }

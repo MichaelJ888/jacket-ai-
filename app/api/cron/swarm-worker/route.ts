@@ -1,3 +1,4 @@
+import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { getSupabaseAdmin } from '../../_lib/integrations';
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
   const { data: jobs } = await supabase.from('swarm_jobs').select('id').eq('status', 'RUNNING').order('created_at').limit(2);
   for (const job of jobs ?? []) {
     const outcome = await advanceSwarmJob(job.id);
-    if (outcome !== 'skipped') return NextResponse.json({ job_id: job.id, outcome });
+    if (outcome !== 'skipped') { await recordHeartbeat('swarm-worker', 'ok', { outcome }); return NextResponse.json({ job_id: job.id, outcome }); }
   }
-  return NextResponse.json({ outcome: 'idle' });
+  await recordHeartbeat('swarm-worker', 'ok', { outcome: 'idle' }); return NextResponse.json({ outcome: 'idle' });
 }
