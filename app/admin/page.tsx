@@ -18,7 +18,9 @@ const button = "rounded bg-zinc-900 px-3 py-1 text-sm font-medium text-white dis
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<"prices" | "book" | "teach" | "overview">("prices");
+  const [tab, setTab] = useState<"prices" | "book" | "teach" | "overview" | "connect">("prices");
+  const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
+  const [oauthConfigured, setOauthConfigured] = useState(true);
   const [prices, setPrices] = useState<Price[]>([]);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [message, setMessage] = useState("");
@@ -40,19 +42,45 @@ export default function AdminPage() {
     return p.ok;
   }, [call, token]);
 
+  const loadPages = useCallback(async (auth = token) => {
+    const r = await call("/api/meta/connections", {}, auth);
+    if (r.ok) { setPages(r.data.pages); setOauthConfigured(r.data.oauthConfigured); }
+  }, [call, token]);
+
+  async function connectMeta() {
+    const r = await call("/api/meta/oauth/start", { method: "POST" });
+    if (r.ok && r.data.url) window.location.href = r.data.url;
+    else setMessage(r.data.error || "Could not start Facebook login.");
+  }
+
+  async function disconnectMeta(pageId: string) {
+    const r = await call(`/api/meta/connections?pageId=${encodeURIComponent(pageId)}`, { method: "DELETE" });
+    setMessage(r.ok ? "Page disconnected." : r.data.error || "Failed to disconnect.");
+    void loadPages();
+  }
+
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("meta")) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTab("connect");
+      setMessage(params.get("meta") === "connected"
+        ? `Connected ${params.get("pages")} Page(s). ${params.get("failed") !== "0" ? `${params.get("failed")} could not auto-subscribe the webhook.` : "Webhooks subscribed automatically."}`
+        : `Facebook connection failed: ${params.get("reason") || "unknown error"}`);
+      window.history.replaceState(null, "", "/admin");
+    }
     const saved = sessionStorage.getItem("mjic_admin");
     if (saved) {
       void (async () => {
         const response = await fetch("/api/admin/prices", { headers: { Authorization: `Bearer ${saved}` } });
-        if (response.ok) { setToken(saved); setPrices((await response.json()).prices); setAuthed(true); void refresh(saved); }
+        if (response.ok) { setToken(saved); setPrices((await response.json()).prices); setAuthed(true); void refresh(saved); void loadPages(saved); }
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function login() {
-    if (await refresh(token)) { sessionStorage.setItem("mjic_admin", token); setAuthed(true); setMessage(""); }
+    if (await refresh(token)) { sessionStorage.setItem("mjic_admin", token); setAuthed(true); setMessage(""); void loadPages(token); }
     else setMessage("Wrong password.");
   }
 
@@ -114,11 +142,32 @@ export default function AdminPage() {
         </div>
       </div>
       <nav className="mb-4 flex gap-2">
-        {([["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["overview", "Overview"]] as const).map(([id, label]) => (
+        {([["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["overview", "Overview"], ["connect", "Connect Facebook / Instagram"]] as const).map(([id, label]) => (
           <button key={id} className={`rounded px-3 py-1 text-sm ${tab === id ? "bg-zinc-900 text-white" : "bg-zinc-200"}`} onClick={() => setTab(id)}>{label}</button>
         ))}
       </nav>
       {message && <p className="mb-3 rounded bg-amber-100 p-2 text-sm">{message}</p>}
+
+      {tab === "connect" && (
+        <section>
+          <p className="mb-3 text-sm text-zinc-600">One click: log in to Facebook, pick your Pages, and we save the long-lived Page token and subscribe the webhook automatically.</p>
+          <button className="rounded bg-blue-600 px-6 py-3 text-base font-semibold text-white disabled:opacity-50" disabled={!oauthConfigured} onClick={connectMeta}>Connect Facebook / Instagram</button>
+          {!oauthConfigured && <p className="mt-2 text-sm text-red-600">META_APP_ID and META_APP_SECRET are not set on the server.</p>}
+          <ul className="mt-4 space-y-2">
+            {pages.map((page) => (
+              <li key={page.page_id} className="flex items-center justify-between rounded border border-zinc-200 p-3 text-sm">
+                <span>
+                  <strong>{page.page_name || page.page_id}</strong>
+                  {page.ig_user_id && <span className="ml-2 rounded bg-pink-100 px-2 py-0.5 text-xs">Instagram linked</span>}
+                  <span className={`ml-2 rounded px-2 py-0.5 text-xs ${page.webhook_subscribed ? "bg-green-100" : "bg-red-100"}`}>{page.webhook_subscribed ? "Webhook active" : `Webhook failed${page.subscribe_error ? `: ${page.subscribe_error}` : ""}`}</span>
+                </span>
+                <button className="text-red-600 underline" onClick={() => disconnectMeta(page.page_id)}>Disconnect</button>
+              </li>
+            ))}
+            {!pages.length && <li className="text-sm text-zinc-500">No Pages connected yet.</li>}
+          </ul>
+        </section>
+      )}
 
       {tab === "prices" && (
         <section>

@@ -1,3 +1,5 @@
+import { getConnectionToken } from './meta-oauth';
+
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
 export type MetaPage = { id: string; name: string; token: string };
@@ -45,6 +47,8 @@ export async function getPageToken(pageId?: string): Promise<string | undefined>
   if (pageId) {
     const mapped = parseTokenMap()[pageId];
     if (mapped) return mapped;
+    const connected = await getConnectionToken(pageId);
+    if (connected) return connected;
     const found = (await discoverPages()).find((page) => page.id === pageId);
     if (found) return found.token;
   }

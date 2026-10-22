@@ -848,3 +848,17 @@ create table if not exists public.dev_tasks (
 create index if not exists dev_tasks_status_idx on public.dev_tasks (status, created_at);
 alter table public.dev_tasks enable row level security;
 revoke all on public.dev_tasks from anon, authenticated;
+
+-- Page connections created by the one-click "Connect Facebook / Instagram" OAuth flow (app/api/meta/oauth).
+create table if not exists public.meta_connections (
+  page_id text primary key,
+  page_name text,
+  page_access_token text not null,
+  ig_user_id text,
+  connected_by text,
+  webhook_subscribed boolean not null default false,
+  subscribe_error text,
+  connected_at timestamptz not null default now()
+);
+alter table public.meta_connections enable row level security;
+revoke all on public.meta_connections from anon, authenticated;
