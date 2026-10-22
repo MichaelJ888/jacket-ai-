@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { publicBaseUrl } from '../../../_lib/channels';
+import { ensureDraftProfile } from '../../../_lib/tenant-bot';
 import { sessionCookieFor, upsertTenantFromProfile } from '../../../_lib/tenants';
 import {
   connectPagesFromUserToken,
@@ -66,6 +67,7 @@ export async function GET(request: Request) {
     const session = sessionCookieFor(tenant.id);
     if (!session) return finish(context, { meta: 'error', reason: 'Server session secret is not configured' });
     const { connected, skipped } = await connectPagesFromUserToken(userToken, tenant);
+    if (connected[0]) await ensureDraftProfile(tenant.id, connected[0].page_id);
     const failed = connected.filter((page) => !page.webhook_subscribed).length;
     const result: Record<string, string> = { meta: 'connected', pages: String(connected.length), failed: String(failed), skipped: String(skipped.length) };
     if (skipped.some((item) => item.reason === 'plan_limit')) result.limit = '1';

@@ -5,6 +5,7 @@ import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { isShadowMode } from '../../_lib/ceo-control';
 import { sendChannelMessage } from '../../_lib/channels';
 import { addHours, logMessage, updateContact, type CrmContact } from '../../_lib/crm';
+import { getTenantBotForPage } from '../../_lib/tenant-bot';
 import { escapeTelegramHtml, getSupabaseAdmin, isManilaDaytime, sendTelegramMessage } from '../../_lib/integrations';
 import { generateFollowUp } from '../../_lib/sales-closer';
 
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
       if (contact.followup_count >= 2 || !windowOpen) {
         await updateContact(contact.id, { stage: 'dormant', next_followup_at: null });
         summary.dormant += 1;
-        void sendTelegramMessage(`<b>Lead gone quiet</b> (${escapeTelegramHtml(contact.name || contact.external_id)} via ${contact.channel}, score ${contact.lead_score}). AI follow-ups exhausted; consider a personal call.`);
+        if (!(await getTenantBotForPage(contact.page_id))) void sendTelegramMessage(`<b>Lead gone quiet</b> (${escapeTelegramHtml(contact.name || contact.external_id)} via ${contact.channel}, score ${contact.lead_score}). AI follow-ups exhausted; consider a personal call.`);
         continue;
       }
 

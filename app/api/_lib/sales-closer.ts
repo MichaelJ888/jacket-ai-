@@ -1,4 +1,4 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
+﻿import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { generateText, isStepCount } from 'ai';
 
@@ -11,6 +11,8 @@ import { mjicQuoteTool } from './sales-tools';
 import { brandAddendum, getPageBrand } from './page-brands';
 import { sanitizePageKey } from './ceo-policy';
 import { getDiscoveredPageName } from './meta-pages';
+import { getTenantBotForPage } from './tenant-bot';
+import { type BotProfile, buildTenantPrompt, defaultHandoff } from './tenant-bot-logic';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -86,7 +88,7 @@ function galleryUrls(count = 5) {
   return SAMPLE_JACKET_IMAGES.slice(0, count).map((path) => `${base}${path}`);
 }
 
-async function notifyCeo(lines: string[]) {
+async function notifyCeoGlobal(lines: string[]) {
   await sendTelegramMessage(lines.join('\n'));
 }
 
@@ -94,6 +96,12 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   const empty: InboundResult = { handled: false, reply: null, sent: false, escalated: false, duplicate: false };
   const text = input.text.trim();
   if (!text && !input.imageUrls?.length) return empty;
+
+  // Pages owned by a buyer (tenant) use that buyer's assistant profile only: never the MJIC prompt, CEO alerts, quotes or photos.
+  const tenantBot = await getTenantBotForPage(input.pageId);
+  if (tenantBot && !tenantBot.enabled) return empty;
+  const notifyCeo = tenantBot ? async (_lines: string[]) => undefined : notifyCeoGlobal;
+  const handoff = tenantBot ? defaultHandoff(tenantBot.profile) : null;
 
   const { contact, isNew, error } = await upsertContact(input);
   if (!contact) {
@@ -122,12 +130,12 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   });
 
   if (isNew) {
-    void recordLead({ name: input.name, contact: input.phone || input.email || input.externalId, message: text, source: `${input.channel}-inbox` });
-    void notifyCeo([`<b>NEW LEAD — ${label}</b>`, escapeTelegramHtml(text.slice(0, 300))]);
+    if (!tenantBot) void recordLead({ name: input.name, contact: input.phone || input.email || input.externalId, message: text, source: `${input.channel}-inbox` });
+    void notifyCeo([`<b>NEW LEAD â€” ${label}</b>`, escapeTelegramHtml(text.slice(0, 300))]);
   }
 
   if (contact.ai_paused) {
-    void notifyCeo([`<b>Customer replied (AI paused) — ${label}</b>`, escapeTelegramHtml(text.slice(0, 300))]);
+    void notifyCeo([`<b>Customer replied (AI paused) â€” ${label}</b>`, escapeTelegramHtml(text.slice(0, 300))]);
     return { ...empty, handled: true };
   }
 
@@ -135,19 +143,19 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   let holding: string | null = null;
   let escalate = false;
   if (input.imageUrls?.length) {
-    holding = 'Received po ang inyong proof of payment. I-verify lang po namin saglit at ico-confirm po namin agad. Salamat po!';
-    void notifyCeo([`<b>PAYMENT PROOF / IMAGE — ${label}</b>`, input.imageUrls.map(escapeTelegramHtml).join('\n'), 'Please verify (use payment-verify).']);
+    holding = handoff || 'Received po ang inyong proof of payment. I-verify lang po namin saglit at ico-confirm po namin agad. Salamat po!';
+    void notifyCeo([`<b>PAYMENT PROOF / IMAGE â€” ${label}</b>`, input.imageUrls.map(escapeTelegramHtml).join('\n'), 'Please verify (use payment-verify).']);
   } else if (ESCALATION_PATTERN.test(text)) {
-    holding = 'Pasensya na po sa abala. Ipapasa ko po agad ito sa aming boss para personal po kayong matulungan. Babalikan po namin kayo sa lalong madaling panahon.';
+    holding = handoff || 'Pasensya na po sa abala. Ipapasa ko po agad ito sa aming boss para personal po kayong matulungan. Babalikan po namin kayo sa lalong madaling panahon.';
     escalate = true;
   } else if (IDENTITY_PATTERN.test(text)) {
-    holding = 'Sandali lang po, ipapasa ko po kayo sa aming team para personal po kayong masagot.';
+    holding = handoff || 'Sandali lang po, ipapasa ko po kayo sa aming team para personal po kayong masagot.';
     escalate = true;
   }
 
   if (escalate) {
     await updateContact(contact.id, { ai_paused: true });
-    void notifyCeo([`🚨 <b>NEEDS YOU — ${label}</b>`, escapeTelegramHtml(text.slice(0, 400)), 'AI is paused on this contact. Reply via POST /api/crm {id, reply}, or set ai_paused:false to resume.']);
+    void notifyCeo([`ðŸš¨ <b>NEEDS YOU â€” ${label}</b>`, escapeTelegramHtml(text.slice(0, 400)), 'AI is paused on this contact. Reply via POST /api/crm {id, reply}, or set ai_paused:false to resume.']);
   }
 
   let reply = holding;
@@ -159,12 +167,12 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
       const messages = history.map((message) => ({ role: message.direction === 'in' ? ('user' as const) : ('assistant' as const), content: message.content }));
       if (!messages.length || messages[messages.length - 1].role !== 'user') messages.push({ role: 'user', content: text });
       const brand = input.brand || (input.pageId ? (await getPageBrand(sanitizePageKey(input.pageId))) || (await getDiscoveredPageName(input.pageId)) : undefined);
-      const system = await buildSystem(isFirst, 'client', brand);
+      const system = tenantBot ? buildTenantPrompt(tenantBot.profile, { first: isFirst }) : await buildSystem(isFirst, 'client', brand);
       const run = (chosen: ReturnType<typeof model>) => generateText({
         model: chosen,
         system,
         messages,
-        tools: { calculateMJICQuote: mjicQuoteTool },
+        ...(tenantBot ? {} : { tools: { calculateMJICQuote: mjicQuoteTool } }),
         stopWhen: isStepCount(3),
         abortSignal: AbortSignal.timeout(25000),
       });
@@ -182,12 +190,12 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   }
 
   if (!reply) {
-    void notifyCeo([`<b>AI could not reply — ${label}</b>`, escapeTelegramHtml(text.slice(0, 300)), 'Please answer manually.']);
+    void notifyCeo([`<b>AI could not reply â€” ${label}</b>`, escapeTelegramHtml(text.slice(0, 300)), 'Please answer manually.']);
     return { ...empty, handled: true };
   }
 
   // Special terms are the CEO's call: park the AI draft behind an Approve/Reject button and send only a holding line.
-  if (!holding && NEGOTIATION_PATTERN.test(text)) {
+  if (!holding && !tenantBot && NEGOTIATION_PATTERN.test(text)) {
     await createApproval({
       kind: 'special-terms',
       summary: `${contact.name || contact.external_id} (${input.channel}) asked: "${text.slice(0, 300)}"\nAI draft: ${reply.slice(0, 400)}\nApprove = send the AI draft as is. Reject = you reply personally.`,
@@ -197,7 +205,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
     reply = 'Noted po. Kino-confirm ko lang po sa aming boss ang request ninyo at babalikan namin kayo agad.';
   }
 
-  if (await isShadowMode()) {
+  if (!tenantBot && (await isShadowMode())) {
     await logMessage({ contactId: contact.id, channel: input.channel, direction: 'out', sender: 'ai', content: reply, status: 'draft' });
     await updateContact(contact.id, { next_followup_at: null });
     void notifyCeo([`<b>SHADOW MODE draft - ${label}</b>`, `Customer: ${escapeTelegramHtml(text.slice(0, 300))}`, `AI would send:\n${escapeTelegramHtml(reply.slice(0, 700))}`]);
@@ -208,7 +216,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   const sendResult = await sendChannelMessage(input.channel, input.externalId, reply, {
     commentId: input.commentId,
     pageId: input.pageId,
-    images: isFirstReply && !holding ? galleryUrls() : [],
+    images: isFirstReply && !holding && !tenantBot ? galleryUrls() : [],
   });
 
   await logMessage({
@@ -226,20 +234,37 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   });
 
   if (!sendResult.ok) {
-    void notifyCeo([`<b>Reply NOT delivered — ${label}</b>`, `Reason: ${escapeTelegramHtml(sendResult.reason || 'unknown')}`, `Draft:\n${escapeTelegramHtml(reply.slice(0, 600))}`]);
+    void notifyCeo([`<b>Reply NOT delivered â€” ${label}</b>`, `Reason: ${escapeTelegramHtml(sendResult.reason || 'unknown')}`, `Draft:\n${escapeTelegramHtml(reply.slice(0, 600))}`]);
   }
   return { handled: true, reply, sent: sendResult.ok, escalated: escalate, duplicate: false };
 }
 
 export async function generateFollowUp(contact: CrmContact, attempt: number) {
+  const tenantBot = await getTenantBotForPage(contact.page_id);
+  if (tenantBot && !tenantBot.enabled) return '';
   const history = await getRecentMessages(contact.id, 14);
   const messages = history.map((message) => ({ role: message.direction === 'in' ? ('user' as const) : ('assistant' as const), content: message.content }));
+  const nudge = tenantBot
+    ? `${attempt === 1 ? 'Friendly, short check-in that restates the next step and offers help.' : 'Last gentle nudge, no pressure.'} Do not repeat earlier wording. Only use facts you were given; never invent prices.`
+    : `${attempt === 1 ? 'Friendly, short check-in that restates the next step and offers help.' : 'Last gentle nudge: mention the sample option (â‚±2,500, fully deductible) or a quick call, no pressure.'} Do not repeat earlier wording. Never invent prices.`;
   messages.push({
     role: 'user',
-    content: `[SYSTEM NOTE - not from the customer] The customer has gone quiet. Write follow-up #${attempt} (of 2). ${attempt === 1 ? 'Friendly, short check-in that restates the next step and offers help.' : 'Last gentle nudge: mention the sample option (₱2,500, fully deductible) or a quick call, no pressure.'} Do not repeat earlier wording. Never invent prices.`,
+    content: `[SYSTEM NOTE - not from the customer] The customer has gone quiet. Write follow-up #${attempt} (of 2). ${nudge}`,
   });
-  const result = await generateText({ model: model(), system: await buildSystem(false), messages, abortSignal: AbortSignal.timeout(30000) });
+  const system = tenantBot ? buildTenantPrompt(tenantBot.profile) : await buildSystem(false);
+  const result = await generateText({ model: model(), system, messages, abortSignal: AbortSignal.timeout(30000) });
   return cleanForChat(result.text);
 }
 
 export { isManilaDaytime };
+
+// Dashboard "try it" chat: runs the owner's draft profile without touching any contact, page or lead.
+export async function previewTenantReply(profile: BotProfile, message: string) {
+  const result = await generateText({
+    model: model(),
+    system: buildTenantPrompt(profile, { first: true }),
+    messages: [{ role: 'user', content: message.slice(0, 500) }],
+    abortSignal: AbortSignal.timeout(30000),
+  });
+  return cleanForChat(result.text);
+}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { describeError, parseOAuthMessage, wizardStep } from "./connect-logic";
+import AssistantPanel from "./assistant-panel";
 
 type Tenant = { name: string | null; email: string | null; plan: string; pageLimit: number };
 type Page = { page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null };
@@ -167,6 +168,8 @@ export default function ConnectPage() {
         })}
         {tenant && !pages.length && <li className="text-sm text-zinc-500">No Pages connected yet.</li>}
       </ul>
+
+      {tenant && pages.length > 0 && <AssistantPanel />}
 
       {!tenant && (
         <details className="mt-8 rounded border border-amber-300 bg-amber-50 p-3 text-sm">

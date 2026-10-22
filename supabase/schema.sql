@@ -890,3 +890,19 @@ create table if not exists public.access_requests (
 );
 alter table public.access_requests enable row level security;
 revoke all on public.access_requests from anon, authenticated;
+
+-- Per-tenant AI assistant settings. Pages owned by a tenant are answered from this profile, never from the MJIC prompt.
+create table if not exists public.bot_profiles (
+  tenant_id uuid primary key references public.tenants (id) on delete cascade,
+  business_name text not null default '',
+  about text not null default '',
+  offers text not null default '',
+  contact_info text not null default '',
+  tone text not null default 'friendly',
+  language text not null default 'taglish',
+  handoff_message text not null default '',
+  enabled boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+alter table public.bot_profiles enable row level security;
+revoke all on public.bot_profiles from anon, authenticated;
