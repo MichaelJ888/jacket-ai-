@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { describeError, parseOAuthMessage, wizardStep } from "./connect-logic";
+import { CLOSED_WITHOUT_RESULT_TEXT, describeError, parseOAuthMessage, wizardStep } from "./connect-logic";
 import AssistantPanel from "./assistant-panel";
 
 type Tenant = { name: string | null; email: string | null; plan: string; pageLimit: number };
@@ -23,6 +23,7 @@ export default function ConnectPage() {
   const [notice, setNotice] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const [request, setRequest] = useState({ name: "", contact: "", note: "" });
   const [requested, setRequested] = useState(false);
+  const resultReceived = useRef(false);
 
   const checkHealth = useCallback(async (pageId: string, resubscribe = false) => {
     const r = await fetch(resubscribe ? "/api/meta/connections/health" : `/api/meta/connections/health?pageId=${encodeURIComponent(pageId)}`, resubscribe ? { method: "POST", headers: json, body: JSON.stringify({ pageId }) } : { cache: "no-store" });
@@ -48,6 +49,7 @@ export default function ConnectPage() {
 
   const handleResult = useCallback((result: ReturnType<typeof parseOAuthMessage>) => {
     if (!result) return;
+    resultReceived.current = true;
     setConnecting(false);
     if (result.status === "connected") {
       const extra = [
@@ -88,9 +90,19 @@ export default function ConnectPage() {
       return;
     }
     setConnecting(true);
+    resultReceived.current = false;
     if (popup) {
       popup.location.href = data.url;
-      const timer = window.setInterval(() => { if (popup.closed) { window.clearInterval(timer); setConnecting(false); void load(); } }, 800);
+      const timer = window.setInterval(() => {
+        if (!popup.closed) return;
+        window.clearInterval(timer);
+        setConnecting(false);
+        // Give the callback's postMessage a moment to arrive before deciding the window was abandoned.
+        window.setTimeout(() => {
+          if (!resultReceived.current) setNotice({ kind: "error", text: CLOSED_WITHOUT_RESULT_TEXT });
+          void load();
+        }, 1500);
+      }, 800);
     } else window.location.href = data.url;
   }
 

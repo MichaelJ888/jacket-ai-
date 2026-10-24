@@ -10,6 +10,9 @@ export function parseOAuthMessage(data: unknown, origin: string, expectedOrigin:
 }
 
 
+// Shown when the Facebook window closes without the callback reporting back (usually Facebook itself refused the login).
+export const CLOSED_WITHOUT_RESULT_TEXT = 'The Facebook window closed before the connection finished. If Facebook showed "App not available" or an error, your account is not added as a Tester yet - use the request-access option below. Otherwise press Connect again.';
+
 export type WizardPage = { page_id: string; webhook_subscribed: boolean };
 export type WizardStep = 1 | 2 | 3 | 4;
 
