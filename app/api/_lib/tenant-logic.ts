@@ -3,8 +3,9 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 export const SESSION_COOKIE = 'mjic_session';
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
-// Pages a plan may connect. Plans are set by the admin (/api/admin/tenants); unknown plans fall back to free.
-export const PLAN_LIMITS: Record<string, number> = { free: 1, starter: 1, pro: 3, business: 10 };
+// Pages a plan may connect. Every plan is unlimited (CEO decision); a large finite number keeps JSON responses valid.
+export const UNLIMITED_PAGES = 1000;
+export const PLAN_LIMITS: Record<string, number> = { free: UNLIMITED_PAGES, starter: UNLIMITED_PAGES, pro: UNLIMITED_PAGES, business: UNLIMITED_PAGES };
 
 export function pageLimit(plan: string | null | undefined) {
   return PLAN_LIMITS[plan || 'free'] ?? PLAN_LIMITS.free;

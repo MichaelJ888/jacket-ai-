@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
 import test from 'node:test';
 
-import { pageLimit, parseSignedRequest, planConnect, readCookie, sessionSecret, signSession, verifySession } from './tenant-logic.ts';
+import { pageLimit, parseSignedRequest, planConnect, readCookie, sessionSecret, signSession, UNLIMITED_PAGES, verifySession } from './tenant-logic.ts';
 
 test('session round-trips and rejects tampering, expiry and wrong secret', () => {
   const token = signSession('t1', 'k', 1000);
@@ -21,9 +21,9 @@ test('session secret derives from the app secret, SESSION_SECRET wins', () => {
 });
 
 test('plan limits and page selection', () => {
-  assert.equal(pageLimit('pro'), 3);
-  assert.equal(pageLimit('weird'), 1);
-  assert.equal(pageLimit(null), 1);
+  assert.equal(pageLimit('pro'), UNLIMITED_PAGES);
+  assert.equal(pageLimit('weird'), UNLIMITED_PAGES);
+  assert.equal(pageLimit(null), UNLIMITED_PAGES);
   assert.deepEqual(planConnect(1, [], [], ['a', 'b']), { allowed: ['a'], skipped: [{ id: 'b', reason: 'plan_limit' }] });
   assert.deepEqual(planConnect(1, ['a'], [], ['a', 'b']), { allowed: ['a'], skipped: [{ id: 'b', reason: 'plan_limit' }] });
   assert.deepEqual(planConnect(3, ['x'], ['b'], ['a', 'b']), { allowed: ['a'], skipped: [{ id: 'b', reason: 'other_account' }] });

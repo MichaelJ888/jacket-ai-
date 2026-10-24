@@ -127,7 +127,7 @@ export default function ConnectPage() {
         {tenant && <button className="text-xs underline" onClick={() => void signOut()}>Sign out</button>}
       </div>
 
-      {tenant && <p className="mt-3 text-sm">Hi <strong>{tenant.name || "there"}</strong> - plan <strong className="capitalize">{tenant.plan}</strong> ({pages.length}/{tenant.pageLimit} Pages used)</p>}
+      {tenant && <p className="mt-3 text-sm">Hi <strong>{tenant.name || "there"}</strong> - {pages.length} Facebook Page(s) connected (unlimited)</p>}
 
       <ol className="my-5 flex gap-2 text-xs">
         {STEPS.map((label, index) => (
@@ -141,6 +141,7 @@ export default function ConnectPage() {
         {connecting ? "Waiting for Facebook..." : tenant ? "Connect another Page" : "Continue with Facebook"}
       </button>
       {!configured && <p className="mt-2 text-sm text-red-600">Facebook connection is not available yet. Please contact support.</p>}
+      {tenant && <p className="mt-2 text-xs text-zinc-600">Have more than one Facebook account? In the Facebook window choose &quot;Log into another account&quot; (or log out of Facebook first), then tap this button again. Pages from every account are kept.</p>}
 
       <ul className="mt-6 space-y-3">
         {pages.map((page) => {
