@@ -48,7 +48,7 @@ function formatMinutes(totalMinutes: number) {
 
 export async function POST(req: Request) {
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (webhookSecret && req.headers.get('x-telegram-bot-api-secret-token') !== webhookSecret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!webhookSecret || req.headers.get('x-telegram-bot-api-secret-token') !== webhookSecret) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const limited = await rateLimitResponse(req, 'telegram-webhook', 120, 60);
   if (limited) return limited;
   try {
@@ -215,7 +215,7 @@ export async function POST(req: Request) {
       const ceoText = text.replace(/@\w*bot\b/gi, '').trim() || text;
       const route = routeCeoMessage(ceoText);
       if (route.kind === 'command' || route.kind === 'dev') {
-        const reply = route.kind === 'dev' ? await queueDevTask(route.task, route.explicit, update?.update_id) : await devQueueCommand(route.name);
+        const reply = route.kind === 'dev' ? await queueDevTask(route.task, route.explicit, update?.update_id) : await devQueueCommand(route.name, route.id);
         await sendTelegramDirectMessage(String(chatId), reply.slice(0, 4000));
         return NextResponse.json({ ok: true });
       }

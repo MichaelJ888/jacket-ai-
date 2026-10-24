@@ -17,5 +17,7 @@ test('biz prefix forces CEO agent, commands are recognised', () => {
   assert.equal(routeCeoMessage('/biz deploy the new price list').kind, 'ceo');
   assert.deepEqual(routeCeoMessage('/ideas'), { kind: 'command', name: 'ideas' });
   assert.deepEqual(routeCeoMessage('/queue'), { kind: 'command', name: 'queue' });
+  assert.deepEqual(routeCeoMessage('/approve'), { kind: 'command', name: 'approve' });
+  assert.deepEqual(routeCeoMessage('/stop'), { kind: 'command', name: 'stop' });
   assert.equal(routeCeoMessage('/dev').kind, 'ceo');
 });

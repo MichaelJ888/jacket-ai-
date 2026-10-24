@@ -9,6 +9,7 @@
     "lint": "eslint",
     "db:push": "node scripts/apply-schema.mjs",
     "devq": "node scripts/devq.mjs",
+    "devq:worker": "node scripts/devq-worker.mjs",
     "memory": "node scripts/memory.mjs",
     "voice:setup": "node scripts/retell-setup.mjs",
     "bootstrap": "node scripts/bootstrap.mjs",

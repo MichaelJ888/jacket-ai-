@@ -3,7 +3,7 @@
 
 export type DevRoute =
   | { kind: 'dev'; task: string; explicit: boolean }
-  | { kind: 'command'; name: 'ideas' | 'queue' }
+  | { kind: 'command'; name: 'ideas' | 'queue' | 'approve' | 'stop'; id?: string }
   | { kind: 'ceo' };
 
 const EXPLICIT = /^\/?(dev|vscode|code|copilot)\b[:\s-]*/i;
@@ -17,6 +17,11 @@ export function routeCeoMessage(raw: string): DevRoute {
   const text = (raw || '').trim();
   if (/^\/ideas\b/i.test(text)) return { kind: 'command', name: 'ideas' };
   if (/^\/queue\b/i.test(text)) return { kind: 'command', name: 'queue' };
+  if (/^\/approve\b/i.test(text)) {
+    const id = text.split(/\s+/)[1];
+    return { kind: 'command', name: 'approve', ...(id ? { id: id.replace(/^#/, '').toLowerCase() } : {}) };
+  }
+  if (/^\/stop\b/i.test(text)) return { kind: 'command', name: 'stop' };
   if (NOT_DEV.test(text)) return { kind: 'ceo' };
 
   const explicit = text.match(EXPLICIT);

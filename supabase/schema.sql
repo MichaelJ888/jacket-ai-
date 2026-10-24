@@ -846,6 +846,7 @@ create table if not exists public.dev_tasks (
   completed_at timestamptz
 );
 create index if not exists dev_tasks_status_idx on public.dev_tasks (status, created_at);
+alter table public.dev_tasks add column if not exists approved_at timestamptz;
 alter table public.dev_tasks enable row level security;
 revoke all on public.dev_tasks from anon, authenticated;
 

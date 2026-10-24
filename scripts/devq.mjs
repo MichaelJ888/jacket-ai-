@@ -1,6 +1,6 @@
 // Bridge between the CEO's Telegram bot and the VS Code AI chat.
 //   node scripts/devq.mjs list                 show queued/claimed jobs
-//   node scripts/devq.mjs next                 claim the oldest queued job and print it
+//   node scripts/devq.mjs next                 claim the oldest APPROVED queued job (CEO sends /approve) and print it
 //   node scripts/devq.mjs done <id> "summary"  mark done and tell the CEO on Telegram
 //   node scripts/devq.mjs fail <id> "reason"   mark failed and tell the CEO
 //   node scripts/devq.mjs watch [seconds]      poll (default 30s) and print new jobs; run in a VS Code terminal
@@ -42,10 +42,10 @@ async function findTask(idOrPrefix) {
 }
 
 async function claimNext() {
-  const [oldest] = await rest('dev_tasks?select=id,task&status=eq.queued&order=created_at.asc&limit=1');
+  const [oldest] = await rest('dev_tasks?select=id,task&status=eq.queued&approved_at=not.is.null&order=created_at.asc&limit=1');
   if (!oldest) return null;
   // Conditional update: only one claimer can flip queued -> claimed.
-  const [claimed] = await rest(`dev_tasks?id=eq.${oldest.id}&status=eq.queued`, { method: 'PATCH', body: JSON.stringify({ status: 'claimed', claimed_at: new Date().toISOString() }) });
+  const [claimed] = await rest(`dev_tasks?id=eq.${oldest.id}&status=eq.queued&approved_at=not.is.null`, { method: 'PATCH', body: JSON.stringify({ status: 'claimed', claimed_at: new Date().toISOString() }) });
   return claimed || null;
 }
 
@@ -69,7 +69,7 @@ if (command === 'list') {
   const seen = new Set();
   for (;;) {
     try {
-      const rows = await rest('dev_tasks?select=id,task&status=eq.queued&order=created_at.asc');
+      const rows = await rest('dev_tasks?select=id,task&status=eq.queued&approved_at=not.is.null&order=created_at.asc');
       for (const row of rows) if (!seen.has(row.id)) { seen.add(row.id); console.log(`\nNEW DEV TASK ${row.id.slice(0, 8)}: ${row.task}\n-> tell the VS Code AI chat: "run npm run devq -- next and do it"`); }
     } catch (error) { console.error('poll failed:', error.message); }
     await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
