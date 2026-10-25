@@ -1,15 +1,48 @@
 import { getSupabaseAdmin } from './integrations';
-import { createCodeChangeIssue } from './ceo-exec';
 
-// Queues a coding job for the VS Code AI chat. The CEO reads the reply on Telegram; results come back via scripts/devq.mjs.
+const CLOUD_WORKFLOW = 'devq-cloud.yml';
+
+// Starts .github/workflows/devq-cloud.yml for one approved task. Fails soft: the task stays approved and the PC worker can still claim it.
+export async function dispatchDevTask(taskId: string): Promise<{ ok: boolean; reason?: string }> {
+  const token = process.env.GITHUB_TOKEN || process.env.GITHUB_PAT;
+  const repo = process.env.GITHUB_REPO || 'MichaelJ888/jacket-ai-';
+  if (!token) return { ok: false, reason: 'GITHUB_PAT is not set' };
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repo}/actions/workflows/${CLOUD_WORKFLOW}/dispatches`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2022-11-28' },
+      body: JSON.stringify({ ref: 'main', inputs: { task_id: taskId } }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (response.ok) return { ok: true };
+    const data = (await response.json().catch(() => ({}))) as { message?: string };
+    return { ok: false, reason: data.message || `HTTP ${response.status}` };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : 'dispatch failed' };
+  }
+}
+
+// Queues a coding job. An explicit /dev message is treated as a clear CEO code request and auto-approved; anything else waits for /approve.
 export async function queueDevTask(task: string, explicit: boolean, updateId?: number) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return 'Hindi ma-queue ang dev task: Supabase is not configured.';
-  const { data, error } = await supabase.from('dev_tasks').insert({ task: task.slice(0, 4000), telegram_update_id: updateId ?? null }).select('id').single();
+  const approvedAt = explicit ? new Date().toISOString() : null;
+  const { data, error } = await supabase
+    .from('dev_tasks')
+    .insert({ task: task.slice(0, 4000), telegram_update_id: updateId ?? null, approved_at: approvedAt })
+    .select('id')
+    .single();
   if (error) return `Hindi ma-queue: ${error.message}`;
-  const { count } = await supabase.from('dev_tasks').select('id', { count: 'exact', head: true }).eq('status', 'queued');
-  const hint = explicit ? '' : '\n(Awtomatikong nakita kong coding task ito. Kung business question ito, simulan ang message sa /biz.)';
-  return `Na-queue para sa VS Code AI, Boss. #${String(data.id).slice(0, 8)} - ${count ?? 1} sa pila.\nKukunin ito kapag bukas ang VS Code AI chat at magsasabi ako dito kapag tapos na.${hint}`;
+  const short = String(data.id).slice(0, 8);
+  if (explicit) {
+    const run = await dispatchDevTask(data.id);
+    const status = run.ok
+      ? 'Auto-approved. Cloud runner na ang gagawa at magpapadala ng PR link dito.'
+      : `Auto-approved, pero hindi ma-trigger ang cloud runner (${run.reason}). Kukunin ito ng PC worker kapag naka-on.`;
+    return `Na-queue #${short}, Boss.\n${status}`;
+  }
+  const { count } = await supabase.from('dev_tasks').select('id', { count: 'exact', head: true }).eq('status', 'queued').is('approved_at', null);
+  return `Na-queue #${short}, Boss. ${count ?? 1} ang naghihintay ng approval.\nI-/approve mo ito kung gusto mong gawin.\n(Awtomatikong nakita kong coding task ito. Kung business question ito, simulan ang message sa /biz.)`;
 }
 
 export async function devQueueCommand(name: 'ideas' | 'queue' | 'approve' | 'stop', id?: string) {
@@ -20,20 +53,19 @@ export async function devQueueCommand(name: 'ideas' | 'queue' | 'approve' | 'sto
     const row = id ? pending?.find((item) => String(item.id).startsWith(id)) : pending?.[0];
     if (!row) return id ? `Walang nakapilang task na may ID ${id}, Boss.` : 'Walang task na naghihintay ng approval, Boss.';
     const short = String(row.id).slice(0, 8);
-    const issue = await createCodeChangeIssue(
-      row.task.slice(0, 120),
-      `Telegram dev task #${short}, approved by the CEO.\n\n${row.task}\n\nImplement with the smallest safe change, add or update a test, and open a PR. Do not merge.`,
-    );
-    if (!issue.ok) return `Hindi na-approve #${short}: GitHub issue failed (${issue.reason}). Nanatili sa pila.`;
-    // Stays queued so scripts/devq.mjs next / devq-worker can claim it (queued -> claimed).
+    // Stays queued+approved so the cloud runner or the PC worker can claim it (queued -> claimed).
     const { error } = await supabase
       .from('dev_tasks')
-      .update({ approved_at: new Date().toISOString(), result: `GitHub issue: ${issue.url}` })
+      .update({ approved_at: new Date().toISOString() })
       .eq('id', row.id)
       .eq('status', 'queued')
       .is('approved_at', null);
-    if (error) return `Na-create ang GitHub issue (${issue.url}) pero hindi na-approve: ${error.message}`;
-    return `Approved #${short}: ${row.task.slice(0, 120)}\nGitHub issue: ${issue.url}\nAko na ang gagawa nito sa VS Code at magsasabi ako kapag tapos na.`;
+    if (error) return `Hindi na-approve #${short}: ${error.message}`;
+    const run = await dispatchDevTask(row.id);
+    const status = run.ok
+      ? 'Cloud runner na ang gagawa at magpapadala ng PR link dito.'
+      : `Hindi ma-trigger ang cloud runner (${run.reason}). Kukunin ito ng PC worker kapag naka-on.`;
+    return `Approved #${short}: ${row.task.slice(0, 120)}\n${status}`;
   }
   if (name === 'stop') {
     const { data, error } = await supabase

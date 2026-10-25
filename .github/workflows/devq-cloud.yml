@@ -1,0 +1,67 @@
+name: Dev queue cloud runner
+
+# Runs one approved dev_tasks item through the Copilot CLI and opens a PR for CEO review.
+# Dispatched by app/api/_lib/dev-queue.ts (Telegram /dev or /approve). Never pushes to main.
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: dev_tasks id (uuid)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: devq-cloud-${{ inputs.task_id }}
+  cancel-in-progress: false
+
+jobs:
+  run-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+      COPILOT_BIN: copilot
+      GH_TOKEN: ${{ secrets.GITHUB_PAT || github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies and Copilot CLI
+        run: |
+          npm ci
+          npm install -g @github/copilot
+
+      - name: Run approved task
+        run: node scripts/devq-worker.mjs --once --task "${{ inputs.task_id }}"
+
+      - name: Open PR with the changes
+        if: success()
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+        run: |
+          set -e
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No file changes from the task."
+            exit 0
+          fi
+          BRANCH="devq/${TASK_ID:0:8}"
+          git checkout -b "$BRANCH"
+          git -c user.name="devq-cloud" -c user.email="devq-cloud@users.noreply.github.com" commit -m "devq ${TASK_ID:0:8}: CEO-approved Telegram task"
+          git push -u origin "$BRANCH"
+          gh pr create --base main --head "$BRANCH" \
+            --title "devq ${TASK_ID:0:8}: CEO-approved Telegram task" \
+            --body "Opened by the devq cloud runner for dev_tasks ${TASK_ID}. Review the diff, check CI, then merge from the GitHub app."

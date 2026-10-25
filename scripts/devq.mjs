@@ -42,6 +42,8 @@ async function findTask(idOrPrefix) {
 }
 
 async function claimNext() {
+  // Put back tasks whose worker died mid-run (claimed > 45 min ago).
+  await rest(`dev_tasks?status=eq.claimed&claimed_at=lt.${new Date(Date.now() - 45 * 60 * 1000).toISOString()}`, { method: 'PATCH', body: JSON.stringify({ status: 'queued', claimed_at: null }) });
   const [oldest] = await rest('dev_tasks?select=id,task&status=eq.queued&approved_at=not.is.null&order=created_at.asc&limit=1');
   if (!oldest) return null;
   // Conditional update: only one claimer can flip queued -> claimed.

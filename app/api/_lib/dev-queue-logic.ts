@@ -10,7 +10,7 @@ const EXPLICIT = /^\/?(dev|vscode|code|copilot)\b[:\s-]*/i;
 const NOT_DEV = /^\/?(biz|ceo|ask)\b[:\s-]*/i;
 
 // Strong code-work signals; a verb alone ("deploy") is not enough, it must hit a repo/code noun too.
-const ACTION = /\b(fix|implement|refactor|add|create|update|deploy|redeploy|commit|push|patch|debug|rewrite|migrate|apply|integrate|upgrade)\b/i;
+const IMPERATIVE = /^(please\s+)?(fix|implement|refactor|add|create|update|deploy|redeploy|commit|push|patch|debug|rewrite|migrate|apply|integrate|upgrade)\b/i;
 const CODE_NOUN = /\b(code|bug|route|api|endpoint|schema|table|migration|webhook|cron|component|page|build|lint|typescript|vercel|repo|github|branch|pull request|pr|env var|\.ts|\.tsx|\.mjs|supabase)\b/i;
 
 export function routeCeoMessage(raw: string): DevRoute {
@@ -29,6 +29,7 @@ export function routeCeoMessage(raw: string): DevRoute {
     const task = text.slice(explicit[0].length).trim();
     return task ? { kind: 'dev', task, explicit: true } : { kind: 'ceo' };
   }
-  if (text.length >= 20 && ACTION.test(text) && CODE_NOUN.test(text)) return { kind: 'dev', task: text, explicit: false };
+  // Non-explicit tasks must open with a clear imperative verb, so chat or forwarded text never lands in the queue.
+  if (text.length >= 20 && IMPERATIVE.test(text) && CODE_NOUN.test(text)) return { kind: 'dev', task: text, explicit: false };
   return { kind: 'ceo' };
 }

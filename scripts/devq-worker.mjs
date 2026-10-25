@@ -1,8 +1,9 @@
 // Unattended worker: runs CEO-approved dev_tasks one at a time through the GitHub Copilot CLI.
 //   node scripts/devq-worker.mjs            poll every 60s (Ctrl+C to stop)
 //   node scripts/devq-worker.mjs --once     run at most one approved task, then exit
-// Requires a one-time `copilot login` on this PC. Never pushes, deploys, or migrates the DB.
-// Changes stay uncommitted so the CEO can review them.
+//   node scripts/devq-worker.mjs --once --task <uuid>   run one specific approved task (used by the cloud runner)
+// Requires a one-time `copilot login` on this PC (or COPILOT_GITHUB_TOKEN in CI). Never pushes, deploys, or migrates the DB.
+// Changes stay uncommitted; the cloud runner commits them to a PR branch, the PC leaves them for CEO review.
 import { readFileSync, existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -24,8 +25,11 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const devq = fileURLToPath(new URL('./devq.mjs', import.meta.url));
 const copilotBin = process.env.COPILOT_BIN || join(process.env.APPDATA || '', 'npm', 'node_modules', '@github', 'copilot', 'node_modules', '@github', 'copilot-win32-x64', 'copilot.exe');
 const TASK_TIMEOUT_MS = 25 * 60 * 1000;
+const STALE_CLAIM_MS = 45 * 60 * 1000;
 const POLL_MS = Number(process.env.DEVQ_WORKER_POLL_MS) || 60_000;
 const once = process.argv.includes('--once');
+const taskFlag = process.argv.indexOf('--task');
+const onlyTaskId = taskFlag > 0 ? process.argv[taskFlag + 1] : null;
 
 async function rest(path, init = {}) {
   const res = await fetch(`${base}/rest/v1/${path}`, { ...init, headers: { ...headers, ...init.headers }, signal: AbortSignal.timeout(20000) });
@@ -33,8 +37,16 @@ async function rest(path, init = {}) {
   return res.json();
 }
 
+// A worker that died mid-task leaves rows in 'claimed'; put them back so they are not stuck forever.
+async function releaseStaleClaims() {
+  const cutoff = new Date(Date.now() - STALE_CLAIM_MS).toISOString();
+  await rest(`dev_tasks?status=eq.claimed&claimed_at=lt.${cutoff}`, { method: 'PATCH', body: JSON.stringify({ status: 'queued', claimed_at: null }) });
+}
+
 async function claimNext() {
-  const [oldest] = await rest('dev_tasks?select=id,task&status=eq.queued&approved_at=not.is.null&order=created_at.asc&limit=1');
+  await releaseStaleClaims();
+  const filter = onlyTaskId ? `id=eq.${onlyTaskId}` : 'order=created_at.asc&limit=1';
+  const [oldest] = await rest(`dev_tasks?select=id,task&status=eq.queued&approved_at=not.is.null&${filter}`);
   if (!oldest) return null;
   const [claimed] = await rest(`dev_tasks?id=eq.${oldest.id}&status=eq.queued&approved_at=not.is.null`, { method: 'PATCH', body: JSON.stringify({ status: 'claimed', claimed_at: new Date().toISOString() }) });
   return claimed || null;
@@ -61,7 +73,7 @@ function buildPrompt(task) {
 
 function runCopilot(prompt) {
   return new Promise((resolve) => {
-    if (!existsSync(copilotBin)) return resolve({ code: 1, out: '', err: `Copilot CLI not found at ${copilotBin}` });
+    if (!process.env.COPILOT_BIN && !existsSync(copilotBin)) return resolve({ code: 1, out: '', err: `Copilot CLI not found at ${copilotBin}` });
     const args = [
       '-p', prompt, '-s', '--allow-all-tools',
       '--deny-tool=shell(git push)', '--deny-tool=shell(vercel)', '--deny-tool=shell(npx vercel)',
