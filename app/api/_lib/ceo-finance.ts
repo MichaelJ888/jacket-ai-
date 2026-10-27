@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import {
   allocateProfit,
+  aggregatePayrollAccruals,
   buildPeriodReport,
   classifyPaymentRisk,
   formatPeso,
@@ -90,13 +91,21 @@ export async function accruePayrollToLedger(period: string) {
   const supabase = getSupabaseAdmin();
   const range = periodRange(period);
   if (!supabase || !range) return { booked: 0 };
-  const { data } = await supabase
-    .from('staff_attendance')
-    .select('staff_name, total_earned, time_in')
-    .gte('time_in', `${range.start}T00:00:00+08:00`)
-    .lt('time_in', `${range.end}T00:00:00+08:00`);
-  const totals = new Map<string, number>();
-  for (const row of data || []) totals.set(String(row.staff_name), (totals.get(String(row.staff_name)) || 0) + Number(row.total_earned || 0));
+  const [{ data: sewerWorkers, error: sewerWorkersError }, { data: attendance, error: attendanceError }] = await Promise.all([
+    supabase.from('payroll_workers').select('name').eq('kind', 'sewer'),
+    supabase
+      .from('staff_attendance')
+      .select('staff_name, total_earned, time_in')
+      .gte('time_in', `${range.start}T00:00:00+08:00`)
+      .lt('time_in', `${range.end}T00:00:00+08:00`),
+  ]);
+  // Fail closed rather than risk double-booking sewer labor if we cannot identify
+  // the workers whose attendance is included in their separate sewer payroll run.
+  if (sewerWorkersError || attendanceError) return { booked: 0 };
+  const totals = aggregatePayrollAccruals(
+    (attendance || []).map((row) => ({ staff_name: String(row.staff_name), total_earned: Number(row.total_earned || 0) })),
+    new Set((sewerWorkers || []).map((worker) => String(worker.name))),
+  );
   let booked = 0;
   for (const [staff, total] of totals) {
     if (total <= 0) continue;

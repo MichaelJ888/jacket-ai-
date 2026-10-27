@@ -81,6 +81,19 @@ export interface LedgerRow {
   amount: number;
 }
 
+export function aggregatePayrollAccruals(
+  rows: Array<{ staff_name: string; total_earned: number | null }>,
+  excludedStaffNames: Set<string>,
+) {
+  const excluded = new Set([...excludedStaffNames].map((name) => name.trim().toLowerCase()));
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    if (excluded.has(row.staff_name.trim().toLowerCase())) continue;
+    totals.set(row.staff_name, (totals.get(row.staff_name) || 0) + Number(row.total_earned || 0));
+  }
+  return totals;
+}
+
 export interface PeriodReport {
   income: number;
   expenses: number;

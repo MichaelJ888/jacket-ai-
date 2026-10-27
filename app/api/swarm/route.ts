@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../_lib/auth';
-import { runSwarm, clampAgents, type SwarmState } from '../_lib/swarm';
+import { runSwarm, clampAgents, CEO_SWARM_MAX_AGENTS, type SwarmState } from '../_lib/swarm';
 import { createPoolRunner } from '../_lib/swarm-runner';
 
 export const maxDuration = 60;
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
       goal: goal || state!.goal,
       context: typeof body?.context === 'string' ? body.context : undefined,
       runner: createPoolRunner(),
-      maxAgents: clampAgents(body?.maxAgents),
+      maxAgents: clampAgents(body?.maxAgents, CEO_SWARM_MAX_AGENTS),
       concurrency: typeof body?.concurrency === 'number' ? body.concurrency : 5,
       verify: body?.verify !== false,
       deadlineMs: 22000,

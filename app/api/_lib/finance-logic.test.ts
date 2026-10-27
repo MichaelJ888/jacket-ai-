@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { allocateProfit, buildPeriodReport, checkQuoteMargin, classifyPaymentRisk, findDuplicateReferences, forecastRunwayDays, periodRange } from './finance-logic.ts';
+import { aggregatePayrollAccruals, allocateProfit, buildPeriodReport, checkQuoteMargin, classifyPaymentRisk, findDuplicateReferences, forecastRunwayDays, periodRange } from './finance-logic.ts';
 
 const rules = [
   { bucket: 'salaries', percent: 25, priority: 10 },
@@ -48,6 +48,16 @@ test('buildPeriodReport totals per project and category', () => {
   assert.equal(report.marginPercent, 50);
   assert.equal(report.expensesByCategory.materials, 400);
   assert.equal(report.byProject[0].project, 'A');
+});
+
+test('monthly payroll accrual excludes sewer attendance already booked by sewer payroll', () => {
+  const totals = aggregatePayrollAccruals([
+    { staff_name: 'Sewer One', total_earned: 1200 },
+    { staff_name: 'Office Staff', total_earned: 2400 },
+    { staff_name: 'office staff', total_earned: 600 },
+  ], new Set(['sewer one']));
+
+  assert.deepEqual([...totals], [['Office Staff', 2400], ['office staff', 600]]);
 });
 
 test('checkQuoteMargin, runway, duplicates and period ranges', () => {

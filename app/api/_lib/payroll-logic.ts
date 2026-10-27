@@ -97,6 +97,58 @@ export function formatPayrollText(title: string, label: string, lines: PayrollLi
   return [`${title}`, label, ...(body.length ? body : ['- No payable entries']), `TOTAL: ${peso(total)}`, ...notes].join('\n');
 }
 
+export type SubconPayrollRun = {
+  id: string;
+  kind: string;
+  subject_key: string;
+  period_start: string;
+  period_end: string;
+};
+
+export type SubconPayoutResult = { created: boolean; runId?: string; total?: number; error?: string | null };
+
+// Coordinates recoverable subcontractor payout without tying this logic to Supabase.
+// The injected reservation must atomically set completed_at only if it is null and
+// return the persisted value, including when another caller already reserved it.
+export async function finalizeSubconPayout(input: {
+  jobId: string;
+  completionAt: string | null;
+  line: PayrollLine;
+}, dependencies: {
+  reserveCompletionAt(jobId: string): Promise<{ value: string | null; error?: string | null }>;
+  findExistingRun(jobId: string): Promise<{ run: SubconPayrollRun | null; error?: string | null }>;
+  periodForCompletion(completionAt: string): PayPeriod;
+  saveRun(period: PayPeriod, line: PayrollLine): Promise<SubconPayoutResult>;
+  closeJob(jobId: string): Promise<{ error?: string | null }>;
+}): Promise<SubconPayoutResult> {
+  let completionAt = input.completionAt;
+  if (!completionAt) {
+    const reservation = await dependencies.reserveCompletionAt(input.jobId);
+    if (reservation.error) return { created: false, error: `Could not reserve subcontractor completion time: ${reservation.error}` };
+    completionAt = reservation.value;
+    if (!completionAt) return { created: false, error: 'Could not reserve or recover subcontractor completion time.' };
+  }
+
+  const existing = await dependencies.findExistingRun(input.jobId);
+  if (existing.error) return { created: false, error: `Could not check for an existing subcontractor payroll run: ${existing.error}` };
+
+  let payout: SubconPayoutResult;
+  if (existing.run) {
+    if (existing.run.kind !== 'subcon' || existing.run.subject_key !== input.jobId || !existing.run.id) {
+      return { created: false, error: 'Existing payroll run does not match this subcontractor job; job remains open.' };
+    }
+    payout = { created: false, runId: existing.run.id };
+  } else {
+    payout = await dependencies.saveRun(dependencies.periodForCompletion(completionAt), input.line);
+    if (payout.error) return payout;
+    if (!payout.runId) return { created: false, error: 'Payroll save did not confirm a matching run; job remains open.' };
+  }
+
+  const closed = await dependencies.closeJob(input.jobId);
+  if (closed.error) return { ...payout, error: `Payroll run ${payout.runId} is confirmed, but subcontractor job could not be marked done: ${closed.error}` };
+  return payout;
+}
+
 // "time in", "time-out", "in", "out" (case-insensitive) -> clock action; anything else -> null.
 export function parseAttendanceText(text: string): 'IN' | 'OUT' | null {
   const match = text.trim().toLowerCase().match(/^(?:time[\s-]*)?(in|out)\b/);

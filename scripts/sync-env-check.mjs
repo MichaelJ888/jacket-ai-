@@ -46,6 +46,7 @@ export async function runEnvCheck({ local, env, fetcher = fetch, syncMissingProd
   const audit = auditEnvironment(local, envs);
   const errors = [];
   const warnings = [];
+  if (audit.databaseIsolation.status === 'shared') warnings.push(audit.databaseIsolation.detail);
   if (audit.targets.production.missing.length) errors.push('Required production/Meta environment names are missing.');
   if (audit.local.missing.length) warnings.push('Local configuration has missing variables; see names in local.missing.');
   for (const target of ['preview', 'development']) {

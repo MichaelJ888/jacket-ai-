@@ -6,6 +6,7 @@
 
 export const HARD_MAX_AGENTS = 1000;
 export const DEFAULT_MAX_AGENTS = 24;
+export const CEO_SWARM_MAX_AGENTS = 100;
 export const DEFAULT_CONCURRENCY = 16;
 const RESULT_CAP = 4000;
 
@@ -45,9 +46,10 @@ export function newState(goal: string): SwarmState {
   return { goal, subtasks: null, results: {}, verdicts: {}, revised: {}, failures: {}, agentsUsed: 0, report: null };
 }
 
-export function clampAgents(requested?: number) {
+export function clampAgents(requested?: number, max = HARD_MAX_AGENTS) {
   const n = Number.isFinite(requested) ? Math.floor(requested as number) : DEFAULT_MAX_AGENTS;
-  return Math.max(3, Math.min(HARD_MAX_AGENTS, n));
+  const ceiling = Math.max(3, Math.min(HARD_MAX_AGENTS, Math.floor(max)));
+  return Math.max(3, Math.min(ceiling, n));
 }
 
 export function parseSubtasks(raw: string, limit: number): string[] {

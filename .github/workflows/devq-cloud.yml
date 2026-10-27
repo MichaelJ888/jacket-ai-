@@ -39,13 +39,33 @@ jobs:
         with:
           node-version: 22
 
+      - name: Check runner configuration
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+        run: |
+          node --input-type=module <<'JS'
+          const names = ['NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'COPILOT_GITHUB_TOKEN'];
+          const missing = names.filter((name) => !process.env[name]?.trim());
+          if (missing.length) {
+            console.error(`Missing cloud runner configuration: ${missing.join(', ')}. No task was claimed.`);
+            process.exitCode = 1;
+          }
+          if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(process.env.TASK_ID || '')) {
+            console.error('task_id must be a full dev_tasks UUID.');
+            process.exitCode = 1;
+          }
+          JS
+
       - name: Install dependencies and Copilot CLI
         run: |
           npm ci
           npm install -g @github/copilot
 
       - name: Run approved task
-        run: node scripts/devq-worker.mjs --once --task "${{ inputs.task_id }}"
+        id: worker
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+        run: node scripts/devq-worker.mjs --once --task "$TASK_ID" --defer-completion
 
       - name: Open PR with the changes
         if: success()
@@ -56,12 +76,20 @@ jobs:
           git add -A
           if git diff --cached --quiet; then
             echo "No file changes from the task."
+            node scripts/devq.mjs done "$TASK_ID" "Cloud task completed; no source changes were produced. No deployment was performed."
             exit 0
           fi
           BRANCH="devq/${TASK_ID:0:8}"
           git checkout -b "$BRANCH"
-          git -c user.name="devq-cloud" -c user.email="devq-cloud@users.noreply.github.com" commit -m "devq ${TASK_ID:0:8}: CEO-approved Telegram task"
+          git -c user.name="devq-cloud" -c user.email="devq-cloud@users.noreply.github.com" commit -m "devq ${TASK_ID:0:8}: CEO-approved Telegram task" -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
           git push -u origin "$BRANCH"
-          gh pr create --base main --head "$BRANCH" \
+          PR_URL=$(gh pr create --base main --head "$BRANCH" \
             --title "devq ${TASK_ID:0:8}: CEO-approved Telegram task" \
-            --body "Opened by the devq cloud runner for dev_tasks ${TASK_ID}. Review the diff, check CI, then merge from the GitHub app."
+            --body "Opened by the devq cloud runner for dev_tasks ${TASK_ID}. Review the diff, check CI, then merge from the GitHub app.")
+          node scripts/devq.mjs done "$TASK_ID" "PR ready for review: $PR_URL . Not merged or deployed."
+
+      - name: Record PR handoff failure
+        if: failure() && steps.worker.outcome == 'success'
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+        run: node scripts/devq.mjs fail "$TASK_ID" "Cloud code step completed but the PR handoff failed. Inspect this workflow run before retrying; no deployment was performed."

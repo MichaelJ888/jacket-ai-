@@ -8,6 +8,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { classifyWorkerResult, parseWorkerOptions, workerExitCode } from './lib/devq-worker-logic.mjs';
+
+const { once, taskId: onlyTaskId, deferCompletion } = parseWorkerOptions(process.argv.slice(2));
 
 try {
   for (const line of readFileSync(new URL('../.env.local', import.meta.url), 'utf8').split(/\r?\n/)) {
@@ -27,9 +30,6 @@ const copilotBin = process.env.COPILOT_BIN || join(process.env.APPDATA || '', 'n
 const TASK_TIMEOUT_MS = 25 * 60 * 1000;
 const STALE_CLAIM_MS = 45 * 60 * 1000;
 const POLL_MS = Number(process.env.DEVQ_WORKER_POLL_MS) || 60_000;
-const once = process.argv.includes('--once');
-const taskFlag = process.argv.indexOf('--task');
-const onlyTaskId = taskFlag > 0 ? process.argv[taskFlag + 1] : null;
 
 async function rest(path, init = {}) {
   const res = await fetch(`${base}/rest/v1/${path}`, { ...init, headers: { ...headers, ...init.headers }, signal: AbortSignal.timeout(20000) });
@@ -91,7 +91,8 @@ function runCopilot(prompt) {
 }
 
 function notify(args) {
-  spawnSync(process.execPath, [devq, ...args], { cwd: root, stdio: 'inherit' });
+  const result = spawnSync(process.execPath, [devq, ...args], { cwd: root, stdio: 'inherit' });
+  if (result.error || result.status !== 0) throw new Error('Dev task completion update failed; inspect the claimed task before retrying.');
 }
 
 function summarize(out) {
@@ -102,25 +103,27 @@ function summarize(out) {
 
 async function runOne() {
   const task = await claimNext();
-  if (!task) return false;
+  if (!task) return 'idle';
   const id = task.id.slice(0, 8);
   console.log(`[worker] running ${id}: ${task.task.slice(0, 120)}`);
   const result = await runCopilot(buildPrompt(task.task));
-  if (/no authentication information|not logged in|login/i.test(result.err) && !result.out) {
+  const outcome = classifyWorkerResult(result);
+  if (outcome === 'auth') {
     await releaseClaim(task.id);
     console.error('[worker] Copilot CLI is not logged in on this PC. Run `copilot login` once; task returned to the queue.');
     return 'auth';
   }
   const text = summarize(result.out);
-  if (result.code === 0 && !/^NEEDS INPUT:/m.test(result.out)) notify(['done', id, text]);
-  else notify(['fail', id, result.code === 0 ? text : `${result.err || 'exit ' + result.code}\n${text}`.slice(0, 3000)]);
+  if (outcome === 'success') {
+    if (!deferCompletion) notify(['done', task.id, text]);
+  } else notify(['fail', task.id, result.code === 0 ? text : `${result.err || 'exit ' + result.code}\n${text}`.slice(0, 3000)]);
   console.log(`[worker] finished ${id} (exit ${result.code})`);
-  return true;
+  return outcome;
 }
 
 if (once) {
   const outcome = await runOne();
-  process.exitCode = outcome === 'auth' ? 2 : 0;
+  process.exitCode = workerExitCode(outcome, Boolean(onlyTaskId));
 }
 
 if (!once) console.log(`devq worker started (poll ${POLL_MS / 1000}s). Ctrl+C to stop.`);
@@ -128,7 +131,7 @@ while (!once) {
   try {
     const outcome = await runOne();
     if (outcome === 'auth') await new Promise((resolve) => setTimeout(resolve, POLL_MS * 10));
-    else if (!outcome) await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    else if (outcome === 'idle') await new Promise((resolve) => setTimeout(resolve, POLL_MS));
   } catch (error) {
     console.error('[worker] error:', error.message);
     await new Promise((resolve) => setTimeout(resolve, POLL_MS));

@@ -1,10 +1,10 @@
-import { runSwarm, type SwarmState } from './swarm';
+import { CEO_SWARM_MAX_AGENTS, clampAgents, runSwarm, type SwarmState } from './swarm';
 import { createPoolRunner } from './swarm-runner';
 import { hindsightRetain } from './hindsight.ts';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from './integrations';
 
-// CEO-initiated swarms are capped well below the engine's 1,000 ceiling: each agent is a paid LLM call.
-export const CEO_SWARM_MAX_AGENTS = 100;
+export { CEO_SWARM_MAX_AGENTS };
+
 export const CEO_SWARM_DEFAULT_AGENTS = 24;
 const MAX_ACTIVE_JOBS = 2;
 const MAX_SLICES = 40;
@@ -17,7 +17,7 @@ export async function createSwarmJob(goal: string, context: string | undefined, 
   if (!supabase) return { error: 'Supabase is not configured' };
   const { count } = await supabase.from('swarm_jobs').select('id', { count: 'exact', head: true }).eq('status', 'RUNNING');
   if ((count ?? 0) >= MAX_ACTIVE_JOBS) return { error: `Already ${count} swarm jobs running. Wait for one to finish.` };
-  const agents = Math.max(3, Math.min(CEO_SWARM_MAX_AGENTS, Math.floor(maxAgents ?? CEO_SWARM_DEFAULT_AGENTS)));
+  const agents = clampAgents(maxAgents ?? CEO_SWARM_DEFAULT_AGENTS, CEO_SWARM_MAX_AGENTS);
   const { data, error } = await supabase
     .from('swarm_jobs')
     .insert({ goal: goal.slice(0, 4000), context: context?.slice(0, 8000) ?? null, max_agents: agents })

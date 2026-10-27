@@ -15,6 +15,18 @@ test('environment metadata covers targets and ignores branch-scoped overrides', 
   assert.ok(!JSON.stringify(result).includes('private-'));
 });
 
+test('shared production Supabase metadata is reported, not mislabeled isolated', () => {
+  const shared = auditEnvironment(local, [{ key: 'NEXT_PUBLIC_SUPABASE_URL', target: ['production', 'preview', 'development'] }]);
+  assert.equal(shared.databaseIsolation.status, 'shared');
+  assert.deepEqual(shared.databaseIsolation.targets, ['production', 'preview', 'development']);
+  const separate = auditEnvironment(local, [
+    { key: 'NEXT_PUBLIC_SUPABASE_URL', target: ['production'] },
+    { key: 'NEXT_PUBLIC_SUPABASE_URL', target: ['preview'] },
+  ]);
+  assert.equal(separate.databaseIsolation.status, 'unverified');
+  assert.ok(!JSON.stringify(shared).includes('private-'));
+});
+
 test('production sync is missing-only, allowlisted and production-only', () => {
   const plan = planProductionSync({ ...local, VERCEL_TOKEN: 'never-copy', SUPABASE_ACCESS_TOKEN: 'never-copy' }, envs.filter((entry) => entry.key !== 'ADMIN_TOKEN'));
   assert.deepEqual(plan, [{ key: 'ADMIN_TOKEN', value: local.ADMIN_TOKEN, type: 'encrypted', target: ['production'] }]);

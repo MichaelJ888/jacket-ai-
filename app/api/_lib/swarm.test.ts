@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { runSwarm, parseSubtasks, parseVerdict, clampAgents, HARD_MAX_AGENTS, type AgentCall } from './swarm.ts';
+import { runSwarm, parseSubtasks, parseVerdict, clampAgents, CEO_SWARM_MAX_AGENTS, HARD_MAX_AGENTS, type AgentCall } from './swarm.ts';
 
 function fakeRunner(opts: { failFirstSkeptic?: boolean; subtasks?: number } = {}) {
   const calls: AgentCall[] = [];
@@ -28,6 +28,7 @@ test('parsers', () => {
   assert.equal(parseVerdict('VERDICT: PASS').ok, true);
   assert.equal(parseVerdict('no idea').ok, false);
   assert.equal(clampAgents(99999), HARD_MAX_AGENTS);
+  assert.equal(clampAgents(99999, CEO_SWARM_MAX_AGENTS), CEO_SWARM_MAX_AGENTS);
 });
 
 test('full run: plan, fan-out, verify, merge, with bounded concurrency', async () => {

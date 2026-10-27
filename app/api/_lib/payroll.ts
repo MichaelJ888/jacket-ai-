@@ -20,7 +20,8 @@ import {
   periodInstants,
   roundPeso,
   sumTotal,
-  toDateString,
+  finalizeSubconPayout,
+  type SubconPayrollRun,
   type PayPeriod,
   type PayrollLine,
 } from './payroll-logic';
@@ -153,7 +154,20 @@ async function saveRun(kind: Kind, period: PayPeriod, subjectKey: string, title:
     kind, period_start: period.start, period_end: period.end, subject_key: subjectKey,
     label: period.label, total, lines, notes,
   }).select('id').single();
-  if (error?.code === '23505') return { created: false };
+  if (error?.code === '23505') {
+    // A unique violation is success only when the exact intended natural key
+    // already exists; unrelated unique conflicts remain visible failures.
+    const { data: existing, error: lookupError } = await supabase.from('payroll_runs')
+      .select('id, kind, subject_key, period_start, period_end, total')
+      .eq('kind', kind).eq('period_start', period.start).eq('period_end', period.end).eq('subject_key', subjectKey)
+      .maybeSingle();
+    if (lookupError) return { created: false, error: `Payroll insert conflicted, but matching run lookup failed: ${lookupError.message}` };
+    if (!existing || existing.kind !== kind || existing.subject_key !== subjectKey ||
+      existing.period_start !== period.start || existing.period_end !== period.end) {
+      return { created: false, error: 'Payroll insert hit an unrelated unique conflict; no matching run exists.' };
+    }
+    return { created: false, runId: existing.id, total: Number(existing.total) };
+  }
   if (error || !data) return { created: false, error: error?.message || 'Insert failed' };
   void sendTelegramMessage(`💵 <b>${escapeTelegramHtml(title)}</b>\n<pre>${escapeTelegramHtml(formatPayrollText(title, period.label, lines, total, notes))}</pre>\nRun ID: <code>${data.id}</code>\nReply <code>PAYROLL PAID ${String(data.id).slice(0, 8)}</code> once released.`);
   return { created: true, runId: data.id, total };
@@ -231,40 +245,96 @@ export async function addSubconJob(input: { subconName: string; amount: number; 
   return { data, error: error?.message || null };
 }
 
-type SubconJob = { id: string; subcon_name: string; job_ref: string | null; amount: number; status: string };
+type SubconJob = { id: string; subcon_name: string; job_ref: string | null; amount: number; status: string; completed_at: string | null };
 
 async function payoutSubconJob(job: SubconJob): Promise<RunResult> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { created: false, error: 'Supabase is not configured' };
-  const { data: claimed } = await supabase.from('subcon_jobs')
-    .update({ status: 'DONE', completed_at: new Date().toISOString() }).eq('id', job.id).eq('status', 'OPEN').select('id').maybeSingle();
-  if (!claimed) return { created: false };
-  const today = toDateString(manilaToday());
-  const period: PayPeriod = { start: today, end: today, label: `Project ${job.job_ref || job.id.slice(0, 8)} - ${today}` };
   const line: PayrollLine = { name: job.subcon_name, total: roundPeso(Number(job.amount)), ...(job.job_ref ? { note: job.job_ref } : {}) };
-  return saveRun('subcon', period, job.id, 'MJIC SUBCON PAYROLL', [line], []);
+  return finalizeSubconPayout({
+    jobId: job.id,
+    completionAt: job.completed_at,
+    line,
+  }, {
+    reserveCompletionAt: async (jobId) => {
+      // Only the first concurrent attempt sets the completion time; retries read
+      // the persisted timestamp and therefore retain the same reporting period.
+      const proposed = new Date().toISOString();
+      const { data: reserved, error: reserveError } = await supabase.from('subcon_jobs')
+        .update({ completed_at: proposed })
+        .eq('id', jobId).eq('status', 'OPEN').is('completed_at', null)
+        .select('completed_at').maybeSingle();
+      if (reserveError) return { value: null, error: reserveError.message };
+      if (reserved?.completed_at) return { value: String(reserved.completed_at) };
+
+      const { data: current, error: readError } = await supabase.from('subcon_jobs')
+        .select('status, completed_at').eq('id', jobId).maybeSingle();
+      if (readError) return { value: null, error: readError.message };
+      if (!current) return { value: null, error: 'Subcontractor job not found.' };
+      if (current.status !== 'OPEN') return { value: null, error: `Subcontractor job is already ${current.status}.` };
+      return { value: current.completed_at ? String(current.completed_at) : null };
+    },
+    findExistingRun: async (jobId) => {
+      // Older versions used payout-attempt date in the run key. Recover by the
+      // stable job identity before inserting under the reserved completion date.
+      const { data, error } = await supabase.from('payroll_runs')
+        .select('id, kind, subject_key, period_start, period_end')
+        .eq('kind', 'subcon').eq('subject_key', jobId).limit(2);
+      if (error) return { run: null, error: error.message };
+      if ((data || []).length > 1) return { run: null, error: 'Multiple subcontractor payroll runs exist for this job; manual reconciliation is required.' };
+      return { run: (data?.[0] as SubconPayrollRun | undefined) || null };
+    },
+    periodForCompletion: (completedAt) => {
+      const { year, month, day } = manilaDateParts(new Date(completedAt));
+      const dateText = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return { start: dateText, end: dateText, label: `Project ${job.job_ref || job.id.slice(0, 8)} - ${dateText}` };
+    },
+    saveRun: (period, payoutLine) => saveRun('subcon', period, job.id, 'MJIC SUBCON PAYROLL', [payoutLine], []),
+    closeJob: async (jobId) => {
+      const { data: closed, error: closeError } = await supabase.from('subcon_jobs')
+        .update({ status: 'DONE' })
+        .eq('id', jobId).eq('status', 'OPEN')
+        .select('id').maybeSingle();
+      if (closeError) return { error: closeError.message };
+      if (closed) return {};
+
+      const { data: current, error: readError } = await supabase.from('subcon_jobs')
+        .select('status').eq('id', jobId).maybeSingle();
+      if (readError) return { error: readError.message };
+      if (current?.status === 'DONE') return {};
+      return { error: current ? `Job status is ${current.status}, not OPEN.` : 'Subcontractor job not found.' };
+    },
+  });
 }
 
 // Marks one project done (by job id, or by an exact job_ref / unique id prefix) and generates the subcon payroll.
 export async function completeSubconJob(idOrRef: string): Promise<{ result: RunResult | null; error: string | null }> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { result: null, error: 'Supabase is not configured' };
-  const { data } = await supabase.from('subcon_jobs').select('*').eq('status', 'OPEN');
+  const { data, error } = await supabase.from('subcon_jobs').select('*').eq('status', 'OPEN');
+  if (error) return { result: null, error: `Could not find subcontractor job: ${error.message}` };
   const key = idOrRef.trim().toLowerCase();
   const matches = ((data || []) as SubconJob[]).filter((job) => job.id.toLowerCase().startsWith(key) || (job.job_ref || '').toLowerCase() === key);
   if (matches.length !== 1) return { result: null, error: matches.length ? 'More than one open job matches - use the full id.' : 'No open subcon job matches.' };
-  return { result: await payoutSubconJob(matches[0]), error: null };
+  const result = await payoutSubconJob(matches[0]);
+  return { result, error: result.error || null };
 }
 
 // Called when an order is DELIVERED: every open subcon job on that order is paid out.
 export async function completeSubconJobsForOrder(orderId: string) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return 0;
-  const { data } = await supabase.from('subcon_jobs').select('*').eq('order_id', orderId).eq('status', 'OPEN');
+  const { data, error } = await supabase.from('subcon_jobs').select('*').eq('order_id', orderId).eq('status', 'OPEN');
+  if (error) {
+    await reportCriticalError('subcon-payroll', error, { orderId });
+    return 0;
+  }
   let created = 0;
   for (const job of (data || []) as SubconJob[]) {
     try {
-      if ((await payoutSubconJob(job)).created) created += 1;
+      const result = await payoutSubconJob(job);
+      if (result.error) await reportCriticalError('subcon-payroll', result.error, { jobId: job.id });
+      if (result.created) created += 1;
     } catch (error) {
       await reportCriticalError('subcon-payroll', error, { jobId: job.id });
     }

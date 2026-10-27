@@ -13,8 +13,19 @@ export const TARGETS = ['production', 'preview', 'development'];
 
 export function auditEnvironment(local, envs) {
   const keys = [...REQUIRED_ENV, ...META_ENV];
+  const sharedUrl = envs.find((entry) => entry.key === 'NEXT_PUBLIC_SUPABASE_URL' && !entry.gitBranch &&
+    [].concat(entry.target || []).includes('production') &&
+    [].concat(entry.target || []).some((target) => target === 'preview' || target === 'development'));
   return {
     local: { missing: keys.filter((key) => !local[key]?.trim()) },
+    databaseIsolation: sharedUrl ? {
+      status: 'shared',
+      targets: [].concat(sharedUrl.target).filter((target) => TARGETS.includes(target)),
+      detail: 'These targets share one Supabase URL setting. Do not enable nonproduction writes against production data.',
+    } : {
+      status: 'unverified', targets: [],
+      detail: 'Separate metadata entries do not prove separate databases; verify project identity before enabling writes.',
+    },
     targets: Object.fromEntries(TARGETS.map((target) => {
       const entries = envs.filter((entry) => [].concat(entry.target || []).includes(target) && !entry.gitBranch);
       const present = new Set(entries.map((entry) => entry.key));
