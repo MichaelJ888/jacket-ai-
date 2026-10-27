@@ -11,6 +11,7 @@
     "devq": "node scripts/devq.mjs",
     "devq:worker": "node scripts/devq-worker.mjs",
     "memory": "node scripts/memory.mjs",
+    "ai-gateway:check": "node scripts/ai-gateway-diagnostics.mjs",
     "voice:setup": "node scripts/retell-setup.mjs",
     "bootstrap": "node scripts/bootstrap.mjs",
     "smoke": "node scripts/smoke.mjs",

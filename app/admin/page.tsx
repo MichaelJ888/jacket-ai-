@@ -11,6 +11,7 @@ type Overview = {
   quotes: Array<{ quote_number: string; client_name: string | null; total: number }>;
   receipts: Array<{ reference: string | null; detected_amount: number | null; verified: boolean; fraud_score: number; fraud_flags: string[] }>;
 };
+type KnowledgeItem = { id: string; category: string; title: string; content: string; file_name: string | null; mime_type: string | null; created_at: string; asset_url: string | null };
 
 const STYLES = ["windbreaker", "varsity", "corporate", "bomber"];
 const input = "rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900";
@@ -19,7 +20,7 @@ const button = "rounded bg-zinc-900 px-3 py-1 text-sm font-medium text-white dis
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<"prices" | "book" | "teach" | "overview" | "connect" | "coo">("prices");
+  const [tab, setTab] = useState<"prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "coo">("prices");
   const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
   const [oauthConfigured, setOauthConfigured] = useState(true);
   const [setup, setSetup] = useState<Array<{ id: string; label: string; ok: boolean; manual?: boolean; hint?: string; link?: string }>>([]);
@@ -32,6 +33,11 @@ export default function AdminPage() {
   const [audience, setAudience] = useState("client");
   const [pasted, setPasted] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
+  const [knowledgeCategory, setKnowledgeCategory] = useState("faq");
+  const [knowledgeTitle, setKnowledgeTitle] = useState("");
+  const [knowledgeContent, setKnowledgeContent] = useState("");
+  const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
 
   const call = useCallback(async (path: string, init: RequestInit = {}, auth = token) => {
     const response = await fetch(path, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${auth}` }, cache: "no-store" });
@@ -46,6 +52,12 @@ export default function AdminPage() {
     return p.ok;
   }, [call, token]);
 
+  const loadKnowledge = useCallback(async (auth = token) => {
+    const result = await call("/api/admin/knowledge", {}, auth);
+    if (result.ok) setKnowledgeItems(result.data.items);
+    else setMessage(result.data.error || "Could not load the knowledge base.");
+  }, [call, token]);
+
   const loadPages = useCallback(async (auth = token) => {
     const r = await call("/api/meta/connections", {}, auth);
     if (r.ok) { setPages(r.data.pages); setOauthConfigured(r.data.oauthConfigured); }
@@ -57,6 +69,27 @@ export default function AdminPage() {
   async function registerCallbacks() {
     const r = await call("/api/admin/meta-setup", { method: "POST" });
     if (r.ok) { setSetup(r.data.checks); setMessage(r.data.registered.ok ? "Callbacks registered." : `Could not register: ${r.data.registered.error}`); }
+  }
+
+  async function saveKnowledge() {
+    const form = new FormData();
+    form.set("category", knowledgeCategory);
+    form.set("title", knowledgeTitle);
+    form.set("content", knowledgeContent);
+    if (knowledgeFile) form.set("file", knowledgeFile);
+    const result = await call("/api/admin/knowledge", { method: "POST", body: form });
+    if (!result.ok) return setMessage(result.data.error || "Knowledge upload failed.");
+    setMessage(`Saved "${result.data.item.title}" to the knowledge base.`);
+    setKnowledgeTitle("");
+    setKnowledgeContent("");
+    setKnowledgeFile(null);
+    await loadKnowledge();
+  }
+
+  async function removeKnowledge(id: string) {
+    const result = await call(`/api/admin/knowledge?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    setMessage(result.ok ? "Knowledge item removed." : result.data.error || "Could not remove the knowledge item.");
+    if (result.ok) await loadKnowledge();
   }
 
   async function changePlan(id: string, plan: string) {
@@ -91,14 +124,14 @@ export default function AdminPage() {
     if (saved) {
       void (async () => {
         const response = await fetch("/api/admin/prices", { headers: { Authorization: `Bearer ${saved}` } });
-        if (response.ok) { setToken(saved); setPrices((await response.json()).prices); setAuthed(true); void refresh(saved); void loadPages(saved); }
+        if (response.ok) { setToken(saved); setPrices((await response.json()).prices); setAuthed(true); void refresh(saved); void loadPages(saved); void loadKnowledge(saved); }
       })();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function login() {
-    if (await refresh(token)) { sessionStorage.setItem("mjic_admin", token); setAuthed(true); setMessage(""); void loadPages(token); }
+    if (await refresh(token)) { sessionStorage.setItem("mjic_admin", token); setAuthed(true); setMessage(""); void loadPages(token); void loadKnowledge(token); }
     else setMessage("Wrong password.");
   }
 
@@ -160,7 +193,7 @@ export default function AdminPage() {
         </div>
       </div>
       <nav className="mb-4 flex gap-2">
-        {([["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["overview", "Overview"], ["connect", "Connect Facebook / Instagram"], ["coo", "COO & all customers"]] as const).map(([id, label]) => (
+        {([["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["knowledge", "Knowledge Base"], ["overview", "Overview"], ["connect", "Connect Facebook / Instagram"], ["coo", "COO & all customers"]] as const).map(([id, label]) => (
           <button key={id} className={`rounded px-3 py-1 text-sm ${tab === id ? "bg-zinc-900 text-white" : "bg-zinc-200"}`} onClick={() => setTab(id)}>{label}</button>
         ))}
       </nav>
@@ -207,6 +240,37 @@ export default function AdminPage() {
         </section>
       )}
 
+      {tab === "knowledge" && (
+        <section className="space-y-3">
+          <p className="text-sm text-zinc-600">Upload client Q&amp;A, Boss Richard tone guidance, catalog/product images, size charts, material costs, and supplier lists. Supplier and internal-cost records stay out of customer-facing AI prompts.</p>
+          <div className="flex flex-wrap gap-2">
+            <select className={input} value={knowledgeCategory} onChange={(event) => setKnowledgeCategory(event.target.value)}>
+              <option value="faq">Client Q&amp;A</option><option value="tone">Tone guidance</option><option value="product">Product/catalog</option>
+              <option value="size_chart">Size chart</option><option value="internal_cost">Internal material costs</option><option value="supplier">Supplier list</option>
+            </select>
+            <input className={input} placeholder="Title" maxLength={120} value={knowledgeTitle} onChange={(event) => setKnowledgeTitle(event.target.value)} />
+            <input key={knowledgeFile?.name || "empty"} type="file" accept=".txt,.docx,.pdf,.xlsx,.jpg,.jpeg,.png,.webp" onChange={(event) => setKnowledgeFile(event.target.files?.[0] || null)} />
+          </div>
+          <textarea className={`${input} h-36 w-full`} maxLength={20000} placeholder="Paste facts, Q&A, or a short image description (optional when a document is uploaded)." value={knowledgeContent} onChange={(event) => setKnowledgeContent(event.target.value)} />
+          <button className={button} disabled={!knowledgeTitle.trim() || (!knowledgeContent.trim() && !knowledgeFile)} onClick={() => void saveKnowledge()}>Save knowledge item</button>
+          <h2 className="pt-4 font-semibold">Saved knowledge</h2>
+          <div className="space-y-2">
+            {knowledgeItems.map((item) => (
+              <article key={item.id} className="flex items-start justify-between gap-3 rounded border border-zinc-200 p-3 text-sm">
+                <div>
+                  <strong>{item.title}</strong><span className="ml-2 rounded bg-zinc-100 px-2 py-0.5 text-xs">{item.category}</span>
+                  {item.file_name && <p className="text-xs text-zinc-500">{item.file_name}</p>}
+                  {item.asset_url && <p><a className="text-xs underline" href={item.asset_url} target="_blank" rel="noreferrer">Preview private image (link expires in 5 minutes)</a></p>}
+                  <p className="mt-1 whitespace-pre-wrap text-xs text-zinc-600">{item.content.slice(0, 500)}</p>
+                </div>
+                <button className="shrink-0 text-xs text-red-600 underline" onClick={() => void removeKnowledge(item.id)}>Delete</button>
+              </article>
+            ))}
+            {!knowledgeItems.length && <p className="text-sm text-zinc-500">No knowledge items uploaded.</p>}
+          </div>
+        </section>
+      )}
+
       {tab === "prices" && (
         <section>
           <p className="mb-2 text-sm text-zinc-600">Edit any price and press Save. The BOM/costing, supplier POs and pricing advice all use these prices (history is kept).</p>
@@ -236,7 +300,7 @@ export default function AdminPage() {
 
       {tab === "teach" && (
         <section className="space-y-3">
-          <p className="text-sm text-zinc-600">Upload your Word (.docx) or .txt chat/Q&amp;A file, and/or paste text. Use lines like <code>Client: ...</code> and <code>Me: ...</code> (or <code>Q:</code>/<code>A:</code>). Without those markers each paragraph is saved as one of your replies.</p>
+          <p className="text-sm text-zinc-600">Upload your Word (.docx) or .txt client-safe chat/Q&amp;A file, and/or paste text. Use lines like <code>Client: ...</code> and <code>Me: ...</code> (or <code>Q:</code>/<code>A:</code>). Without those markers each paragraph is saved as one of your replies. Put supplier lists and internal costs in the Knowledge Base&apos;s internal categories instead.</p>
           <select className={input} value={audience} onChange={(e) => setAudience(e.target.value)}>
             <option value="client">Replies to clients</option><option value="employee">Replies to employees</option><option value="supplier">Replies to suppliers</option>
           </select>

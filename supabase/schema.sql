@@ -565,6 +565,34 @@ create index if not exists content_calendar_due_idx on public.content_calendar (
 alter table public.content_calendar enable row level security;
 revoke all on public.content_calendar from anon, authenticated;
 
+create table if not exists public.mjic_knowledge_items (
+  id uuid primary key default gen_random_uuid(),
+  category text not null check (category in ('faq', 'tone', 'product', 'size_chart', 'internal_cost', 'supplier')),
+  title text not null,
+  content text not null default '',
+  storage_path text,
+  file_name text,
+  mime_type text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists mjic_knowledge_items_category_idx on public.mjic_knowledge_items (category, created_at desc);
+alter table public.mjic_knowledge_items enable row level security;
+revoke all on public.mjic_knowledge_items from anon, authenticated;
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'mjic-knowledge',
+  'mjic-knowledge',
+  false,
+  8388608,
+  array['text/plain', 'application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'image/jpeg', 'image/png', 'image/webp']
+)
+on conflict (id) do update
+set public = false,
+    file_size_limit = 8388608,
+    allowed_mime_types = excluded.allowed_mime_types;
+
 alter table public.style_examples add column if not exists audience text not null default 'client';
 alter table public.style_examples add column if not exists prompt text;
 -- Goal 4: CEO control plane (vacation mode, shadow mode, approval inbox)
