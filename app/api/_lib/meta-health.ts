@@ -1,5 +1,6 @@
 import { evaluateHealth, type HealthCheck, type HealthInputs } from './meta-health-logic';
-import { getConnectionToken, metaOAuthConfig, subscribePageToWebhooks } from './meta-oauth';
+import { metaOAuthConfig, subscribePageToWebhooks } from './meta-oauth';
+import { getPageToken } from './meta-pages';
 
 const GRAPH = 'https://graph.facebook.com/v21.0';
 const TIMEOUT_MS = 15000;
@@ -13,7 +14,7 @@ async function graph<T>(path: string, token: string, params: Record<string, stri
 
 export async function checkPageHealth(pageId: string, igUserId: string | null): Promise<{ checks: HealthCheck[]; healthy: boolean }> {
   const config = metaOAuthConfig();
-  const token = await getConnectionToken(pageId);
+  const token = await getPageToken(pageId);
   if (!config || !token) {
     return { healthy: false, checks: evaluateHealth({ appId: config?.appId || '', tokenValid: false, tokenError: !config ? 'Meta app is not configured on the server.' : 'No saved token for this Page. Connect it again.', igUserId }) };
   }
@@ -43,7 +44,7 @@ export async function checkPageHealth(pageId: string, igUserId: string | null): 
 }
 
 export async function resubscribePage(pageId: string) {
-  const token = await getConnectionToken(pageId);
+  const token = await getPageToken(pageId);
   if (!token) return { ok: false, error: 'No saved token for this Page. Connect it again.' };
   return subscribePageToWebhooks(pageId, token);
 }

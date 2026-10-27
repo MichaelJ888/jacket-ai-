@@ -907,3 +907,12 @@ create table if not exists public.bot_profiles (
 );
 alter table public.bot_profiles enable row level security;
 revoke all on public.bot_profiles from anon, authenticated;
+
+-- Supabase's automatic RLS event trigger runs as postgres, never as a client RPC.
+do $$
+begin
+  if to_regprocedure('public.rls_auto_enable()') is not null then
+    revoke execute on function public.rls_auto_enable() from public, anon, authenticated;
+  end if;
+end;
+$$;

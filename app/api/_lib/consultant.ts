@@ -66,8 +66,10 @@ export async function runConsultantReport() {
     problems_last_7d: 'problems_last_7d' in system ? system.problems_last_7d : null,
     config_hints: system.config_hints,
   };
-  const result = await withModelFallback({ tier: 'strong', budgetMs: 50_000, attemptMs: 40_000 }, (model, attemptMs) =>
-    generateText({ model, system: CONSULTANT_PROMPT, prompt: JSON.stringify({ business, system: systemSummary }), maxRetries: 0, abortSignal: AbortSignal.timeout(attemptMs) }),
+  // Leave time for data collection and Telegram delivery inside the 60-second route limit.
+  const result = await withModelFallback({ tier: 'strong', budgetMs: 30_000, attemptMs: 12_000 }, (model, attemptMs) =>
+    generateText({ model, system: CONSULTANT_PROMPT, prompt: JSON.stringify({ business, system: systemSummary }), maxOutputTokens: 1600, maxRetries: 0, abortSignal: AbortSignal.timeout(attemptMs) }),
   );
+  if (!result.text.trim()) throw new Error('Consultant model returned an empty report');
   return { ok: true as const, report: result.text.trim(), business };
 }

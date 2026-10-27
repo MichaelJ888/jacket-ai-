@@ -37,7 +37,7 @@ jobs:
 
       - run: npm ci
 
-      # next.config.ts ignores TS/eslint errors at build time, so gate here.
+      # Lint separately; Next.js also enforces TypeScript checking during the build.
       - name: Lint
         run: npm run lint
 

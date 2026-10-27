@@ -11,6 +11,8 @@ import {
   sendTelegramMessage,
 } from './integrations';
 import { getPageToken } from './meta-pages';
+import { checkMetaPublishing, metaPublishFailure, type MetaPlatform } from './meta-publishing';
+import { recordMetaPublishingHealth } from './meta-publishing-alerts';
 import { SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -186,6 +188,31 @@ function fullCaption(row: CalendarRow) {
 
 class MissingCredentials extends Error {}
 
+export function createMetaPublishingPreflight() {
+  const pending = new Map<MetaPlatform, ReturnType<typeof mjicMetaAccount>>();
+  return (platform: MetaPlatform) => {
+    let task = pending.get(platform);
+    if (!task) {
+      task = (async () => {
+        let account: Awaited<ReturnType<typeof mjicMetaAccount>>;
+        try {
+          account = await mjicMetaAccount(platform === 'instagram');
+        } catch (error) {
+          const reason = error instanceof MissingCredentials ? error.message : 'Meta account resolution failed. Check saved connections and provider access.';
+          await recordMetaPublishingHealth(platform, { ok: false, code: 'missing_account', reason });
+          throw new MissingCredentials(reason);
+        }
+        const result = await checkMetaPublishing(account.pageId, account.token, platform);
+        await recordMetaPublishingHealth(platform, result);
+        if (!result.ok) throw new MissingCredentials(result.reason);
+        return account;
+      })();
+      pending.set(platform, task);
+    }
+    return task;
+  };
+}
+
 // MJIC's own Page/IG account. The token comes from the same resolver the inbox bot uses (DB OAuth token, System User
 // discovery, then legacy env), so a rotated or logged-out env token no longer breaks posting.
 async function mjicMetaAccount(needInstagram: boolean) {
@@ -213,26 +240,36 @@ async function resolveMedia(row: CalendarRow): Promise<{ url: string | null; sto
   return { url: signed.url, storagePath: path };
 }
 
-async function publishFacebook(row: CalendarRow, mediaUrl: string | null) {
-  const { token, pageId } = await mjicMetaAccount(false);
+async function requireMetaPostSuccess(platform: MetaPlatform, result: Awaited<ReturnType<typeof graphPost>>) {
+  if (result.ok) return;
+  const blocked = metaPublishFailure(result.data.error);
+  if (blocked) {
+    await recordMetaPublishingHealth(platform, blocked);
+    throw new MissingCredentials(blocked.reason);
+  }
+  throw new Error(result.reason);
+}
+
+async function publishFacebook(row: CalendarRow, mediaUrl: string | null, validateMeta: ReturnType<typeof createMetaPublishingPreflight>) {
+  const { token, pageId } = await validateMeta('facebook');
   const caption = fullCaption(row);
   const result = row.media_type === 'video' && mediaUrl
     ? await graphPost(`/${pageId}/videos`, { file_url: mediaUrl, description: caption }, token)
     : row.media_type === 'image' && mediaUrl
       ? await graphPost(`/${pageId}/photos`, { url: mediaUrl, caption }, token)
       : await graphPost(`/${pageId}/feed`, { message: caption }, token);
-  if (!result.ok) throw new Error(result.reason);
+  await requireMetaPostSuccess('facebook', result);
   const id = String(result.data.post_id || result.data.id || '');
   return { id, url: id ? `https://www.facebook.com/${id}` : null };
 }
 
-async function publishInstagram(row: CalendarRow, mediaUrl: string | null) {
-  const { token, igId } = await mjicMetaAccount(true);
+async function publishInstagram(row: CalendarRow, mediaUrl: string | null, validateMeta: ReturnType<typeof createMetaPublishingPreflight>) {
+  const { token, igId } = await validateMeta('instagram');
   if (!mediaUrl) throw new Error('Instagram needs an image or video URL');
   const container = await graphPost(`/${igId}/media`, row.media_type === 'video'
     ? { media_type: 'REELS', video_url: mediaUrl, caption: fullCaption(row) }
     : { image_url: mediaUrl, caption: fullCaption(row) }, token);
-  if (!container.ok) throw new Error(container.reason);
+  await requireMetaPostSuccess('instagram', container);
   const creationId = String(container.data.id);
 
   if (row.media_type === 'video') {
@@ -246,7 +283,7 @@ async function publishInstagram(row: CalendarRow, mediaUrl: string | null) {
     if (!finished) throw new Error('Instagram is still processing the video; will retry');
   }
   const published = await graphPost(`/${igId}/media_publish`, { creation_id: creationId }, token);
-  if (!published.ok) throw new Error(published.reason);
+  await requireMetaPostSuccess('instagram', published);
   return { id: String(published.data.id), url: null as string | null };
 }
 
@@ -303,7 +340,7 @@ async function publishTiktok(row: CalendarRow, mediaUrl: string | null) {
   return { id: body.data?.publish_id || '', url: null as string | null };
 }
 
-export async function runContentPipeline(origin: string) {
+export async function runContentPipeline(origin: string, validateMeta = createMetaPublishingPreflight()) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { error: 'Supabase is not configured' };
 
@@ -324,13 +361,13 @@ export async function runContentPipeline(origin: string) {
     .order('scheduled_at')
     .limit(4);
 
-  const summary = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [] as string[] };
+  const summary = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [] as string[], credentialIssues: {} as Record<string, string> };
   for (const row of (data || []) as CalendarRow[]) {
     try {
       const media = await resolveMedia(row);
       if (row.media_type === 'video' && !media.url) throw new Error('video file not available yet');
-      const result = row.platform === 'facebook' ? await publishFacebook(row, media.url)
-        : row.platform === 'instagram' ? await publishInstagram(row, media.url)
+      const result = row.platform === 'facebook' ? await publishFacebook(row, media.url, validateMeta)
+        : row.platform === 'instagram' ? await publishInstagram(row, media.url, validateMeta)
           : row.platform === 'youtube' ? await publishYoutube(row, media.storagePath)
             : await publishTiktok(row, media.url);
       await supabase.from('content_calendar').update({ status: 'PUBLISHED', external_post_id: result.id, post_url: result.url, published_at: new Date().toISOString(), error: null }).eq('id', row.id);
@@ -341,6 +378,7 @@ export async function runContentPipeline(origin: string) {
       if (error instanceof MissingCredentials) {
         await supabase.from('content_calendar').update({ status: 'NEEDS_CREDENTIALS', error: message }).eq('id', row.id);
         if (!summary.needsCredentials.includes(row.platform)) summary.needsCredentials.push(row.platform);
+        summary.credentialIssues[row.platform] = message;
       } else {
         const attempts = row.attempts + 1;
         await supabase.from('content_calendar').update({ attempts, error: message.slice(0, 500), status: attempts >= 3 ? 'FAILED' : 'READY' }).eq('id', row.id);
@@ -351,23 +389,32 @@ export async function runContentPipeline(origin: string) {
   }
 
   for (const platform of summary.needsCredentials) {
-    void sendTelegramMessage(`<b>Auto-posting paused for ${platform.toUpperCase()}</b>\nMissing credentials. Add them in Vercel env and set the queued rows back to READY.`);
+    if (platform !== 'facebook' && platform !== 'instagram') {
+      await sendTelegramMessage(`<b>Auto-posting paused for ${platform.toUpperCase()}</b>\n${escapeTelegramHtml(summary.credentialIssues[platform])}`);
+    }
   }
   return summary;
 }
 
 // Re-queues rows that were parked for missing credentials once the credentials exist.
-export async function requeueCredentialBlocked() {
+export async function requeueCredentialBlocked(validateMeta = createMetaPublishingPreflight()) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return 0;
   const available: Platform[] = [];
-  try {
-    await mjicMetaAccount(false);
-    available.push('facebook');
-    await mjicMetaAccount(true);
-    available.push('instagram');
-  } catch {
-    // Whatever is missing stays parked.
+  const { data: blocked, error } = await supabase.from('content_calendar').select('platform').in('status', ['NEEDS_CREDENTIALS', 'FAILED']).gte('scheduled_at', new Date(Date.now() - MISSED_SLOT_MS).toISOString());
+  if (error) {
+    console.error('Credential-blocked content lookup failed:', error.message);
+    throw new Error('Could not inspect credential-blocked content.');
+  }
+  for (const platform of ['facebook', 'instagram'] as const) {
+    if (!blocked?.some((row) => row.platform === platform)) continue;
+    try {
+      await validateMeta(platform);
+      available.push(platform);
+    } catch (error) {
+      if (!(error instanceof MissingCredentials)) throw error;
+      // The preflight logs and alerts with a cooldown; blocked rows stay parked.
+    }
   }
   if (process.env.YOUTUBE_REFRESH_TOKEN) available.push('youtube');
   if (process.env.TIKTOK_ACCESS_TOKEN) available.push('tiktok');

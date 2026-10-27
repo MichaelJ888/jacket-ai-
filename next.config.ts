@@ -1,13 +1,7 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
-  typescript: {
-    // Pinahihintulutan ang deployment kahit may kaunting TypeScript warnings
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    // Pinahihintulutan ang deployment kahit may ESLint warnings
-    ignoreDuringBuilds: true,
-  },
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  outputFileTracingRoot: __dirname,
 };
 
 export default nextConfig;

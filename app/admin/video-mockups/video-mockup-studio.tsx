@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import CampaignPlanner from "./campaign-planner";
+import type { CampaignInput } from "./campaign-logic";
 import {
   getWebmMimeType,
   makeVideoFilename,
@@ -41,6 +43,8 @@ function drawMockupFrame(
   logo: ImageBitmap | null,
   clientName: string,
   progress: number,
+  productName: string,
+  callToAction: string,
 ) {
   const { width, height } = context.canvas;
   const background = context.createLinearGradient(0, 0, width, height);
@@ -59,7 +63,7 @@ function drawMockupFrame(
   context.textAlign = "center";
   context.fillStyle = "#d4b261";
   context.font = "600 25px Arial, sans-serif";
-  context.fillText("A CUSTOM JACKET MOCKUP", width / 2, 132);
+  context.fillText(productName.trim() || "CUSTOM JACKETS AND UNIFORMS", width / 2, 132, width - 80);
 
   context.fillStyle = "#ffffff";
   context.font = "700 54px Arial, sans-serif";
@@ -113,7 +117,7 @@ function drawMockupFrame(
 
   context.fillStyle = "#e8d5a1";
   context.font = "500 27px Arial, sans-serif";
-  context.fillText("DESIGNED AROUND YOUR BRAND", width / 2, 1150);
+  context.fillText(callToAction.trim() || "Message MJIC for a quotation", width / 2, 1150, width - 80);
   context.fillStyle = "rgba(255, 255, 255, 0.76)";
   context.font = "400 21px Arial, sans-serif";
   context.fillText("Custom apparel by Michael Jeffrey International Corporation", width / 2, 1200);
@@ -133,7 +137,15 @@ async function checkAdminToken(token: string) {
 export default function VideoMockupStudio() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [clientName, setClientName] = useState("YOUR TEAM");
+  const [campaign, setCampaign] = useState<CampaignInput>({
+    clientName: "YOUR TEAM",
+    productName: "Custom jackets and uniforms",
+    callToAction: "Message MJIC for a quotation",
+    language: "taglish",
+    platforms: ["facebook", "instagram", "youtube", "tiktok"],
+    accountLabels: {},
+  });
+  const { clientName, productName, callToAction } = campaign;
   const [artwork, setArtwork] = useState<Artwork | null>(null);
   const [logo, setLogo] = useState<ImageBitmap | null>(null);
   const [logoFilename, setLogoFilename] = useState("");
@@ -186,8 +198,14 @@ export default function VideoMockupStudio() {
   useEffect(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
-    if (context) drawMockupFrame(context, artwork, logo, clientName, 0.45);
-  }, [artwork, logo, clientName]);
+    if (context) drawMockupFrame(context, artwork, logo, clientName, 0.45, productName, callToAction);
+  }, [artwork, logo, clientName, productName, callToAction]);
+
+  function changeCampaign(input: CampaignInput) {
+    setCampaign(input);
+    setDownloadUrl("");
+    setMessage("");
+  }
 
   async function loadImage(file: File | undefined, kind: "artwork" | "logo") {
     if (!file) return;
@@ -210,6 +228,7 @@ export default function VideoMockupStudio() {
         setLogo(image);
         setLogoFilename(file.name);
       }
+      setDownloadUrl("");
       setMessage("");
     } catch {
       setMessage("This image could not be decoded. Try exporting it as PNG, JPEG, or WebP.");
@@ -271,7 +290,7 @@ export default function VideoMockupStudio() {
         const draw = (now: number) => {
           const elapsed = now - startedAt;
           const ratio = Math.min(elapsed / (VIDEO_DURATION_SECONDS * 1000), 1);
-          drawMockupFrame(context, artwork, logo, clientName, ratio);
+          drawMockupFrame(context, artwork, logo, clientName, ratio, productName, callToAction);
           if (now - lastProgressUpdate >= 100 || ratio === 1) {
             setProgress(Math.floor(ratio * 100));
             lastProgressUpdate = now;
@@ -350,7 +369,7 @@ export default function VideoMockupStudio() {
             <p className="mt-3 text-center text-xs text-zinc-500">Vertical 9:16 · 720 × 1280 · {VIDEO_FPS} fps · WebM video</p>
           </section>
 
-          <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
+          <fieldset disabled={rendering} className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold">Build a preview</h2>
             <p className="mt-1 text-sm text-zinc-600">Upload an already-approved jacket mockup image. This tool animates and brands that image; it does not invent or alter garment details.</p>
 
@@ -371,6 +390,7 @@ export default function VideoMockupStudio() {
                   className="shrink-0 underline"
                   onClick={() => {
                     setArtwork(null);
+                    setDownloadUrl("");
                     if (artworkInputRef.current) artworkInputRef.current.value = "";
                   }}
                 >Remove</button>
@@ -383,7 +403,7 @@ export default function VideoMockupStudio() {
               className={inputClass}
               maxLength={48}
               value={clientName}
-              onChange={(event) => setClientName(event.target.value)}
+              onChange={(event) => changeCampaign({ ...campaign, clientName: event.target.value })}
               placeholder="Your team"
             />
 
@@ -405,6 +425,7 @@ export default function VideoMockupStudio() {
                   onClick={() => {
                     setLogo(null);
                     setLogoFilename("");
+                    setDownloadUrl("");
                     if (logoInputRef.current) logoInputRef.current.value = "";
                   }}
                 >Remove</button>
@@ -430,8 +451,9 @@ export default function VideoMockupStudio() {
             <p className="mt-4 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-950">
               Private by design: rendering happens in your browser. Artwork and logos are not sent to MJIC servers. Keep this page open while rendering. MP4 export is not guaranteed by browsers; this tool produces WebM.
             </p>
-          </section>
+          </fieldset>
         </div>
+        <CampaignPlanner input={campaign} onChange={changeCampaign} disabled={rendering} />
       </div>
     </main>
   );

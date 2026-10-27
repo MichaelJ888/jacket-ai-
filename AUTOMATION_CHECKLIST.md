@@ -14,6 +14,7 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 
 ## Build & deploy
 - Build command is `next build --webpack` (Turbopack panics on this project's global CSS — do not remove `--webpack`).
+- TypeScript errors now block `next build`; the obsolete Next.js 16 `eslint` config and `ignoreBuildErrors` bypass were removed. Run `npm run lint` separately.
 - Vercel account is **Hobby tier**: native crons only run once/day. More-frequent jobs are handled by `.github/workflows/scheduler.yml` (GitHub Actions), which calls `/api/cron/staff-reminders?type=watch` every 45 min and `/api/cron/embroidery-pickup-alerts` every 5 min with `Authorization: Bearer $CRON_SECRET`. Requires repo secrets `APP_BASE_URL` and `CRON_SECRET` set under GitHub repo Settings → Secrets → Actions.
 - After any Supabase schema change: run `npm run db:push` to apply `supabase/schema.sql` automatically (requires `SUPABASE_ACCESS_TOKEN` in `.env.local`, a personal access token from https://supabase.com/dashboard/account/tokens — never commit it), then run `npm run lint && npm run build` before `npx vercel --prod --yes`.
 
@@ -70,7 +71,7 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 | Route | Auth | Purpose |
 | --- | --- | --- |
 | `/admin` (page) | ADMIN_PASSWORD or CRON_SECRET | Material prices, selling prices, Teach the AI (.docx/.txt), overview |
-| `/admin/video-mockups` (page) | Admin token/password (validated via `/api/admin/prices`) | Browser-local 8-second WebM mockup; customer images stay on the device |
+| `/admin/video-mockups` (page) | Admin token/password (validated via `/api/admin/prices`) | Browser-local 8-second WebM mockup + free campaign planner; customer images stay on the device |
 | `/api/admin/prices`, `/api/admin/price-book`, `/api/admin/overview`, `/api/admin/voice` | Bearer admin | Admin APIs |
 | `/api/costing` (+ `/api/costing/po`) | open (costing) / admin (PO) | Per-order BOM from admin prices; draft supplier POs |
 | `/api/quote-pdf` | Bearer admin | Branded PDF quote, private `quotes` bucket |
@@ -81,6 +82,14 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 | `/api/media/generate-ad` | CRON_SECRET | Now secured |
 
 Env: optional `ADMIN_PASSWORD` (separate admin login).
+
+### Browser-only video ad planning (2026-10-26)
+- Open `/admin/video-mockups` from Admin. Supply a real product photo or approved mockup and optional logo; set the client name, product label, CTA, and English/Taglish caption language. Product and CTA are included in the silent 720 x 1280, 24 fps, 8-second WebM. Copy uses deterministic templates, not a paid AI call. Changing campaign inputs invalidates an older video download so it cannot be mistaken for the current creative.
+- Select Facebook, Instagram, YouTube, TikTok, LinkedIn, or Other networks, with one account label per line. Download the campaign draft JSON to persist captions, suggested voiceover text (not synthesized), format requirements, and account notes. Unsaved settings are lost on reload; artwork is not included in the JSON.
+- All exports are `DRAFT` / `NOT_SUBMITTED`, with `APPROVED_CAMPAIGNS_ONLY`, `autoPublishEligible: false`, and `queuedForPublishing: false`. Local labels do not authorize accounts. This rollout does not upload media, create server approvals/calendar rows, trigger paid generation, alter existing cron behavior, or publish. The draft policy is metadata, not a new enforcement gate on the existing publisher.
+- The existing publisher in `app/api/_lib/content.ts` targets one configured account per Facebook/Instagram/YouTube/TikTok platform; multiple OAuth connections do not yet mean multi-account publishing. LinkedIn and other networks are manual export only. WebM may require MP4/H.264 conversion. TikTok needs user consent, `video.publish`, a verified media URL domain, and audit for public posts; credentials alone do not prove readiness.
+- Existing Veo / AI Gateway rendering remains separate and paid. FFmpeg/Remotion workers are deferred by the browser-only rollout choice; there is no claimed CapCut API integration. A browser tab must remain open to render, so this option is not unattended video production.
+- Hosting is not automatically free for business use: [Vercel Hobby](https://vercel.com/docs/plans/hobby) is restricted to non-commercial personal use. MJIC needs an eligible commercial plan; no billing or deployment changes are made by this feature.
 
 | /api/cron/improvement-scout | CRON_SECRET | Weekly (Wed 11am Manila) GitHub scan; shortlists permissive-licence repos into repo_candidates and alerts CEO. Optional env GITHUB_TOKEN for higher rate limits. |
 
@@ -95,3 +104,21 @@ Env: optional `ADMIN_PASSWORD` (separate admin login).
 - `.github/workflows/ci.yml` runs `npm ci`, lint, tests, and `next build --webpack` on pull requests. It needs no application secrets, does not deploy, and does not let an agent change code.
 - To make it a merge gate, configure the target branch's GitHub ruleset/branch protection to require one approving review and the `CI / Validate` status check. Workflow runs alone do not enforce either rule.
 - The workflow uses GitHub-hosted runners and caches npm/Next.js build data. AI reviewer/model calls are intentionally not enabled; add them only after selecting a provider, budget, and token permissions.
+
+## Operational health and automatic recovery
+- Reuse `/api/health`, `/api/cron/watchdog`, `/api/cron/retry-queue`, and the capped `/api/cron/swarm-worker`; no additional always-on AI swarm is needed for routine infrastructure checks.
+- Operational health fails closed on Supabase query errors, missing counts, failed job statuses, and invalid heartbeat timestamps. Sales follow-ups, content publishing, retry processing, and swarm processing must have a successful heartbeat within six hours (a tolerance for GitHub scheduler delays, not a six-hour execution target).
+- Weekly consultant generation has a 30-second model budget, 12-second attempts, and a 1,600-token output cap to leave room for data collection and delivery in the 60-second route. Empty reports, provider failures, and undelivered Telegram reports are failures; all write a non-success heartbeat.
+- The schema conditionally removes client EXECUTE privileges from Supabase's `public.rls_auto_enable()` event-trigger function without disabling the automatic RLS trigger. Apply only this narrow grant correction to an existing database when no full schema deployment is required.
+- Preview and Development must use isolated databases and scoped test credentials. Missing production-only webhook/scheduler credentials are not a reason to copy production secrets blindly. Environment-variable presence and model-list access do not prove successful billable generation or token equality.
+
+### Environment diagnostics and Meta publishing guardrails (2026-10-27)
+- `npm run env:check` runs `scripts/sync-env-check.mjs`: audit local configuration and unbranched Production/Preview/Development variable metadata. Output contains names, counts, HTTP statuses and warnings, never secret values. Run on Node 22.18+.
+- `npm run env:check -- --sync-missing-production` can add only allowlisted, nonempty local values missing in Production. Existing values are never overwritten, management credentials are excluded, and Preview/Development are never modified. Newly added values require a deployment before runtime use. Metadata-only checks cannot certify token validity, secret equality or database isolation.
+- Optional Vercel `/v2/user` and `/v2/teams` 403/404 responses are inspection warnings, not deployment failures. `--github-job=<numeric-job-id>` also checks GitHub log access without downloading logs; 401 there is a warning. Project/env API errors, other statuses and failed core health remain failures. Warning-only audits exit 0; errors exit 1. This does not bypass authentication or suppress genuine runtime failures.
+- Facebook/Instagram publishing now validates canonical Meta app/webhook config, resolved Page token, expiry/data-access expiry, matching app/Page and platform publishing scopes using read-only Graph calls. Existing saved/discovered Page-token fallback remains supported. Messaging-only tenant connections do not need publishing scopes.
+- `pages_manage_posts` + `pages_read_engagement` are required for Facebook publishing; Instagram needs `instagram_basic` + `instagram_content_publish`. Diagnostics cannot grant Meta approval or permissions. Do not automatically widen the messaging OAuth request to scopes that the app has not been approved to use.
+- Blocked posts remain `NEEDS_CREDENTIALS` without consuming publish attempts; they requeue only after successful validation. Preflight results are shared within a publisher run. Meta publish errors 190/10/200 are also treated as credential blocks if access changes after validation. Other platforms continue processing.
+- Meta failures create warning diagnostics and use the shared Telegram helper to alert the CEO. Unchanged problems have a durable six-hour alert cooldown; failed notifications are logged and can retry. Alert persistence/delivery failures do not crash the publishing queue. Daily `meta-health` also checks the configured MJIC publishing token even when no OAuth Page rows exist.
+- Missing webhook verification/signature secrets explicitly return HTTP 503; incorrect presented tokens/signatures still fail authentication. No fallback disables signature validation. The publisher records degraded status for parked/failed items and error status for infrastructure failures.
+- `npm test` includes the script audit/warning-policy regressions and Meta publishing tests. No new dependencies, paid AI calls, provider accounts or schedules were added by these guardrails; existing hosting/provider quotas and billing terms still apply.

@@ -100,7 +100,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   // Pages owned by a buyer (tenant) use that buyer's assistant profile only: never the MJIC prompt, CEO alerts, quotes or photos.
   const tenantBot = await getTenantBotForPage(input.pageId);
   if (tenantBot && !tenantBot.enabled) return empty;
-  const notifyCeo = tenantBot ? async (_lines: string[]) => undefined : notifyCeoGlobal;
+  const notifyCeo: typeof notifyCeoGlobal = tenantBot ? async () => undefined : notifyCeoGlobal;
   const handoff = tenantBot ? defaultHandoff(tenantBot.profile) : null;
 
   const { contact, isNew, error } = await upsertContact(input);

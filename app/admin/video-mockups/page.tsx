@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import VideoMockupStudio from "./video-mockup-studio";
 
 export const metadata: Metadata = {
-  title: "Local Video Mockups | MJIC Admin",
+  title: "Video Mockups & Campaign Planner | MJIC Admin",
   robots: { index: false, follow: false },
 };
 

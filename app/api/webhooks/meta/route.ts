@@ -19,6 +19,10 @@ function verifyMetaSignature(body: string, signature: string | null) {
 }
 
 export async function GET(req: Request) {
+  if (!process.env.META_WEBHOOK_VERIFY_TOKEN) {
+    console.error('Meta webhook handshake unavailable: META_WEBHOOK_VERIFY_TOKEN is missing.');
+    return NextResponse.json({ error: 'Meta webhook is not configured' }, { status: 503 });
+  }
   const url = new URL(req.url);
   const mode = url.searchParams.get('hub.mode');
   const token = url.searchParams.get('hub.verify_token');
@@ -126,6 +130,10 @@ function publicCommentText(result: { sent: boolean; reply: string | null }, sent
   return `${answer}\n\nPara sa quotation, i-message lang po kami sa page na ito. Salamat po!`;
 }
 export async function POST(req: Request) {
+  if (!process.env.META_APP_SECRET) {
+    console.error('Meta webhook authentication unavailable: META_APP_SECRET is missing.');
+    return NextResponse.json({ error: 'Meta webhook is not configured' }, { status: 503 });
+  }
   const rawBody = await req.text();
   if (!verifyMetaSignature(rawBody, req.headers.get('x-hub-signature-256'))) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
