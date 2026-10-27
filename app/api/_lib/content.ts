@@ -43,10 +43,16 @@ const FALLBACK_IDEAS: IdeaPost[] = [
   { theme: 'team', caption: 'Ang suot ng team ninyo ang mukha ng inyong brand. Custom company jackets at uniforms, delivered nationwide. Request a quote!', hashtags: ['#MJIC', '#CompanyUniform', '#BrandWear'], video: false, videoPrompt: '' },
 ];
 
+// Daily posting times in Manila (UTC+8). Scheduled by GitHub Actions (scheduler.yml), since Vercel Hobby crons run once a day.
+export const POSTING_SLOTS_MANILA: ReadonlyArray<{ hour: number; minute: number }> = [
+  { hour: 9, minute: 0 }, { hour: 11, minute: 0 }, { hour: 13, minute: 30 }, { hour: 15, minute: 0 }, { hour: 18, minute: 0 },
+  { hour: 21, minute: 0 }, { hour: 1, minute: 0 }, { hour: 3, minute: 0 }, { hour: 6, minute: 0 },
+];
+
 // Manila is UTC+8 with no DST.
-function manilaSlot(daysFromToday: number, hourManila: number) {
+function manilaSlot(daysFromToday: number, hourManila: number, minuteManila = 0) {
   const now = new Date(Date.now() + 8 * 3600 * 1000);
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysFromToday, hourManila - 8, 0, 0));
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysFromToday, hourManila - 8, minuteManila, 0));
 }
 
 async function generateIdeas(count: number): Promise<IdeaPost[]> {
@@ -79,34 +85,38 @@ export async function planContent(days = 7) {
   const last = await supabase.from('content_calendar').select('scheduled_at').order('scheduled_at', { ascending: false }).limit(1).maybeSingle();
   const startOffset = last.data ? Math.max(1, Math.ceil((new Date(last.data.scheduled_at).getTime() - Date.now()) / 86400000) + 1) : 1;
 
-  let ideas = await generateIdeas(days);
+  const slotCount = POSTING_SLOTS_MANILA.length;
+  let ideas = await generateIdeas(days * slotCount);
   if (!ideas.length) ideas = FALLBACK_IDEAS;
   const maxVideosPerWeek = Number(process.env.CONTENT_VIDEOS_PER_WEEK || 2);
   let videosLeft = maxVideosPerWeek;
 
+  // One idea per posting slot; each idea fans out to every platform at that slot's time.
   const rows: Array<Record<string, unknown>> = [];
   for (let day = 0; day < days; day += 1) {
-    const idea = ideas[day % ideas.length];
-    const isVideo = idea.video && videosLeft > 0;
-    if (isVideo) videosLeft -= 1;
-    const imageUrl = `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset + day) % SAMPLE_JACKET_IMAGES.length]}`;
-    const videoPrompt = isVideo ? `${idea.videoPrompt} [${manilaSlot(startOffset + day, 0).toISOString().slice(0, 10)}]` : null;
+    for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
+      const slot = POSTING_SLOTS_MANILA[slotIndex];
+      const ideaIndex = day * slotCount + slotIndex;
+      const idea = ideas[ideaIndex % ideas.length];
+      const isVideo = idea.video && videosLeft > 0;
+      if (isVideo) videosLeft -= 1;
+      const imageUrl = `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + ideaIndex) % SAMPLE_JACKET_IMAGES.length]}`;
+      const videoPrompt = isVideo ? `${idea.videoPrompt} [${manilaSlot(startOffset + day, 0).toISOString().slice(0, 10)}]` : null;
+      const scheduledAt = manilaSlot(startOffset + day, slot.hour, slot.minute).toISOString();
 
-    const targets: Array<{ platform: Platform; hour: number }> = isVideo
-      ? [{ platform: 'facebook', hour: 19 }, { platform: 'instagram', hour: 19 }, { platform: 'youtube', hour: 18 }, { platform: 'tiktok', hour: 20 }]
-      : [{ platform: 'facebook', hour: 11 }, { platform: 'instagram', hour: 12 }];
-
-    for (const target of targets) {
-      rows.push({
-        platform: target.platform,
-        media_type: isVideo ? 'video' : 'image',
-        caption: idea.caption,
-        hashtags: idea.hashtags,
-        video_prompt: videoPrompt,
-        media_url: isVideo ? null : imageUrl,
-        scheduled_at: manilaSlot(startOffset + day, target.hour).toISOString(),
-        status: isVideo ? 'AWAITING_VIDEO' : 'READY',
-      });
+      const platforms: Platform[] = isVideo ? ['facebook', 'instagram', 'youtube', 'tiktok'] : ['facebook', 'instagram'];
+      for (const platform of platforms) {
+        rows.push({
+          platform,
+          media_type: isVideo ? 'video' : 'image',
+          caption: idea.caption,
+          hashtags: idea.hashtags,
+          video_prompt: videoPrompt,
+          media_url: isVideo ? null : imageUrl,
+          scheduled_at: scheduledAt,
+          status: isVideo ? 'AWAITING_VIDEO' : 'READY',
+        });
+      }
     }
   }
 
@@ -363,6 +373,14 @@ export async function runContentPipeline(origin: string, validateMeta = createMe
 
   const summary = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [] as string[], credentialIssues: {} as Record<string, string> };
   for (const row of (data || []) as CalendarRow[]) {
+    // Atomic claim: overlapping publisher runs (slot crons + */45 job) must not post the same row twice.
+    const { data: claimed, error: claimError } = await supabase.from('content_calendar').update({ attempts: row.attempts + 1 }).eq('id', row.id).eq('status', 'READY').eq('attempts', row.attempts).select('id');
+    if (claimError) {
+      console.error(`Content publisher could not claim row ${row.id}:`, claimError.message);
+      summary.failed += 1;
+      continue;
+    }
+    if (!claimed?.length) continue;
     try {
       const media = await resolveMedia(row);
       if (row.media_type === 'video' && !media.url) throw new Error('video file not available yet');
@@ -376,7 +394,7 @@ export async function runContentPipeline(origin: string, validateMeta = createMe
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (error instanceof MissingCredentials) {
-        await supabase.from('content_calendar').update({ status: 'NEEDS_CREDENTIALS', error: message }).eq('id', row.id);
+        await supabase.from('content_calendar').update({ status: 'NEEDS_CREDENTIALS', error: message, attempts: row.attempts }).eq('id', row.id);
         if (!summary.needsCredentials.includes(row.platform)) summary.needsCredentials.push(row.platform);
         summary.credentialIssues[row.platform] = message;
       } else {

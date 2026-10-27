@@ -12,7 +12,16 @@ on:
     - cron: '*/30 * * * *'    # improvement scout every 30 min
     - cron: '0 1 * * 1'     # weekly forecast + pricing advice, Monday 9am Manila
     - cron: '30 1 * * 1'    # weekly AI consultant report, Monday 9:30am Manila
-    - cron: '0 10 * * *'    # payroll: Saturday sewers, 1st/16th employees (6pm Manila)
+    - cron: '0 10 * * *'    # payroll: Saturday sewers, 1st/16th employees (6pm Manila); also the 6pm content slot
+    - cron: '0 1 * * *'     # content slot 9:00 AM Manila
+    - cron: '0 3 * * *'     # content slot 11:00 AM Manila
+    - cron: '30 5 * * *'    # content slot 1:30 PM Manila
+    - cron: '0 7 * * *'     # content slot 3:00 PM Manila
+    - cron: '0 13 * * *'    # content slot 9:00 PM Manila
+    - cron: '0 17 * * *'    # content slot 1:00 AM Manila
+    - cron: '0 19 * * *'    # content slot 3:00 AM Manila
+    - cron: '0 22 * * *'    # content slot 6:00 AM Manila
+    - cron: '30 1 * * *'    # CEO boost advisor 9:30 AM Manila
   workflow_dispatch: {}
 
 jobs:
@@ -131,6 +140,96 @@ jobs:
       - name: Advance background agent-swarm jobs
         run: |
           curl -sf --max-time 70 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/swarm-worker" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-6pm:
+    if: github.event.schedule == '0 10 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (6:00 PM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-9am:
+    if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (9:00 AM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-11am:
+    if: github.event.schedule == '0 3 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (11:00 AM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-130pm:
+    if: github.event.schedule == '30 5 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (1:30 PM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-3pm:
+    if: github.event.schedule == '0 7 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (3:00 PM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-9pm:
+    if: github.event.schedule == '0 13 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (9:00 PM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-1am:
+    if: github.event.schedule == '0 17 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (1:00 AM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-3am:
+    if: github.event.schedule == '0 19 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (3:00 AM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  content-slot-6am:
+    if: github.event.schedule == '0 22 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (6:00 AM Manila slot)
+        run: |
+          curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  boost-advisor:
+    if: github.event.schedule == '30 1 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: CEO daily boost advisor (9:30 AM Manila)
+        run: |
+          curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/boost-advisor" \
             -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   payroll:
