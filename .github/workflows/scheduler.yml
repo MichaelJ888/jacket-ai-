@@ -20,7 +20,8 @@ on:
     - cron: '0 13 * * *'    # content slot 9:00 PM Manila
     - cron: '0 17 * * *'    # content slot 1:00 AM Manila
     - cron: '0 19 * * *'    # content slot 3:00 AM Manila
-    - cron: '0 22 * * *'    # content slot 6:00 AM Manila
+    - cron: '0 22 * * *'    # content slot 6:00 AM Manila; also client pulse 6:00 AM Manila
+    - cron: '0 5 * * *'     # client pulse 1:00 PM Manila
     - cron: '30 1 * * *'    # CEO boost advisor 9:30 AM Manila
   workflow_dispatch: {}
 
@@ -86,6 +87,15 @@ jobs:
       - name: Send CEO briefing
         run: |
           curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/ceo-digest" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  client-pulse:
+    if: github.event.schedule == '0 22 * * *' || github.event.schedule == '0 5 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send per-client action list (6AM / 1PM Manila)
+        run: |
+          curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/client-pulse" \
             -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
   backup:

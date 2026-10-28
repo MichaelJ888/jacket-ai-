@@ -13,6 +13,7 @@ type OrderRow = {
   contact_phone: string | null;
   delivery_address: string | null;
   total_amount: number;
+  deposit_amount: number;
   stage: string;
   po_drafted_at: string | null;
   dispatch_id: string | null;

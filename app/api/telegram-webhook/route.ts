@@ -8,6 +8,8 @@ import { claimTelegramUpdate, downloadTelegramMedia, startTyping } from '../_lib
 import { rateLimitResponse } from '../_lib/rate-limit';
 import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
+import { advanceOrder, confirmDeposit, createOrder } from '../_lib/order-lifecycle';
+import { buildClientPulseMessage, findOrdersByRef, listOpenOrders, parseMoveInput, parseOrderInput } from '../_lib/client-pulse';
 import { addSubconJob, completeSubconJob, handleAttendanceMessage, isAttendanceChat, logSewerOutput, markPayrollPaid } from '../_lib/payroll';
 import {
   clockInStaff,
@@ -202,14 +204,20 @@ export async function POST(req: Request) {
     } else if (/^(task|urgent|emergency)$/i.test(command)) {
       const priority = command.toLowerCase() as 'task' | 'urgent' | 'emergency';
       reply = staffName && freeText ? await handleTaskCommand(staffName, freeText, priority === 'task' ? 'normal' : priority) : `Use: ${command.toUpperCase()} Jonathan <bilin text>`;
+    } else if (/^clients$/i.test(command)) {
+      reply = buildClientPulseMessage(await listOpenOrders());
+    } else if (/^order$/i.test(command)) {
+      reply = await handleOrderCreateCommand(text.slice(text.indexOf(command) + command.length).trim());
+    } else if (/^move$/i.test(command)) {
+      reply = await handleOrderMoveCommand(text.slice(text.indexOf(command) + command.length).trim());
     } else if (/^start$/i.test(command)) {
-      reply = 'MJIC Ops Bot ready. Use IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, or PICKUP <job-id> YYYY-MM-DD HH:mm.';
+      reply = 'MJIC Ops Bot ready. Use IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, or CLIENTS.';
     }
 
     if (!reply) {
       const ceoUserId = process.env.TELEGRAM_CEO_USER_ID;
       if (!ceoUserId || String(message.from?.id) !== ceoUserId) {
-        await sendTelegramDirectMessage(String(chatId), 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm.');
+        await sendTelegramDirectMessage(String(chatId), 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, CLIENTS.');
         return NextResponse.json({ ok: true });
       }
       const ceoText = text.replace(/@\w*bot\b/gi, '').trim() || text;
@@ -268,6 +276,30 @@ async function handlePayrollCommand(command: string, args: string[]) {
     return outcome.result?.created ? 'Subcon payroll generated - see the payroll message above.' : 'That job was already completed.';
   }
   return 'Use: SUBCON ADD <name> <amount> [job-ref] or SUBCON DONE <job-ref>';
+}
+
+async function handleOrderCreateCommand(raw: string) {
+  const parsed = parseOrderInput(raw);
+  if ('error' in parsed) return parsed.error;
+  const result = await createOrder(parsed);
+  if (!result.order) return `Order error: ${result.error}`;
+  return `✅ Na-save na si ${result.order.client_name} (${result.order.order_number}). Deposit na kailangan: ₱${Number(result.order.deposit_amount).toLocaleString('en-PH')}. Kapag bayad na: MOVE ${result.order.order_number} paid`;
+}
+
+async function handleOrderMoveCommand(raw: string) {
+  const parsed = parseMoveInput(raw);
+  if ('error' in parsed) return parsed.error;
+  const matches = await findOrdersByRef(parsed.ref);
+  if (!matches.length) return `Walang open order na match sa "${parsed.ref}". I-type ang CLIENTS para makita lahat.`;
+  if (matches.length > 1) {
+    return `Maraming match sa "${parsed.ref}":\n${matches.map((order) => `- ${order.order_number} · ${order.client_name || order.project_name} (${order.stage})`).join('\n')}\nGamitin ang ORD-number, hal: MOVE ${matches[0].order_number} ${parsed.stage}`;
+  }
+  const order = matches[0];
+  const result = parsed.stage === 'DEPOSIT_VERIFIED'
+    ? await confirmDeposit(order.id, null)
+    : await advanceOrder(order.id, parsed.stage, 'via Telegram');
+  if (!result.ok) return `❌ ${order.order_number}: ${result.error}`;
+  return `✅ ${order.order_number} · ${order.client_name || order.project_name}: ${order.stage} → ${parsed.stage}`;
 }
 
 async function handleLinkCommand(staffName: StaffName) {

@@ -8,7 +8,9 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - [ ] Check `supabase/schema.sql` for an existing table before creating a new one.
 
 ## Existing API routes (app/api/)
-`chat`, `costing`, `cron/staff-reminders`, `cron/embroidery-pickup-alerts`, `cron/memory-archive`, `cron/retry-queue`, `embroidery/auto-digitize`, `leads`, `logistics`, `operations`, `order-status`, `payment-verify`, `telegram-notify`, `telegram-webhook`, `test-db`, `webhooks/manychat`, `webhooks/meta`.
+`chat`, `costing`, `cron/staff-reminders`, `cron/client-pulse`, `cron/embroidery-pickup-alerts`, `cron/memory-archive`, `cron/retry-queue`, `embroidery/auto-digitize`, `leads`, `logistics`, `operations`, `orders`, `order-status`, `payment-verify`, `telegram-notify`, `telegram-webhook`, `test-db`, `webhooks/manychat`, `webhooks/meta`.
+
+- `cron/client-pulse` sends the boss a per-client next-action list (every open order, its stage, how long it's been there, and what to do next) 2x daily at 6AM & 1PM Manila via the `client-pulse` job in `.github/workflows/scheduler.yml`. Stage→action map lives in `app/api/_lib/client-pulse.ts`. Boss updates orders from Telegram: `ORDER <client> | <project> | <total>`, `MOVE <client-or-ORD#> <stage>` (aliases: deposit/paid/po/cutting/embroidery/sewing/qc/packing/ready/shipped/delivered/done/hold/cancel), `CLIENTS` (on-demand list). Bulk-import existing clients: `node scripts/import-orders.mjs clients.csv [--apply]` (dry-run default).
 
 - `cron/retry-queue` processes the durable `outbound_request_queue` table (Lalamove booking retries after provider outages); scheduled every 45 min via the GitHub Actions `retry-queue` job in `.github/workflows/scheduler.yml`.
 
