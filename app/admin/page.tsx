@@ -246,7 +246,7 @@ export default function AdminPage() {
           <div className="flex flex-wrap gap-2">
             <select className={input} value={knowledgeCategory} onChange={(event) => setKnowledgeCategory(event.target.value)}>
               <option value="faq">Client Q&amp;A</option><option value="tone">Tone guidance</option><option value="product">Product/catalog</option>
-              <option value="size_chart">Size chart</option><option value="internal_cost">Internal material costs</option><option value="supplier">Supplier list</option>
+              <option value="size_chart">Size chart</option><option value="internal_cost">Internal material costs</option><option value="supplier">Supplier list</option><option value="template">Template (internal)</option>
             </select>
             <input className={input} placeholder="Title" maxLength={120} value={knowledgeTitle} onChange={(event) => setKnowledgeTitle(event.target.value)} />
             <input key={knowledgeFile?.name || "empty"} type="file" accept=".txt,.docx,.pdf,.xlsx,.jpg,.jpeg,.png,.webp" onChange={(event) => setKnowledgeFile(event.target.files?.[0] || null)} />

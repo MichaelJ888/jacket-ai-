@@ -567,7 +567,7 @@ revoke all on public.content_calendar from anon, authenticated;
 
 create table if not exists public.mjic_knowledge_items (
   id uuid primary key default gen_random_uuid(),
-  category text not null check (category in ('faq', 'tone', 'product', 'size_chart', 'internal_cost', 'supplier')),
+  category text not null check (category in ('faq', 'tone', 'product', 'size_chart', 'internal_cost', 'supplier', 'template')),
   title text not null,
   content text not null default '',
   storage_path text,
@@ -577,6 +577,9 @@ create table if not exists public.mjic_knowledge_items (
   updated_at timestamptz not null default now()
 );
 create index if not exists mjic_knowledge_items_category_idx on public.mjic_knowledge_items (category, created_at desc);
+-- widen the category check to include 'template' (idempotent; create-table-if-not-exists won't update an existing constraint)
+alter table public.mjic_knowledge_items drop constraint if exists mjic_knowledge_items_category_check;
+alter table public.mjic_knowledge_items add constraint mjic_knowledge_items_category_check check (category in ('faq', 'tone', 'product', 'size_chart', 'internal_cost', 'supplier', 'template'));
 alter table public.mjic_knowledge_items enable row level security;
 revoke all on public.mjic_knowledge_items from anon, authenticated;
 

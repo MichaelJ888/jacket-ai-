@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const BUCKET = 'mjic-knowledge';
-const CATEGORIES = ['faq', 'tone', 'product', 'size_chart', 'internal_cost', 'supplier'] as const;
+const CATEGORIES = ['faq', 'tone', 'product', 'size_chart', 'internal_cost', 'supplier', 'template'] as const;
 const MIME_BY_EXTENSION: Record<string, string> = {
   '.txt': 'text/plain',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

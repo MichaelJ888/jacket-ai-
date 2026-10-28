@@ -13,6 +13,23 @@ export type OpenOrder = {
   created_at: string | null;
 };
 
+// MJIC Client Project Status template (client_project_status_template.md) milestones
+// mapped to the internal order pipeline stage. Used to phrase per-client updates.
+export const STAGE_MILESTONE: Record<string, string> = {
+  AWAITING_DEPOSIT: 'M5 Down Payment (50% D.P. required before production)',
+  DEPOSIT_VERIFIED: 'M2 Fabric & Material Sourcing',
+  PO_DRAFTED: 'M2 Fabric & Material Sourcing (PO to supplier)',
+  CUTTING: 'M8 Mass Production — cutting',
+  EMBROIDERY: 'M8 Mass Production — embroidery/branding',
+  SEWING: 'M8 Mass Production — sewing',
+  QC: 'M9 Quality Control Inspection',
+  PACKING: 'M8→M11 Final packaging & brand-label check',
+  READY_FOR_DELIVERY: 'M11 Order Pickup / Dispatch & Delivery',
+  DISPATCHED: 'M11 Shipped — in transit',
+  DELIVERED: 'M10 Full Balance Payment (settle before/after release)',
+  ON_HOLD: 'On hold — blocker',
+};
+
 // What the boss needs to do next for each pipeline stage (Taglish, action-first).
 export const STAGE_NEXT_ACTION: Record<string, string> = {
   AWAITING_DEPOSIT: 'Kulitin ang client para sa 50% deposit — i-send ang GCash details.',
@@ -153,7 +170,9 @@ export function buildClientPulseMessage(orders: OpenOrder[], now = new Date()): 
     const days = daysInStage(order, nowMs);
     const age = days >= 3 ? ` ⚠️ ${days} araw na!` : days >= 1 ? ` (${days} araw na)` : ' (ngayon lang)';
     const action = STAGE_NEXT_ACTION[order.stage] || 'I-check ang status nito.';
-    return `${index + 1}. <b>${name}</b>${project} · ${peso(order.total_amount)}\n   Stage: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>${age}\n   👉 ${escapeTelegramHtml(action)}`;
+    const milestone = STAGE_MILESTONE[order.stage];
+    const milestoneLine = milestone ? `\n   📋 ${escapeTelegramHtml(milestone)}` : '';
+    return `${index + 1}. <b>${name}</b>${project} · ${peso(order.total_amount)}\n   Stage: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>${age}${milestoneLine}\n   👉 ${escapeTelegramHtml(action)}`;
   });
   const more = sorted.length > 25 ? `\n…+${sorted.length - 25} pang order(s). Type CLIENTS sa bot para sa full list.` : '';
   return `${header}\n${sorted.length} open order(s) — eto ang gagawin mo per client:\n\n${lines.join('\n\n')}${more}\n\nI-update: MOVE &lt;client&gt; &lt;stage&gt; (hal. MOVE Juan sewing)`;
