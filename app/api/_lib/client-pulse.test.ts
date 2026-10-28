@@ -42,6 +42,6 @@ test('buildClientPulseMessage lists next actions and flags stale orders', () => 
   assert.match(message, /SEWING/);
   assert.match(message, /4 araw na/); // stale flag
   assert.match(message, /deposit/i);
-  assert.match(message, /MOVE <client> <stage>/);
+  assert.match(message, /MOVE &lt;client&gt; &lt;stage&gt;/);
   assert.match(buildClientPulseMessage([], now), /Walang open orders/);
 });

@@ -138,7 +138,7 @@ const peso = (value: number | null) => (value ? `₱${Math.round(value).toLocale
 export function buildClientPulseMessage(orders: OpenOrder[], now = new Date()): string {
   const manilaTime = now.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   const header = `<b>📋 CLIENT PULSE — ${escapeTelegramHtml(manilaTime)}</b>`;
-  if (!orders.length) return `${header}\n\nWalang open orders ngayon. 🎉\nMag-add bago: ORDER <client> | <project> | <total>`;
+  if (!orders.length) return `${header}\n\nWalang open orders ngayon. 🎉\nMag-add bago: ORDER &lt;client&gt; | &lt;project&gt; | &lt;total&gt;`;
 
   const rank = (stage: string) => {
     const idx = (ORDER_STAGES as readonly string[]).indexOf(stage);
@@ -156,5 +156,5 @@ export function buildClientPulseMessage(orders: OpenOrder[], now = new Date()): 
     return `${index + 1}. <b>${name}</b>${project} · ${peso(order.total_amount)}\n   Stage: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>${age}\n   👉 ${escapeTelegramHtml(action)}`;
   });
   const more = sorted.length > 25 ? `\n…+${sorted.length - 25} pang order(s). Type CLIENTS sa bot para sa full list.` : '';
-  return `${header}\n${sorted.length} open order(s) — eto ang gagawin mo per client:\n\n${lines.join('\n\n')}${more}\n\nI-update: MOVE <client> <stage> (hal. MOVE Juan sewing)`;
+  return `${header}\n${sorted.length} open order(s) — eto ang gagawin mo per client:\n\n${lines.join('\n\n')}${more}\n\nI-update: MOVE &lt;client&gt; &lt;stage&gt; (hal. MOVE Juan sewing)`;
 }
