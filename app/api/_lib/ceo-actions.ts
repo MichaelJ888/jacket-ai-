@@ -6,7 +6,7 @@ import { CRON_JOBS, cronRisk, evaluateGuard, sanitizePageKey, type CronJob } fro
 import { runCronJob } from './ceo-exec';
 import { listPageBrands } from './page-brands';
 import { updateContact } from './crm';
-import { advanceOrder, confirmDeposit } from './order-lifecycle';
+import { advanceOrder, confirmDeposit, createOrder } from './order-lifecycle';
 import { findOrdersByRef, resolveStageInput } from './client-pulse';
 import { getSupabaseAdmin } from './integrations';
 
@@ -107,6 +107,41 @@ export function buildActionTools() {
         const body = `Problem:\n${input.problem}\n\nProposal:\n${input.proposal}\n\nExpected impact: ${input.expected_impact}\nEffort: ${input.effort}`;
         const approval = await createApproval({ kind: 'improvement', summary: `Improvement idea: ${input.title}\nImpact: ${input.expected_impact}\nEffort: ${input.effort}`, action: { type: 'code_change', title: input.title, body } });
         return { status: 'awaiting_ceo_approval', approval_id: approval.id };
+      }),
+    }),
+
+    create_order: tool({
+      description: 'Add a NEW client/order to tracking when the CEO types or forwards client details in chat (or from a photo/voice note). Use this whenever the CEO gives a new client to track (e.g. "add si Juan 50pcs jackets 25000 deposit", "new client Maria corporate uniforms"). Extract client name, project, quantity, total price, and current stage if mentioned.',
+      inputSchema: z.object({
+        clientName: z.string().min(2).max(120).describe('Client or organization name.'),
+        projectName: z.string().max(200).optional().describe('Project / item details (e.g. "50pcs custom jackets").'),
+        quantity: z.number().int().positive().optional(),
+        totalAmount: z.number().nonnegative().optional().describe('Total price in pesos (0 if not yet quoted).'),
+        stage: z.string().max(30).optional().describe('Current stage if mentioned: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered. Defaults to deposit.'),
+        contactPhone: z.string().max(40).optional(),
+        deliveryAddress: z.string().max(300).optional(),
+      }),
+      execute: async (input) => guarded('create_order', input, async () => {
+        const result = await createOrder({
+          clientName: input.clientName,
+          projectName: input.projectName || null,
+          quantity: input.quantity ?? null,
+          totalAmount: input.totalAmount ?? 0,
+          contactPhone: input.contactPhone || null,
+          deliveryAddress: input.deliveryAddress || null,
+        });
+        if (!result.order) return { error: result.error };
+        const order = result.order;
+        // If the CEO said the client is already past deposit, move it there right away.
+        const targetStage = input.stage ? resolveStageInput(input.stage) : null;
+        let finalStage = order.stage;
+        if (targetStage && targetStage !== 'AWAITING_DEPOSIT') {
+          const moved = targetStage === 'DEPOSIT_VERIFIED'
+            ? await confirmDeposit(order.id, null)
+            : await advanceOrder(order.id, targetStage, 'via CEO Telegram (initial stage)');
+          if (moved.ok) finalStage = targetStage;
+        }
+        return { created: true, order_number: order.order_number, client: order.client_name, stage: finalStage, deposit_needed: order.deposit_amount };
       }),
     }),
 
