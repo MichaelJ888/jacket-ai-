@@ -142,6 +142,21 @@ export async function POST(req: Request) {
     const text = (typeof message?.text === 'string' ? message.text.trim() : '') || caption;
     const picked = message ? pickTelegramMedia(message) : { media: null };
 
+    // Diagnostic: log every incoming message with media to trace photo processing
+    if (picked.media || picked.rejected) {
+      await reportCriticalError('telegram-webhook-entry', new Error('Message with media received'), {
+        chatId: String(chatId),
+        chatType,
+        fromId: String(message?.from?.id),
+        hasText: !!text,
+        hasMedia: !!picked.media,
+        mediaKind: picked.media?.kind || null,
+        rejected: picked.rejected || null,
+        allowedChat: allowedChatId(chatId),
+        ceoUserId: process.env.TELEGRAM_CEO_USER_ID ? 'set' : 'NOT SET',
+      });
+    }
+
     if (!chatId || (!text && !picked.media && !picked.rejected)) return NextResponse.json({ ok: true });
     if (update?.update_id !== undefined && !(await claimTelegramUpdate(update.update_id))) return NextResponse.json({ ok: true });
 
