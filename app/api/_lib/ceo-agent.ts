@@ -297,17 +297,24 @@ export async function runCeoAgent(userText: string, media?: CeoMedia): Promise<s
   const manifest = () => describeTools(tools);
   Object.assign(tools, buildTools(), buildActionTools(), buildDataTools(), buildIntrospectionTools(manifest));
 
-  const result = await withModelFallback({ tier: 'strong', tools: true, budgetMs: 52000, attemptMs: 26000 }, (model, attemptMs) =>
-    generateText({
-      model,
-      system: `${CEO_PERSONA}\nToday (Asia/Manila): ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.${summaryContext}${memoryContext}`,
-      messages: [...history, { role: 'user', content: userContent }],
-      tools: tools as ReturnType<typeof buildTools> & ReturnType<typeof buildActionTools> & ReturnType<typeof buildDataTools> & ReturnType<typeof buildIntrospectionTools>,
-      stopWhen: isStepCount(8),
-      maxRetries: 0,
-      abortSignal: AbortSignal.timeout(attemptMs),
-    }),
-  );
+  let result;
+  try {
+    result = await withModelFallback({ tier: 'strong', tools: true, budgetMs: 52000, attemptMs: 26000 }, (model, attemptMs) =>
+      generateText({
+        model,
+        system: `${CEO_PERSONA}\nToday (Asia/Manila): ${new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' })}.${summaryContext}${memoryContext}`,
+        messages: [...history, { role: 'user', content: userContent }],
+        tools: tools as ReturnType<typeof buildTools> & ReturnType<typeof buildActionTools> & ReturnType<typeof buildDataTools> & ReturnType<typeof buildIntrospectionTools>,
+        stopWhen: isStepCount(8),
+        maxRetries: 0,
+        abortSignal: AbortSignal.timeout(attemptMs),
+      }),
+    );
+  } catch (error) {
+    // Never leave the CEO on "seen" with no reply — even if every model is down, acknowledge and tell him what still works.
+    console.error('CEO agent all-models-failed:', error);
+    return 'Sorry Boss, lahat ng AI models busy/down ngayon kaya hindi ko muna naproseso ang message/photo mo. ❌ WALA pang nai-save — pakipadala ulit in a few minutes, o gamitin ang exact commands na laging gumagana kahit down ang AI: ORDER <client> | <project> | <total>, MOVE <client> <stage>, CLIENTS.';
+  }
 
   const reply = result.text.trim() || 'Done po, Boss.';
   if (supabase) {
