@@ -151,17 +151,40 @@ function daysInStage(order: OpenOrder, nowMs: number): number {
 
 const peso = (value: number | null) => (value ? `₱${Math.round(value).toLocaleString('en-PH')}` : 'walang presyo');
 
+function stageRank(stage: string) {
+  const idx = (ORDER_STAGES as readonly string[]).indexOf(stage);
+  return idx === -1 ? ORDER_STAGES.length : idx; // ON_HOLD etc. go last
+}
+
+export function sortOrdersForPulse(orders: OpenOrder[]): OpenOrder[] {
+  return [...orders].sort((a, b) => stageRank(a.stage) - stageRank(b.stage));
+}
+
+// One Telegram message per client: name, stage, milestone, and the next step to make it move.
+export function buildOrderPulseMessage(order: OpenOrder, index: number, total: number, now = new Date()): string {
+  const name = escapeTelegramHtml(order.client_name || order.project_name || 'Client');
+  const project = order.project_name && order.project_name !== order.client_name ? ` — ${escapeTelegramHtml(order.project_name)}` : '';
+  const days = daysInStage(order, now.getTime());
+  const age = days >= 3 ? ` ⚠️ ${days} araw na!` : days >= 1 ? ` (${days} araw na)` : '';
+  const action = STAGE_NEXT_ACTION[order.stage] || 'I-check ang status nito.';
+  const milestone = STAGE_MILESTONE[order.stage];
+  const lines = [
+    `<b>${index + 1}/${total} · ${name}</b>${project} · ${peso(order.total_amount)}`,
+    `Stage: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>${age}`,
+  ];
+  if (milestone) lines.push(`📋 ${escapeTelegramHtml(milestone)}`);
+  lines.push(`👉 <b>${escapeTelegramHtml(action)}</b>`);
+  lines.push(`<i>Update: type "${escapeTelegramHtml(order.order_number)} &lt;update&gt;" o mag-send ng photo/voice.</i>`);
+  return lines.join('\n');
+}
+
 // The 6AM / 1PM message: every open order, its stage age, and the next action to do.
 export function buildClientPulseMessage(orders: OpenOrder[], now = new Date()): string {
   const manilaTime = now.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   const header = `<b>📋 CLIENT PULSE — ${escapeTelegramHtml(manilaTime)}</b>`;
   if (!orders.length) return `${header}\n\nWalang open orders ngayon. 🎉\nMag-add bago: ORDER &lt;client&gt; | &lt;project&gt; | &lt;total&gt;`;
 
-  const rank = (stage: string) => {
-    const idx = (ORDER_STAGES as readonly string[]).indexOf(stage);
-    return idx === -1 ? ORDER_STAGES.length : idx; // ON_HOLD etc. go last
-  };
-  const sorted = [...orders].sort((a, b) => rank(a.stage) - rank(b.stage));
+  const sorted = sortOrdersForPulse(orders);
   const nowMs = now.getTime();
 
   const lines = sorted.slice(0, 25).map((order, index) => {

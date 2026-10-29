@@ -6,6 +6,8 @@ import { CRON_JOBS, cronRisk, evaluateGuard, sanitizePageKey, type CronJob } fro
 import { runCronJob } from './ceo-exec';
 import { listPageBrands } from './page-brands';
 import { updateContact } from './crm';
+import { advanceOrder, confirmDeposit } from './order-lifecycle';
+import { findOrdersByRef, resolveStageInput } from './client-pulse';
 import { getSupabaseAdmin } from './integrations';
 
 // Action tools for the CEO bot. Each one goes through guarded(): kill switch, daily action budget, injection screen, audit log.
@@ -105,6 +107,28 @@ export function buildActionTools() {
         const body = `Problem:\n${input.problem}\n\nProposal:\n${input.proposal}\n\nExpected impact: ${input.expected_impact}\nEffort: ${input.effort}`;
         const approval = await createApproval({ kind: 'improvement', summary: `Improvement idea: ${input.title}\nImpact: ${input.expected_impact}\nEffort: ${input.effort}`, action: { type: 'code_change', title: input.title, body } });
         return { status: 'awaiting_ceo_approval', approval_id: approval.id };
+      }),
+    }),
+
+    update_order: tool({
+      description: 'Update a client order\'s production stage when the CEO says so in chat (typed, or transcribed from a photo/voice note). Find the order by client name or ORD-number, then move it to a new stage. Stages: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered, done, hold, cancel. Use this whenever the CEO reports progress on a client (e.g. "Max project tapos na ang sewing", "Philflex nadeliver na").',
+      inputSchema: z.object({
+        ref: z.string().min(2).max(80).describe('Client name or ORD-number the CEO mentioned.'),
+        stage: z.string().min(2).max(30).describe('The new stage (shortcut or full name).'),
+        note: z.string().max(300).optional().describe('Optional note about the update.'),
+      }),
+      execute: async (input) => guarded('update_order', input, async () => {
+        const stage = resolveStageInput(input.stage);
+        if (!stage) return { error: `Unknown stage "${input.stage}". Use: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered, done, hold, cancel` };
+        const matches = await findOrdersByRef(input.ref);
+        if (!matches.length) return { error: `No open order matches "${input.ref}".` };
+        if (matches.length > 1) return { error: `Multiple matches for "${input.ref}": ${matches.map((o) => `${o.order_number} (${o.client_name || o.project_name}, ${o.stage})`).join('; ')}. Ask the CEO which one or use the ORD-number.` };
+        const order = matches[0];
+        const result = stage === 'DEPOSIT_VERIFIED'
+          ? await confirmDeposit(order.id, null)
+          : await advanceOrder(order.id, stage, (input.note || 'via CEO Telegram').slice(0, 300));
+        if (!result.ok) return { error: `${order.order_number}: ${result.error}` };
+        return { updated: true, order_number: order.order_number, client: order.client_name || order.project_name, from: order.stage, to: stage };
       }),
     }),
 

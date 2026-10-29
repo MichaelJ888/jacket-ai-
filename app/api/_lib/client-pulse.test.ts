@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildClientPulseMessage, parseMoveInput, parseOrderInput, resolveStageInput, type OpenOrder } from './client-pulse.ts';
+import { buildClientPulseMessage, buildOrderPulseMessage, parseMoveInput, parseOrderInput, resolveStageInput, sortOrdersForPulse, type OpenOrder } from './client-pulse.ts';
 
 test('resolveStageInput accepts aliases and canonical names', () => {
   assert.equal(resolveStageInput('sewing'), 'SEWING');
@@ -44,4 +44,25 @@ test('buildClientPulseMessage lists next actions and flags stale orders', () => 
   assert.match(message, /deposit/i);
   assert.match(message, /MOVE &lt;client&gt; &lt;stage&gt;/);
   assert.match(buildClientPulseMessage([], now), /Walang open orders/);
+});
+
+test('buildOrderPulseMessage is one message per client with next step + update hint', () => {
+  const now = new Date('2026-10-29T06:00:00+08:00');
+  const order: OpenOrder = { id: '1', order_number: 'ORD-12345678', client_name: 'Max', project_name: 'Jackets', quantity: 50, total_amount: 25000, stage: 'PO_DRAFTED', updated_at: '2026-10-28T06:00:00+08:00', created_at: null };
+  const message = buildOrderPulseMessage(order, 0, 3, now);
+  assert.match(message, /1\/3 · Max/);
+  assert.match(message, /PO DRAFTED/);
+  assert.match(message, /👉/); // next step
+  assert.match(message, /📋/); // template milestone
+  assert.match(message, /ORD-12345678/); // update hint references order number
+});
+
+test('sortOrdersForPulse orders by pipeline stage, ON_HOLD last', () => {
+  const base = { order_number: 'X', client_name: 'C', project_name: null, quantity: null, total_amount: 0, updated_at: null, created_at: null };
+  const orders: OpenOrder[] = [
+    { ...base, id: '1', stage: 'SEWING' },
+    { ...base, id: '2', stage: 'ON_HOLD' },
+    { ...base, id: '3', stage: 'AWAITING_DEPOSIT' },
+  ];
+  assert.deepEqual(sortOrdersForPulse(orders).map((o) => o.stage), ['AWAITING_DEPOSIT', 'SEWING', 'ON_HOLD']);
 });
