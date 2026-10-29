@@ -24,6 +24,8 @@ test('largest photo under the size cap is chosen', () => {
 
 test('only image documents are accepted', () => {
   assert.equal(pickTelegramMedia({ document: { file_id: 'd', mime_type: 'image/png', file_size: 100 } }).media?.kind, 'image-file');
+  assert.equal(pickTelegramMedia({ document: { file_id: 'd', mime_type: 'image/JPG', file_size: 100 } }).media?.mediaType, 'image/jpeg');
+  assert.equal(pickTelegramMedia({ document: { file_id: 'd', mime_type: 'image/heic', file_size: 100 } }).media?.kind, 'image-file');
   assert.equal(pickTelegramMedia({ document: { file_id: 'd', mime_type: 'application/x-msdownload', file_size: 100 } }).media, null);
   assert.equal(pickTelegramMedia({}).media, null);
   assert.equal(pickTelegramMedia(null).media, null);

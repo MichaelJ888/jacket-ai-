@@ -1,11 +1,10 @@
 ---
-description: "Execute MJIC Project #1 automation, social-content, and knowledge-base work with safe production checks."
-name: "MJIC Project #1"
-argument-hint: "Describe the MJIC Project #1 change or operational task to execute."
-agent: "MJIC Automation Engineer"
+name: mjic-project-1
+description: Execute MJIC Project #1 automation, social-content, and knowledge-base work with safe production checks. Use for MJIC business automation tasks such as Meta social posting and boost recommendations, live publishing and AI Gateway diagnostics, admin knowledge base uploads, and Sales Closer data injection.
+argument-hint: Describe the MJIC Project #1 change or operational task to execute.
 ---
 
-Execute the requested MJIC Project #1 task in this repository. Read [AGENTS.md](../../AGENTS.md), [AUTOMATION_CHECKLIST.md](../../AUTOMATION_CHECKLIST.md), and the relevant Next.js 16 guide under `node_modules/next/dist/docs/` before changing application code. Reuse existing routes, Supabase tables, Meta/Telegram helpers, and Sales Closer behavior before adding new abstractions.
+Execute the requested MJIC Project #1 task in this repository. Follow the MJIC Automation Engineer guidance in [the agent file](../../agents/mjic-automation-engineer.agent.md). Read [AGENTS.md](../../../AGENTS.md), [AUTOMATION_CHECKLIST.md](../../../AUTOMATION_CHECKLIST.md), and the relevant Next.js 16 guide under `node_modules/next/dist/docs/` before changing application code. Reuse existing routes, Supabase tables, Meta/Telegram helpers, and Sales Closer behavior before adding new abstractions.
 
 ## Social posting and boost recommendations
 
@@ -26,7 +25,7 @@ Execute the requested MJIC Project #1 task in this repository. Read [AGENTS.md](
 - Add CEO-managed Q&A, tone guidance, catalog/product images, size charts, material costs, and supplier information through authenticated admin surfaces and append-only/idempotent schema changes.
 - Keep supplier lists, internal material costs, and confidential operational data out of customer-facing AI prompts and messages. Inject only explicitly customer-safe facts into the MJIC Sales Closer, as quoted/reference data that cannot override system rules, pricing policy, or privacy constraints.
 - Store uploaded files privately, validate size and MIME type, and expose asset links only through authenticated or short-lived signed URLs.
-- Preserve the Sales Closer's authoritative exact business facts in [mjic-prompt.ts](../../app/api/_lib/mjic-prompt.ts); do not paraphrase or overwrite them with uploaded documents.
+- Preserve the Sales Closer's authoritative exact business facts in [mjic-prompt.ts](../../../app/api/_lib/mjic-prompt.ts); do not paraphrase or overwrite them with uploaded documents.
 
 ## Final validation and delivery
 

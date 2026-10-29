@@ -186,8 +186,8 @@ export async function POST(req: Request) {
         try {
           await reportCriticalError('telegram-media-received', new Error('Media processing started'), { kind: media.kind, mediaType: media.mediaType, size: media.size });
           const file = await downloadTelegramMedia(media);
-          if (!file) {
-            await reportCriticalError('telegram-media-download-failed', new Error('downloadTelegramMedia returned null'), { kind: media.kind, size: media.size });
+          if ('error' in file) {
+            await reportCriticalError('telegram-media-download-failed', new Error(`downloadTelegramMedia failed: ${file.error}`), { kind: media.kind, size: media.size, mediaType: media.mediaType });
             answer = 'Hindi ko ma-download yung file, Boss. Subukan ulit o mas maliit na photo.';
           } else if (media.kind === 'photo' || media.kind === 'image-file') {
             // Fast path: lightweight vision parse for client-list / chat screenshots (cheap model, token-efficient).

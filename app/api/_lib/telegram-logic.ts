@@ -28,9 +28,10 @@ export function pickTelegramMedia(message: TelegramMessage | undefined | null): 
     return { media: { kind: 'photo', fileId: best.file_id, mediaType: 'image/jpeg', size: best.file_size ?? null } };
   }
   const doc = message.document;
-  if (doc?.file_id && /^image\/(jpeg|png|webp)$/i.test(doc.mime_type || '')) {
+  if (doc?.file_id && /^image\/(jpe?g|png|webp|heic|heif)$/i.test(doc.mime_type || '')) {
     if ((doc.file_size ?? 0) > MAX_MEDIA_BYTES) return { media: null, rejected: 'Image file is too large.' };
-    return { media: { kind: 'image-file', fileId: doc.file_id, mediaType: (doc.mime_type as string).toLowerCase(), size: doc.file_size ?? null } };
+    const mediaType = (doc.mime_type as string).toLowerCase().replace('image/jpg', 'image/jpeg');
+    return { media: { kind: 'image-file', fileId: doc.file_id, mediaType, size: doc.file_size ?? null } };
   }
   return { media: null };
 }
