@@ -10,6 +10,7 @@ import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
 import { advanceOrder, confirmDeposit, createOrder } from '../_lib/order-lifecycle';
 import { buildClientPulseMessage, findOrdersByRef, listOpenOrders, parseMoveInput, parseOrderInput } from '../_lib/client-pulse';
+import { applyClientUpdates, parseClientScreenshot } from '../_lib/vision-parse';
 import { addSubconJob, completeSubconJob, handleAttendanceMessage, isAttendanceChat, logSewerOutput, markPayrollPaid } from '../_lib/payroll';
 import {
   clockInStaff,
@@ -188,6 +189,18 @@ export async function POST(req: Request) {
           if (!file) {
             await reportCriticalError('telegram-media-download-failed', new Error('downloadTelegramMedia returned null'), { kind: media.kind, size: media.size });
             answer = 'Hindi ko ma-download yung file, Boss. Subukan ulit o mas maliit na photo.';
+          } else if (media.kind === 'photo' || media.kind === 'image-file') {
+            // Fast path: lightweight vision parse for client-list / chat screenshots (cheap model, token-efficient).
+            const parsed = await parseClientScreenshot(file, text);
+            if (parsed.clients.length) {
+              const applied = await applyClientUpdates(parsed.clients);
+              answer = `📸 Nabasa ko ang screenshot — ${applied.created} new, ${applied.updated} updated, ${applied.failed} failed:\n${applied.lines.join('\n')}`;
+            } else if (parsed.error) {
+              await reportCriticalError('telegram-vision-parse', new Error(parsed.error), { kind: media.kind });
+              answer = await runCeoAgent(text, file); // fall back to the full CEO agent
+            } else {
+              answer = await runCeoAgent(text, file); // no clients found — let the CEO agent describe/act
+            }
           } else {
             answer = await runCeoAgent(text, file);
           }
