@@ -148,7 +148,17 @@ export async function POST(req: Request) {
     if (picked.media || picked.rejected) {
       // Voice notes and photos are CEO-only; everyone else's media is ignored.
       const ceoOnly = allowedChatId(chatId) && !isAttendanceChat(chatId) && (!!process.env.TELEGRAM_CEO_USER_ID && String(message.from?.id) === process.env.TELEGRAM_CEO_USER_ID);
-      if (!ceoOnly) return NextResponse.json({ ok: true });
+      if (!ceoOnly) {
+        await reportCriticalError('telegram-media-ignored', new Error('Media received but not from CEO chat'), {
+          chatId: String(chatId),
+          fromId: String(message.from?.id),
+          expectedCeoId: process.env.TELEGRAM_CEO_USER_ID ? 'set' : 'NOT SET',
+          chatType,
+          hasMedia: !!picked.media,
+          rejected: picked.rejected || null,
+        });
+        return NextResponse.json({ ok: true });
+      }
       if (picked.rejected) {
         await sendTelegramDirectMessage(String(chatId), picked.rejected);
         return NextResponse.json({ ok: true });
@@ -158,8 +168,14 @@ export async function POST(req: Request) {
         const stopTyping = startTyping(String(chatId));
         let answer: string;
         try {
+          await reportCriticalError('telegram-media-received', new Error('Media processing started'), { kind: media.kind, mediaType: media.mediaType, size: media.size });
           const file = await downloadTelegramMedia(media);
-          answer = file ? await runCeoAgent(text, file) : 'Hindi ko ma-download yung file, Boss. Subukan ulit.';
+          if (!file) {
+            await reportCriticalError('telegram-media-download-failed', new Error('downloadTelegramMedia returned null'), { kind: media.kind, size: media.size });
+            answer = 'Hindi ko ma-download yung file, Boss. Subukan ulit o mas maliit na photo.';
+          } else {
+            answer = await runCeoAgent(text, file);
+          }
         } catch (error) {
           console.error('CEO media failed:', error);
           await reportCriticalError('telegram-ceo-media', error);
