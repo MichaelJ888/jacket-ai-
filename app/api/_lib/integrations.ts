@@ -675,7 +675,12 @@ export async function sendTelegramDirectMessage(chatId: string, text: string): P
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text: sanitizeTelegramText(text) }),
     });
-    return Boolean(response?.ok);
+    if (!response?.ok) {
+      const detail = response ? await response.text().catch(() => '') : 'no response';
+      console.error(`Telegram direct message rejected (${response?.status ?? 'n/a'}):`, detail.slice(0, 300));
+      return false;
+    }
+    return true;
   } catch (error) {
     console.error('Telegram direct message failed:', error);
     return false;
