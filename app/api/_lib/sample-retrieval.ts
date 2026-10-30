@@ -3,17 +3,9 @@ import { selectStaleSamplesToAlert, staleSampleDays, STALE_SAMPLE_DAYS, type Sta
 
 type SupabaseLike = NonNullable<ReturnType<typeof import('./integrations').getSupabaseAdmin>>;
 
-// Ms. Anne Manalo receives the sample retrieval pushes. Env wins; otherwise look her up in staff_profiles.
-export async function resolveSampleRetrievalChatId(supabase: SupabaseLike): Promise<string | null> {
-  const fromEnv = process.env.ANNE_MANALO_TELEGRAM_CHAT_ID?.trim();
-  if (fromEnv) return fromEnv;
-  const { data } = await supabase
-    .from('staff_profiles')
-    .select('staff_name, telegram_chat_id')
-    .not('telegram_chat_id', 'is', null)
-    .ilike('staff_name', '%manalo%');
-  const match = (data || []).find((row) => /anne/i.test(String(row.staff_name)) && row.telegram_chat_id);
-  return match ? String(match.telegram_chat_id) : null;
+// Ms. Anne Manalo receives the sample retrieval pushes. Uses ANNE_MANALO_TELEGRAM_CHAT_ID when set; otherwise null (owner group fallback).
+export function resolveSampleRetrievalChatId(): string | null {
+  return process.env.ANNE_MANALO_TELEGRAM_CHAT_ID?.trim() || null;
 }
 
 export function buildRetrievalMessage(samples: StaleSampleRow[], today: string) {
@@ -40,7 +32,7 @@ export async function runStaleSampleRetrieval(supabase: SupabaseLike, today: str
   const due = selectStaleSamplesToAlert((data || []) as StaleSampleRow[], today);
   if (!due.length) return { stale: 0, alerted: 0, recipient: 'none' as const };
 
-  const chatId = await resolveSampleRetrievalChatId(supabase);
+  const chatId = resolveSampleRetrievalChatId();
   const text = buildRetrievalMessage(due, today);
   if (chatId) await sendTelegramDirectMessage(chatId, text);
   else await sendTelegramMessage(`⚠️ Walang Telegram chat ID si Ms. Anne Manalo (set ANNE_MANALO_TELEGRAM_CHAT_ID).\n${text}`);
