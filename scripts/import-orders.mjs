@@ -5,9 +5,9 @@
 //
 // CSV header (order of columns does not matter; only client_name is required):
 //   client_name,project_name,quantity,total_amount,stage,contact_phone,delivery_address
-// stage must be one of: AWAITING_DEPOSIT, DEPOSIT_VERIFIED, PO_DRAFTED, CUTTING,
-//   EMBROIDERY, SEWING, QC, PACKING, READY_FOR_DELIVERY, DISPATCHED, DELIVERED, ON_HOLD
-//   (case-insensitive; common shortcuts like "sewing", "deposit", "ready" also work)
+// stage must be one of the 11 pipeline keys (S01_INQUIRY ... S11_DISPATCH), COMPLETED, ON_HOLD or CANCELLED.
+//   Shortcuts also work: inquiry, sourcing, design, quote, deposit, paid, sizing, sample, production, qc,
+//   balance, dispatch, done, hold, cancel. Legacy words (sewing, cutting, po, packing, ready, delivered) are mapped too.
 import { readFileSync } from 'node:fs';
 
 const envPath = new URL('../.env.local', import.meta.url);
@@ -24,25 +24,27 @@ try {
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const STAGES = ['AWAITING_DEPOSIT', 'DEPOSIT_VERIFIED', 'PO_DRAFTED', 'CUTTING', 'EMBROIDERY', 'SEWING', 'QC', 'PACKING', 'READY_FOR_DELIVERY', 'DISPATCHED', 'DELIVERED', 'ON_HOLD'];
+const STAGES = ['S01_INQUIRY', 'S02_SOURCING', 'S03_DESIGN_APPROVAL', 'S04_QUOTATION', 'S05_DEPOSIT', 'S06_SIZING', 'S07_SAMPLE', 'S08_PRODUCTION', 'S09_QC', 'S10_BALANCE', 'S11_DISPATCH', 'COMPLETED', 'ON_HOLD', 'CANCELLED'];
 const ALIASES = {
-  deposit: 'AWAITING_DEPOSIT', dp: 'AWAITING_DEPOSIT', downpayment: 'AWAITING_DEPOSIT',
-  paid: 'DEPOSIT_VERIFIED', verified: 'DEPOSIT_VERIFIED',
-  po: 'PO_DRAFTED', materials: 'PO_DRAFTED',
-  cut: 'CUTTING', cutting: 'CUTTING',
-  embroidery: 'EMBROIDERY', burda: 'EMBROIDERY',
-  sewing: 'SEWING', tahi: 'SEWING',
-  qc: 'QC', checking: 'QC',
-  pack: 'PACKING', packing: 'PACKING',
-  ready: 'READY_FOR_DELIVERY',
-  shipped: 'DISPATCHED', dispatch: 'DISPATCHED', dispatched: 'DISPATCHED', delivery: 'DISPATCHED',
-  delivered: 'DELIVERED',
-  hold: 'ON_HOLD',
+  inquiry: 'S01_INQUIRY', brief: 'S01_INQUIRY',
+  sourcing: 'S02_SOURCING', materials: 'S02_SOURCING', po: 'S02_SOURCING',
+  design: 'S03_DESIGN_APPROVAL', mockup: 'S03_DESIGN_APPROVAL', artwork: 'S03_DESIGN_APPROVAL',
+  quote: 'S04_QUOTATION', quotation: 'S04_QUOTATION',
+  deposit: 'S05_DEPOSIT', dp: 'S05_DEPOSIT', downpayment: 'S05_DEPOSIT', awaiting_deposit: 'S05_DEPOSIT',
+  sizing: 'S06_SIZING', size: 'S06_SIZING', names: 'S06_SIZING', deposit_verified: 'S06_SIZING', paid: 'S06_SIZING', verified: 'S06_SIZING',
+  sample: 'S07_SAMPLE', prototype: 'S07_SAMPLE',
+  production: 'S08_PRODUCTION', cutting: 'S08_PRODUCTION', cut: 'S08_PRODUCTION', embroidery: 'S08_PRODUCTION', burda: 'S08_PRODUCTION', sewing: 'S08_PRODUCTION', tahi: 'S08_PRODUCTION', po_drafted: 'S08_PRODUCTION',
+  qc: 'S09_QC', checking: 'S09_QC',
+  balance: 'S10_BALANCE', packing: 'S10_BALANCE', pack: 'S10_BALANCE',
+  dispatch: 'S11_DISPATCH', ready: 'S11_DISPATCH', ready_for_delivery: 'S11_DISPATCH', shipped: 'S11_DISPATCH', dispatched: 'S11_DISPATCH', delivery: 'S11_DISPATCH', delivered: 'S11_DISPATCH',
+  done: 'COMPLETED', completed: 'COMPLETED',
+  hold: 'ON_HOLD', on_hold: 'ON_HOLD',
+  cancel: 'CANCELLED',
 };
 
 function resolveStage(value) {
   const key = String(value || '').trim().toLowerCase();
-  if (!key) return 'AWAITING_DEPOSIT';
+  if (!key) return 'S05_DEPOSIT';
   if (ALIASES[key]) return ALIASES[key];
   const upper = key.toUpperCase();
   return STAGES.includes(upper) ? upper : null;

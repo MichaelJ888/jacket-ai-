@@ -10,6 +10,7 @@ import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
 import { advanceOrder, confirmDeposit, createOrder } from '../_lib/order-lifecycle';
 import { buildClientPulseMessage, findOrdersByRef, listOpenOrders, parseMoveInput, parseOrderInput } from '../_lib/client-pulse';
+import { DEPOSIT_RECEIVED } from '../_lib/order-stages';
 import { applyClientUpdates, parseClientScreenshot } from '../_lib/vision-parse';
 import { addSubconJob, completeSubconJob, handleAttendanceMessage, isAttendanceChat, logSewerOutput, markPayrollPaid } from '../_lib/payroll';
 import {
@@ -339,11 +340,12 @@ async function handleOrderMoveCommand(raw: string) {
     return `Maraming match sa "${parsed.ref}":\n${matches.map((order) => `- ${order.order_number} · ${order.client_name || order.project_name} (${order.stage})`).join('\n')}\nGamitin ang ORD-number, hal: MOVE ${matches[0].order_number} ${parsed.stage}`;
   }
   const order = matches[0];
-  const result = parsed.stage === 'DEPOSIT_VERIFIED'
+  const result = parsed.stage === DEPOSIT_RECEIVED
     ? await confirmDeposit(order.id, null)
     : await advanceOrder(order.id, parsed.stage, 'via Telegram');
   if (!result.ok) return `❌ ${order.order_number}: ${result.error}`;
-  return `✅ ${order.order_number} · ${order.client_name || order.project_name}: ${order.stage} → ${parsed.stage}`;
+  const newStage = parsed.stage === DEPOSIT_RECEIVED ? 'S06_SIZING' : parsed.stage;
+  return `✅ ${order.order_number} · ${order.client_name || order.project_name}: ${order.stage} → ${newStage}`;
 }
 
 async function handleLinkCommand(staffName: StaffName) {

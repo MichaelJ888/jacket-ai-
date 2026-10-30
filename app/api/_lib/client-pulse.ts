@@ -1,4 +1,4 @@
-import { ORDER_STAGES } from './order-stages.ts';
+import { ORDER_STAGES, PIPELINE_STAGES, stageNumber } from './order-stages.ts';
 import { escapeTelegramHtml, getSupabaseAdmin } from './integrations.ts';
 
 export type OpenOrder = {
@@ -13,63 +13,69 @@ export type OpenOrder = {
   created_at: string | null;
 };
 
-// MJIC Client Project Status template (client_project_status_template.md) milestones
-// mapped to the internal order pipeline stage. Used to phrase per-client updates.
-export const STAGE_MILESTONE: Record<string, string> = {
-  AWAITING_DEPOSIT: 'M5 Down Payment (50% D.P. required before production)',
-  DEPOSIT_VERIFIED: 'M2 Fabric & Material Sourcing',
-  PO_DRAFTED: 'M2 Fabric & Material Sourcing (PO to supplier)',
-  CUTTING: 'M8 Mass Production — cutting',
-  EMBROIDERY: 'M8 Mass Production — embroidery/branding',
-  SEWING: 'M8 Mass Production — sewing',
-  QC: 'M9 Quality Control Inspection',
-  PACKING: 'M8→M11 Final packaging & brand-label check',
-  READY_FOR_DELIVERY: 'M11 Order Pickup / Dispatch & Delivery',
-  DISPATCHED: 'M11 Shipped — in transit',
-  DELIVERED: 'M10 Full Balance Payment (settle before/after release)',
-  ON_HOLD: 'On hold — blocker',
-};
-
 // What the boss needs to do next for each pipeline stage (Taglish, action-first).
 export const STAGE_NEXT_ACTION: Record<string, string> = {
-  AWAITING_DEPOSIT: 'Kulitin ang client para sa 50% deposit — i-send ang GCash details.',
-  DEPOSIT_VERIFIED: 'I-draft ang supplier PO / materials list para makapag-start na.',
-  PO_DRAFTED: 'I-approve at ipadala ang PO sa supplier, then order materials.',
-  CUTTING: 'I-cut ang tela — bantayan ang cutting ngayong araw.',
-  EMBROIDERY: 'Ipa-embroidery ang mga logo/patches.',
-  SEWING: 'Tahiin — i-check kay Jonathan/Linda ang sewing progress.',
-  QC: 'I-QC: bilangin at hanapin ang depekto bago i-pack.',
-  PACKING: 'I-pack per size/color at ihanda ang delivery details.',
-  READY_FOR_DELIVERY: 'I-book ang delivery (Lalamove) o i-schedule ang pickup.',
-  DISPATCHED: 'I-track ang rider at i-update ang client na paparating na.',
-  DELIVERED: 'I-collect ang balance payment, then MOVE to done.',
+  S01_INQUIRY: 'I-follow up ang brief: design, quantity, at deadline ng client.',
+  S02_SOURCING: 'Kumuha ng fabric/material quotes at i-confirm ang availability.',
+  S03_DESIGN_APPROVAL: 'Ipa-approve ang mockup/artwork sa client bago mag-quote.',
+  S04_QUOTATION: 'I-send ang official quotation at hintayin ang sagot ng client.',
+  S05_DEPOSIT: 'Kulitin ang client para sa 50% D.P. — i-send ang GCash details.',
+  S06_SIZING: 'Kunin ang size breakdown, names, at numbers ng bawat piyesa.',
+  S07_SAMPLE: 'I-ipa-approve ang sample/prototype sa client bago mass production.',
+  S08_PRODUCTION: 'Bantayan ang cutting, printing/embroidery, at sewing ngayong araw.',
+  S09_QC: 'I-QC: bilangin at hanapin ang depekto bago i-pack.',
+  S10_BALANCE: 'Kolektahin ang balance payment bago i-release ang order.',
+  S11_DISPATCH: 'I-book ang pickup/delivery (Lalamove) at i-update ang client.',
+  COMPLETED: 'Tapos na — i-follow up para sa review at reorder.',
   ON_HOLD: 'May blocker — i-follow up kung ano ang hinihintay nito.',
 };
 
 const STAGE_ALIASES: Record<string, string> = {
-  deposit: 'AWAITING_DEPOSIT',
-  downpayment: 'AWAITING_DEPOSIT',
-  dp: 'AWAITING_DEPOSIT',
-  verified: 'DEPOSIT_VERIFIED',
-  paid: 'DEPOSIT_VERIFIED',
-  po: 'PO_DRAFTED',
-  materials: 'PO_DRAFTED',
-  cutting: 'CUTTING',
-  cut: 'CUTTING',
-  embroidery: 'EMBROIDERY',
-  burda: 'EMBROIDERY',
-  sewing: 'SEWING',
-  tahi: 'SEWING',
-  qc: 'QC',
-  checking: 'QC',
-  packing: 'PACKING',
-  pack: 'PACKING',
-  ready: 'READY_FOR_DELIVERY',
-  dispatch: 'DISPATCHED',
-  dispatched: 'DISPATCHED',
-  shipped: 'DISPATCHED',
-  delivery: 'DISPATCHED',
-  delivered: 'DELIVERED',
+  inquiry: 'S01_INQUIRY',
+  brief: 'S01_INQUIRY',
+  sourcing: 'S02_SOURCING',
+  fabric: 'S02_SOURCING',
+  materials: 'S02_SOURCING',
+  po: 'S02_SOURCING',
+  design: 'S03_DESIGN_APPROVAL',
+  mockup: 'S03_DESIGN_APPROVAL',
+  artwork: 'S03_DESIGN_APPROVAL',
+  approval: 'S03_DESIGN_APPROVAL',
+  quote: 'S04_QUOTATION',
+  quotation: 'S04_QUOTATION',
+  presyo: 'S04_QUOTATION',
+  deposit: 'S05_DEPOSIT',
+  downpayment: 'S05_DEPOSIT',
+  dp: 'S05_DEPOSIT',
+  paid: 'DEPOSIT_RECEIVED',
+  verified: 'DEPOSIT_RECEIVED',
+  binayaran: 'DEPOSIT_RECEIVED',
+  sizing: 'S06_SIZING',
+  size: 'S06_SIZING',
+  names: 'S06_SIZING',
+  sample: 'S07_SAMPLE',
+  prototype: 'S07_SAMPLE',
+  production: 'S08_PRODUCTION',
+  cutting: 'S08_PRODUCTION',
+  cut: 'S08_PRODUCTION',
+  embroidery: 'S08_PRODUCTION',
+  burda: 'S08_PRODUCTION',
+  sewing: 'S08_PRODUCTION',
+  tahi: 'S08_PRODUCTION',
+  print: 'S08_PRODUCTION',
+  qc: 'S09_QC',
+  checking: 'S09_QC',
+  balance: 'S10_BALANCE',
+  fullpay: 'S10_BALANCE',
+  packing: 'S10_BALANCE',
+  pack: 'S10_BALANCE',
+  ready: 'S11_DISPATCH',
+  dispatch: 'S11_DISPATCH',
+  dispatched: 'S11_DISPATCH',
+  shipped: 'S11_DISPATCH',
+  delivery: 'S11_DISPATCH',
+  delivered: 'S11_DISPATCH',
+  pickup: 'S11_DISPATCH',
   done: 'COMPLETED',
   complete: 'COMPLETED',
   completed: 'COMPLETED',
@@ -78,14 +84,23 @@ const STAGE_ALIASES: Record<string, string> = {
   cancelled: 'CANCELLED',
 };
 
-// Accepts "sewing", "SEWING", "ready", "done", etc. Returns the canonical stage or null.
+// Accepts "sewing", "S08_PRODUCTION", "ready", "done", etc. Returns the canonical stage or null.
 export function resolveStageInput(word: string): string | null {
   const key = word.trim().toLowerCase();
   if (!key) return null;
   if (STAGE_ALIASES[key]) return STAGE_ALIASES[key];
   const upper = key.toUpperCase();
-  if ((ORDER_STAGES as readonly string[]).includes(upper) || upper === 'ON_HOLD' || upper === 'CANCELLED') return upper;
+  if ((ORDER_STAGES as readonly string[]).includes(upper) || upper === 'COMPLETED' || upper === 'ON_HOLD' || upper === 'CANCELLED') return upper;
   return null;
+}
+
+// "Stage 08/11 · Mass Production & Custom Branding" plus a progress bar.
+export function stageProgressLine(stage: string): string | null {
+  const no = stageNumber(stage);
+  if (!no) return null;
+  const label = PIPELINE_STAGES[no - 1].label;
+  const bar = '▰'.repeat(no) + '▱'.repeat(PIPELINE_STAGES.length - no);
+  return `Stage ${String(no).padStart(2, '0')}/${PIPELINE_STAGES.length} · ${escapeTelegramHtml(label)}\n   ${bar}`;
 }
 
 // "Juan | school uniforms 50pcs | 15000" -> create input. Total is optional.
@@ -98,12 +113,14 @@ export function parseOrderInput(raw: string): { clientName: string; projectName:
   return { clientName, projectName: parts[1] || null, totalAmount: totalAmount > 0 ? totalAmount : 0 };
 }
 
-// "Juan Dela Cruz sewing" -> { ref: 'Juan Dela Cruz', stage: 'SEWING' } (last word = stage).
+const STAGE_HELP = 'Stages: 1 inquiry, 2 sourcing, 3 design, 4 quote, 5 deposit, 6 sizing, 7 sample, 8 production, 9 qc, 10 balance, 11 dispatch, done, hold, cancel';
+
+// "Juan Dela Cruz sewing" -> { ref: 'Juan Dela Cruz', stage: 'S08_PRODUCTION' } (last word = stage).
 export function parseMoveInput(raw: string): { ref: string; stage: string } | { error: string } {
   const words = raw.trim().split(/\s+/).filter(Boolean);
-  if (words.length < 2) return { error: 'Use: MOVE <client name o ORD-number> <stage>\nStages: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered, done, hold, cancel' };
+  if (words.length < 2) return { error: `Use: MOVE <client name o ORD-number> <stage>\n${STAGE_HELP}` };
   const stage = resolveStageInput(words[words.length - 1]);
-  if (!stage) return { error: `Hindi kilala ang stage na "${words[words.length - 1]}". Stages: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered, done, hold, cancel` };
+  if (!stage) return { error: `Hindi kilala ang stage na "${words[words.length - 1]}". ${STAGE_HELP}` };
   return { ref: words.slice(0, -1).join(' '), stage };
 }
 
@@ -160,25 +177,24 @@ export function sortOrdersForPulse(orders: OpenOrder[]): OpenOrder[] {
   return [...orders].sort((a, b) => stageRank(a.stage) - stageRank(b.stage));
 }
 
-// One Telegram message per client: name, stage, milestone, and the next step to make it move.
+// One Telegram message per client: name, stage (x/11 with progress bar), age, and the next step.
 export function buildOrderPulseMessage(order: OpenOrder, index: number, total: number, now = new Date()): string {
   const name = escapeTelegramHtml(order.client_name || order.project_name || 'Client');
   const project = order.project_name && order.project_name !== order.client_name ? ` — ${escapeTelegramHtml(order.project_name)}` : '';
   const days = daysInStage(order, now.getTime());
   const age = days >= 3 ? ` ⚠️ ${days} araw na!` : days >= 1 ? ` (${days} araw na)` : '';
   const action = STAGE_NEXT_ACTION[order.stage] || 'I-check ang status nito.';
-  const milestone = STAGE_MILESTONE[order.stage];
+  const progress = stageProgressLine(order.stage) || `Status: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>`;
   const lines = [
     `<b>${index + 1}/${total} · ${name}</b>${project} · ${peso(order.total_amount)}`,
-    `Stage: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>${age}`,
+    `${progress}${age}`,
+    `👉 <b>${escapeTelegramHtml(action)}</b>`,
+    `<i>Update: type "${escapeTelegramHtml(order.order_number)} &lt;update&gt;" o mag-send ng photo/voice.</i>`,
   ];
-  if (milestone) lines.push(`📋 ${escapeTelegramHtml(milestone)}`);
-  lines.push(`👉 <b>${escapeTelegramHtml(action)}</b>`);
-  lines.push(`<i>Update: type "${escapeTelegramHtml(order.order_number)} &lt;update&gt;" o mag-send ng photo/voice.</i>`);
   return lines.join('\n');
 }
 
-// The 6AM / 1PM message: every open order, its stage age, and the next action to do.
+// The 6AM / 1PM message: header plus one entry per open order (ordered by pipeline stage).
 export function buildClientPulseMessage(orders: OpenOrder[], now = new Date()): string {
   const manilaTime = now.toLocaleString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
   const header = `<b>📋 CLIENT PULSE — ${escapeTelegramHtml(manilaTime)}</b>`;
@@ -193,10 +209,9 @@ export function buildClientPulseMessage(orders: OpenOrder[], now = new Date()): 
     const days = daysInStage(order, nowMs);
     const age = days >= 3 ? ` ⚠️ ${days} araw na!` : days >= 1 ? ` (${days} araw na)` : ' (ngayon lang)';
     const action = STAGE_NEXT_ACTION[order.stage] || 'I-check ang status nito.';
-    const milestone = STAGE_MILESTONE[order.stage];
-    const milestoneLine = milestone ? `\n   📋 ${escapeTelegramHtml(milestone)}` : '';
-    return `${index + 1}. <b>${name}</b>${project} · ${peso(order.total_amount)}\n   Stage: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>${age}${milestoneLine}\n   👉 ${escapeTelegramHtml(action)}`;
+    const progress = stageProgressLine(order.stage) || `Status: <b>${escapeTelegramHtml(order.stage.replaceAll('_', ' '))}</b>`;
+    return `${index + 1}. <b>${name}</b>${project} · ${peso(order.total_amount)}\n   ${progress}${age}\n   👉 ${escapeTelegramHtml(action)}`;
   });
   const more = sorted.length > 25 ? `\n…+${sorted.length - 25} pang order(s). Type CLIENTS sa bot para sa full list.` : '';
-  return `${header}\n${sorted.length} open order(s) — eto ang gagawin mo per client:\n\n${lines.join('\n\n')}${more}\n\nI-update: MOVE &lt;client&gt; &lt;stage&gt; (hal. MOVE Juan sewing)`;
+  return `${header}\n${sorted.length} open order(s) — eto ang gagawin mo per client:\n\n${lines.join('\n\n')}${more}\n\nI-update: MOVE &lt;client&gt; &lt;stage&gt; (hal. MOVE Juan production)`;
 }

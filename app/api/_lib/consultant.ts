@@ -29,7 +29,7 @@ export async function gatherConsultantData() {
   const contactRows = (contacts.data || []) as Array<{ stage: string; ai_paused: boolean | null; last_inbound_at: string | null; last_outbound_at: string | null; next_followup_at: string | null }>;
   const unanswered = contactRows.filter((c) => c.last_inbound_at && Date.parse(c.last_inbound_at) > now - 7 * day && Date.parse(c.last_inbound_at) < now - 2 * 3_600_000 && (!c.last_outbound_at || Date.parse(c.last_outbound_at) < Date.parse(c.last_inbound_at))).length;
   const orderRows = (orders.data || []) as Array<{ stage: string; total_amount: number | null; created_at: string; updated_at: string | null; delivered_at: string | null }>;
-  const open = orderRows.filter((o) => !['DELIVERED', 'COMPLETED', 'CANCELLED'].includes(o.stage));
+  const open = orderRows.filter((o) => !['COMPLETED', 'CANCELLED'].includes(o.stage));
   const ledgerRows = (ledger.data || []) as Array<{ entry_type: string; category: string | null; amount: number }>;
   const sum = (type: string) => ledgerRows.filter((r) => r.entry_type === type).reduce((total, r) => total + Number(r.amount || 0), 0);
   const weeklyLeads = [0, 1, 2, 3].map((week) => (leads.data || []).filter((l) => { const age = now - Date.parse(l.created_at as string); return age >= week * 7 * day && age < (week + 1) * 7 * day; }).length);

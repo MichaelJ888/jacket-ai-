@@ -712,7 +712,7 @@ create table if not exists public.orders (
   quantity numeric,
   total_amount numeric not null default 0,
   deposit_amount numeric not null default 0,
-  stage text not null default 'AWAITING_DEPOSIT',
+  stage text not null default 'S05_DEPOSIT',
   deposit_verification_id uuid references public.payment_verifications(id),
   po_drafted_at timestamptz,
   dispatch_id uuid,
@@ -721,6 +721,33 @@ create table if not exists public.orders (
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+-- Client project spec (client_project_status_template.md sections 1-5).
+alter table public.orders add column if not exists organization_name text;
+alter table public.orders add column if not exists contact_person text;
+alter table public.orders add column if not exists target_deadline date;
+alter table public.orders add column if not exists garment_type text;
+alter table public.orders add column if not exists fabric_type_gsm text;
+alter table public.orders add column if not exists colorway_pantone text;
+alter table public.orders add column if not exists print_method text;
+alter table public.orders add column if not exists itemized_items jsonb not null default '[]'::jsonb;
+alter table public.orders add column if not exists size_matrix jsonb not null default '[]'::jsonb;
+
+-- One-time move of legacy 12-value stages onto the 11-stage pipeline (idempotent).
+update public.orders set stage = case stage
+  when 'AWAITING_DEPOSIT' then 'S05_DEPOSIT'
+  when 'DEPOSIT_VERIFIED' then 'S06_SIZING'
+  when 'PO_DRAFTED' then 'S08_PRODUCTION'
+  when 'CUTTING' then 'S08_PRODUCTION'
+  when 'EMBROIDERY' then 'S08_PRODUCTION'
+  when 'SEWING' then 'S08_PRODUCTION'
+  when 'QC' then 'S09_QC'
+  when 'PACKING' then 'S10_BALANCE'
+  when 'READY_FOR_DELIVERY' then 'S11_DISPATCH'
+  when 'DISPATCHED' then 'S11_DISPATCH'
+  when 'DELIVERED' then 'S11_DISPATCH'
+  else stage end
+where stage in ('AWAITING_DEPOSIT','DEPOSIT_VERIFIED','PO_DRAFTED','CUTTING','EMBROIDERY','SEWING','QC','PACKING','READY_FOR_DELIVERY','DISPATCHED','DELIVERED');
 
 create table if not exists public.order_events (
   id uuid default gen_random_uuid() primary key,

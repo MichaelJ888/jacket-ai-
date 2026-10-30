@@ -5,13 +5,14 @@ import { resolveStageInput } from './client-pulse.ts';
 
 // The vision parser maps Filipino/English status words to canonical stages via resolveStageInput.
 test('stage mapping covers Viber/chat screenshot phrases', () => {
-  assert.equal(resolveStageInput('sewing'), 'SEWING');
-  assert.equal(resolveStageInput('tahi'), 'SEWING');
-  assert.equal(resolveStageInput('burda'), 'EMBROIDERY');
-  assert.equal(resolveStageInput('paid'), 'DEPOSIT_VERIFIED');
-  assert.equal(resolveStageInput('deposit'), 'AWAITING_DEPOSIT');
-  assert.equal(resolveStageInput('ready'), 'READY_FOR_DELIVERY');
-  assert.equal(resolveStageInput('delivered'), 'DELIVERED');
+  assert.equal(resolveStageInput('sewing'), 'S08_PRODUCTION');
+  assert.equal(resolveStageInput('tahi'), 'S08_PRODUCTION');
+  assert.equal(resolveStageInput('burda'), 'S08_PRODUCTION');
+  assert.equal(resolveStageInput('paid'), 'DEPOSIT_RECEIVED');
+  assert.equal(resolveStageInput('deposit'), 'S05_DEPOSIT');
+  assert.equal(resolveStageInput('ready'), 'S11_DISPATCH');
+  assert.equal(resolveStageInput('delivered'), 'S11_DISPATCH');
+  assert.equal(resolveStageInput('qc'), 'S09_QC');
   assert.equal(resolveStageInput('done'), 'COMPLETED');
   assert.equal(resolveStageInput('hold'), 'ON_HOLD');
   assert.equal(resolveStageInput('cancel'), 'CANCELLED');

@@ -1,6 +1,7 @@
 ﻿import { draftPurchaseOrders } from './bom';
 import { completeSubconJobsForOrder } from './payroll';
-import { canTransition, defaultDepositAmount } from './order-stages';
+import { canTransition, DEFAULT_ORDER_STAGE, defaultDepositAmount, requiresDepositFirst } from './order-stages';
+import { normalizeOrderSpec, orderSpecToColumns, type OrderSpec } from './order-spec';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from './integrations';
 
 type OrderRow = {
@@ -21,7 +22,7 @@ type OrderRow = {
 
 type CostingMaterials = Array<{ material: string; quantity: number; unit: string; unitCost: number; supplier?: string | null }>;
 
-const label = (order: OrderRow) => escapeTelegramHtml(`${order.order_number} Â· ${order.client_name || order.project_name || 'order'}`);
+const label = (order: OrderRow) => escapeTelegramHtml(`${order.order_number} · ${order.client_name || order.project_name || 'order'}`);
 
 export async function createOrder(input: {
   costingId?: string | null;
@@ -33,10 +34,13 @@ export async function createOrder(input: {
   quantity?: number | null;
   totalAmount?: number;
   depositAmount?: number;
+  spec?: unknown;
 }) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { order: null, error: 'Supabase is not configured' };
   let { clientName, projectName, quantity } = input;
+  const spec: OrderSpec = normalizeOrderSpec(input.spec);
+  clientName = clientName || spec.organizationName || spec.contactPerson || null;
   if (input.costingId) {
     const { data: costing } = await supabase.from('project_costings').select('client_name, project_name, quantity').eq('id', input.costingId).maybeSingle();
     if (!costing) return { order: null, error: 'Costing not found' };
@@ -44,7 +48,8 @@ export async function createOrder(input: {
     projectName = projectName || costing.project_name;
     quantity = quantity ?? Number(costing.quantity);
   }
-  const total = Number(input.totalAmount) > 0 ? Number(input.totalAmount) : 0;
+  const itemizedTotal = spec.itemizedItems.reduce((sum, line) => sum + line.amount, 0);
+  const total = Number(input.totalAmount) > 0 ? Number(input.totalAmount) : Math.round(itemizedTotal * 100) / 100;
   const deposit = Number(input.depositAmount) > 0 ? Number(input.depositAmount) : defaultDepositAmount(total);
   const { data, error } = await supabase.from('orders').insert({
     order_number: `ORD-${Date.now().toString().slice(-8)}`,
@@ -52,15 +57,17 @@ export async function createOrder(input: {
     contact_id: input.contactId || null,
     client_name: clientName || null,
     project_name: projectName || null,
-    contact_phone: input.contactPhone || null,
+    contact_phone: input.contactPhone || spec.contactNumber || null,
     delivery_address: input.deliveryAddress || null,
     quantity: quantity ?? null,
     total_amount: total,
     deposit_amount: deposit,
+    stage: DEFAULT_ORDER_STAGE,
+    ...orderSpecToColumns(spec),
   }).select().single();
   if (error || !data) return { order: null, error: error?.message || 'Order insert failed' };
-  await supabase.from('order_events').insert({ order_id: data.id, to_stage: 'AWAITING_DEPOSIT', note: 'Order created' });
-  void sendTelegramMessage(`ðŸ§¾ <b>ORDER CREATED</b>\n${label(data as OrderRow)}\nDeposit expected: <b>â‚±${deposit.toLocaleString('en-PH')}</b>`);
+  await supabase.from('order_events').insert({ order_id: data.id, to_stage: DEFAULT_ORDER_STAGE, note: 'Order created' });
+  void sendTelegramMessage(`🧾 <b>ORDER CREATED</b>\n${label(data as OrderRow)}\nDeposit expected: <b>₱${deposit.toLocaleString('en-PH')}</b>`);
   return { order: data as OrderRow, error: null };
 }
 
@@ -82,13 +89,13 @@ async function loadOrder(orderId: string) {
   return (data as OrderRow | null) || null;
 }
 
-// Staff-verified deposit: lock the order, then auto-draft supplier POs from its costing (once).
+// Staff-verified deposit (Stage 05 -> 06): lock the order, then auto-draft supplier POs from its costing (once).
 export async function confirmDeposit(orderId: string, verificationId: string | null) {
   const supabase = getSupabaseAdmin();
   const order = await loadOrder(orderId);
   if (!supabase || !order) return { ok: false, error: 'Order not found' };
-  if (order.stage === 'AWAITING_DEPOSIT' || order.stage === 'ON_HOLD') {
-    await setStage(order, 'DEPOSIT_VERIFIED', 'Deposit verified by staff', verificationId ? { deposit_verification_id: verificationId } : {});
+  if (order.stage === 'S05_DEPOSIT' || order.stage === 'ON_HOLD') {
+    await setStage(order, 'S06_SIZING', 'Deposit verified by staff', verificationId ? { deposit_verification_id: verificationId } : {});
   }
 
   let drafted: string[] = [];
@@ -102,7 +109,7 @@ export async function confirmDeposit(orderId: string, verificationId: string | n
       drafted = result.drafted.map((po) => po.poNumber);
       skipped = result.skipped;
       if (drafted.length) await supabase.from('purchase_orders').update({ order_id: order.id }).in('po_number', drafted);
-      if (order.stage === 'DEPOSIT_VERIFIED') await setStage(order, 'PO_DRAFTED', `${drafted.length} supplier PO(s) drafted`);
+      if (drafted.length) await supabase.from('purchase_orders').update({ order_id: order.id }).in('po_number', drafted);
       void sendTelegramMessage(`ðŸ“¦ <b>POs DRAFTED</b> for ${label(order)}: ${drafted.length}${skipped.length ? `\nâš ï¸ Skipped: ${escapeTelegramHtml(skipped.join(', '))}` : ''}\nApprove them before sending to suppliers.`);
     }
   }
@@ -119,18 +126,18 @@ export async function advanceOrder(orderId: string, to: string, note = '') {
   const supabase = getSupabaseAdmin();
   const order = await loadOrder(orderId);
   if (!supabase || !order) return { ok: false, error: 'Order not found' };
-  if (!canTransition(order.stage, to)) return { ok: false, error: `Cannot move ${order.stage} â†’ ${to}` };
-  if (['CUTTING', 'EMBROIDERY', 'SEWING', 'QC', 'PACKING', 'READY_FOR_DELIVERY', 'DISPATCHED', 'DELIVERED', 'COMPLETED'].includes(to) && order.stage === 'AWAITING_DEPOSIT') {
-    return { ok: false, error: 'Deposit not verified yet â€” production cannot start' };
+  if (!canTransition(order.stage, to)) return { ok: false, error: `Cannot move ${order.stage} → ${to}` };
+  if (requiresDepositFirst(order.stage, to)) {
+    return { ok: false, error: 'Deposit not verified yet — confirm the down payment before Stage 06 and beyond' };
   }
 
   const from = order.stage;
   const extra: Record<string, unknown> = {};
-  if (to === 'DELIVERED') extra.delivered_at = new Date().toISOString();
+  if (to === 'COMPLETED') extra.delivered_at = new Date().toISOString();
   if (!(await setStage(order, to, note || `Moved from ${from}`, extra))) return { ok: false, error: 'Order changed concurrently, retry' };
   const notices: string[] = [];
 
-  if (to === 'READY_FOR_DELIVERY') {
+  if (to === 'S11_DISPATCH') {
     const pickup = process.env.MJIC_PICKUP_ADDRESS;
     if (order.delivery_address && order.contact_phone && pickup && !order.dispatch_id) {
       const { data: dispatch } = await supabase.from('dispatch_requests').insert({
@@ -145,21 +152,21 @@ export async function advanceOrder(orderId: string, to: string, note = '') {
       }).select('id').single();
       if (dispatch) {
         await supabase.from('orders').update({ dispatch_id: dispatch.id }).eq('id', order.id);
-        notices.push(`Dispatch drafted (<code>${dispatch.id}</code>) â€” approve to book Lalamove.`);
+        notices.push(`Dispatch drafted (<code>${dispatch.id}</code>) — approve to book Lalamove.`);
       }
     } else if (!order.dispatch_id) {
-      notices.push('No dispatch drafted (missing delivery address, phone, or MJIC_PICKUP_ADDRESS) â€” arrange delivery manually.');
+      notices.push('No dispatch drafted (missing delivery address, phone, or MJIC_PICKUP_ADDRESS) — arrange delivery manually.');
     }
   }
 
-  if (to === 'DELIVERED' && order.contact_id) {
+  if (to === 'COMPLETED' && order.contact_id) {
     // The sales-followups cron sends the review/reorder message 24h after contact.delivered_at.
     const { data: contact } = await supabase.from('crm_contacts').select('lifetime_value').eq('id', order.contact_id).maybeSingle();
     await supabase.from('crm_contacts').update({ delivered_at: extra.delivered_at, stage: 'won', next_followup_at: null, lifetime_value: Number(contact?.lifetime_value || 0) + Number(order.total_amount || 0) }).eq('id', order.contact_id);
     notices.push('Post-sale review request scheduled in 24h.');
   }
 
-  if (to === 'DELIVERED') {
+  if (to === 'COMPLETED') {
     const subconPayrolls = await completeSubconJobsForOrder(orderId).catch(() => 0);
     if (subconPayrolls) notices.push(`${subconPayrolls} subcon payroll(s) generated.`);
   }

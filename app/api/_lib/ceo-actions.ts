@@ -7,6 +7,7 @@ import { runCronJob } from './ceo-exec';
 import { listPageBrands } from './page-brands';
 import { updateContact } from './crm';
 import { advanceOrder, confirmDeposit, createOrder } from './order-lifecycle';
+import { DEFAULT_ORDER_STAGE, DEPOSIT_RECEIVED } from './order-stages';
 import { findOrdersByRef, resolveStageInput } from './client-pulse';
 import { getSupabaseAdmin } from './integrations';
 
@@ -117,7 +118,7 @@ export function buildActionTools() {
         projectName: z.string().max(200).optional().describe('Project / item details (e.g. "50pcs custom jackets").'),
         quantity: z.number().int().positive().optional(),
         totalAmount: z.number().nonnegative().optional().describe('Total price in pesos (0 if not yet quoted).'),
-        stage: z.string().max(30).optional().describe('Current stage if mentioned: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered. Defaults to deposit.'),
+        stage: z.string().max(30).optional().describe('Current stage if mentioned: inquiry, sourcing, design, quote, deposit, paid, sizing, sample, production, qc, balance, dispatch. Defaults to deposit.'),
         contactPhone: z.string().max(40).optional(),
         deliveryAddress: z.string().max(300).optional(),
       }),
@@ -135,18 +136,18 @@ export function buildActionTools() {
         // If the CEO said the client is already past deposit, move it there right away.
         const targetStage = input.stage ? resolveStageInput(input.stage) : null;
         let finalStage = order.stage;
-        if (targetStage && targetStage !== 'AWAITING_DEPOSIT') {
-          const moved = targetStage === 'DEPOSIT_VERIFIED'
+        if (targetStage && targetStage !== DEFAULT_ORDER_STAGE) {
+          const moved = targetStage === DEPOSIT_RECEIVED
             ? await confirmDeposit(order.id, null)
             : await advanceOrder(order.id, targetStage, 'via CEO Telegram (initial stage)');
-          if (moved.ok) finalStage = targetStage;
+          if (moved.ok) finalStage = targetStage === DEPOSIT_RECEIVED ? 'S06_SIZING' : targetStage;
         }
         return { created: true, order_number: order.order_number, client: order.client_name, stage: finalStage, deposit_needed: order.deposit_amount };
       }),
     }),
 
     update_order: tool({
-      description: 'Update a client order\'s production stage when the CEO says so in chat (typed, or transcribed from a photo/voice note). Find the order by client name or ORD-number, then move it to a new stage. Stages: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered, done, hold, cancel. Use this whenever the CEO reports progress on a client (e.g. "Max project tapos na ang sewing", "Philflex nadeliver na").',
+      description: 'Update a client order\'s production stage when the CEO says so in chat (typed, or transcribed from a photo/voice note). Find the order by client name or ORD-number, then move it to a new stage. Stages: inquiry, sourcing, design, quote, deposit, paid, sizing, sample, production, qc, balance, dispatch, done, hold, cancel. Use this whenever the CEO reports progress on a client (e.g. "Max tapos na ang production", "Philflex nadeliver na").',
       inputSchema: z.object({
         ref: z.string().min(2).max(80).describe('Client name or ORD-number the CEO mentioned.'),
         stage: z.string().min(2).max(30).describe('The new stage (shortcut or full name).'),
@@ -154,16 +155,16 @@ export function buildActionTools() {
       }),
       execute: async (input) => guarded('update_order', input, async () => {
         const stage = resolveStageInput(input.stage);
-        if (!stage) return { error: `Unknown stage "${input.stage}". Use: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered, done, hold, cancel` };
+        if (!stage) return { error: `Unknown stage "${input.stage}". Use: inquiry, sourcing, design, quote, deposit, paid, sizing, sample, production, qc, balance, dispatch, done, hold, cancel` };
         const matches = await findOrdersByRef(input.ref);
         if (!matches.length) return { error: `No open order matches "${input.ref}".` };
         if (matches.length > 1) return { error: `Multiple matches for "${input.ref}": ${matches.map((o) => `${o.order_number} (${o.client_name || o.project_name}, ${o.stage})`).join('; ')}. Ask the CEO which one or use the ORD-number.` };
         const order = matches[0];
-        const result = stage === 'DEPOSIT_VERIFIED'
+        const result = stage === DEPOSIT_RECEIVED
           ? await confirmDeposit(order.id, null)
           : await advanceOrder(order.id, stage, (input.note || 'via CEO Telegram').slice(0, 300));
         if (!result.ok) return { error: `${order.order_number}: ${result.error}` };
-        return { updated: true, order_number: order.order_number, client: order.client_name || order.project_name, from: order.stage, to: stage };
+        return { updated: true, order_number: order.order_number, client: order.client_name || order.project_name, from: order.stage, to: stage === DEPOSIT_RECEIVED ? 'S06_SIZING' : stage };
       }),
     }),
 

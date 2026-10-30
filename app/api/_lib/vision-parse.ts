@@ -3,6 +3,7 @@ import { generateText } from 'ai';
 import { withModelFallback } from './llm-pool.ts';
 import { findOrdersByRef, resolveStageInput } from './client-pulse.ts';
 import { advanceOrder, confirmDeposit, createOrder } from './order-lifecycle.ts';
+import { DEFAULT_ORDER_STAGE, DEPOSIT_RECEIVED } from './order-stages.ts';
 
 // Lightweight, cost-efficient vision parser for chat screenshots (Viber, Messenger, etc.).
 // Uses the cheap tier (gemini flash-lite) — NOT the strong CEO model — to stay within token budget.
@@ -28,7 +29,7 @@ const PARSE_PROMPT = `You are reading a screenshot of a chat (Viber/Messenger/SM
 Extract EVERY client mentioned and their LATEST project status. For each client return:
 - clientName: the client/organization name (required)
 - projectName: the project/item (e.g. "50pcs jackets", "corporate uniforms") or null
-- stage: ONE of these exact words that best matches their current status: deposit, paid, po, cutting, embroidery, sewing, qc, packing, ready, shipped, delivered, done, hold, cancel. Map Filipino/English status words: "binayaran na"/"nag-down" = paid, "bumibili pa ng materials"/"buy mats" = po, "tinatahi" = sewing, "binaburda" = embroidery, "naka-ready"/"for pickup" = ready, "nadeliver"/"nareceive na" = delivered, "tapos na" = done. If unclear, use null.
+- stage: ONE of these exact words that best matches their current status: inquiry, sourcing, design, quote, deposit, paid, sizing, sample, production, qc, balance, dispatch, done, hold, cancel. Map Filipino/English status words: "nag-inquire"/"bagong brief" = inquiry, "bumibili pa ng materials"/"buy mats"/"po" = sourcing, "mockup"/"artwork approved" = design, "quotation"/"presyo" = quote, "nag-down"/"naka-deposit" = deposit, "binayaran na"/"verified" = paid, "sizes/names" = sizing, "sample" = sample, "tinatahi"/"binaburda"/"cutting" = production, "QC"/"chine-check" = qc, "fully paid"/"balance" = balance, "naka-ready"/"for pickup"/"nadeliver"/"shipped" = dispatch, "tapos na" = done. If unclear, use null.
 - stageRaw: the exact status phrase as written
 - totalAmount: number in pesos if mentioned, else null
 - quantity: number of pieces if mentioned, else null
@@ -98,14 +99,15 @@ export async function applyClientUpdates(clients: ParsedClientUpdate[]): Promise
           lines.push(`ℹ️ ${client.clientName} — existing order ${order.order_number} (${order.stage}), walang bagong stage na nabasa.`);
           continue;
         }
-        const result = client.stage === 'DEPOSIT_VERIFIED'
+        const result = client.stage === DEPOSIT_RECEIVED
           ? await confirmDeposit(order.id, null)
           : await advanceOrder(order.id, client.stage, client.note || 'via screenshot');
         if (!result.ok) {
           lines.push(`❌ ${client.clientName} — ${result.error}`);
           failed += 1;
         } else {
-          lines.push(`✅ ${client.clientName} — ${order.stage} → ${client.stage}${client.note ? ` (${client.note})` : ''}`);
+          const newStage = client.stage === DEPOSIT_RECEIVED ? 'S06_SIZING' : client.stage;
+          lines.push(`✅ ${client.clientName} — ${order.stage} → ${newStage}${client.note ? ` (${client.note})` : ''}`);
           updated += 1;
         }
         continue;
@@ -123,11 +125,11 @@ export async function applyClientUpdates(clients: ParsedClientUpdate[]): Promise
         continue;
       }
       let finalStage = result.order.stage;
-      if (client.stage && client.stage !== 'AWAITING_DEPOSIT') {
-        const moved = client.stage === 'DEPOSIT_VERIFIED'
+      if (client.stage && client.stage !== DEFAULT_ORDER_STAGE) {
+        const moved = client.stage === DEPOSIT_RECEIVED
           ? await confirmDeposit(result.order.id, null)
           : await advanceOrder(result.order.id, client.stage, 'via screenshot (initial stage)');
-        if (moved.ok) finalStage = client.stage;
+        if (moved.ok) finalStage = client.stage === DEPOSIT_RECEIVED ? 'S06_SIZING' : client.stage;
       }
       lines.push(`✅ ${client.clientName} — NEW order ${result.order.order_number} (${finalStage})`);
       created += 1;
