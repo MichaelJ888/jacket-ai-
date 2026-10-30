@@ -12,7 +12,7 @@ export type SiteDoc = {
 
 export const SITE_KEY = 'site';
 export const EDITOR_COOKIE = 'mjic_editor';
-export const EDITOR_SESSION_MS = 8 * 60 * 60 * 1000;
+export const EDITOR_SESSION_MS = 30 * 24 * 60 * 60 * 1000;
 export const OTP_TTL_MS = 5 * 60 * 1000;
 export const OTP_MAX_ATTEMPTS = 5;
 export const ANNE_MANALO_CHAT_ID = '7329264426';

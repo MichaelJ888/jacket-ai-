@@ -41,6 +41,29 @@ export default function EditorPage() {
     frameRef.current?.contentWindow?.postMessage({ source: 'mjic-cms-editor', type: 'render', doc }, location.origin);
   }, []);
 
+  const [frameHeight, setFrameHeight] = useState(800);
+  const frameObserverRef = useRef<ResizeObserver | null>(null);
+
+  const syncFrameHeight = useCallback(() => {
+    const frameDoc = frameRef.current?.contentDocument;
+    if (frameDoc) setFrameHeight(frameDoc.documentElement.scrollHeight);
+  }, []);
+
+  // The iframe grows to its content so the outer page (toolbar included) scrolls top to bottom.
+  const onFrameLoad = useCallback(() => {
+    frameObserverRef.current?.disconnect();
+    const frameWin = frameRef.current?.contentWindow;
+    const frameDoc = frameRef.current?.contentDocument;
+    if (!frameWin || !frameDoc) return;
+    const FrameResizeObserver = (frameWin as unknown as typeof globalThis).ResizeObserver;
+    const observer = new FrameResizeObserver(syncFrameHeight);
+    frameObserverRef.current = observer;
+    observer.observe(frameDoc.body);
+    syncFrameHeight();
+  }, [syncFrameHeight]);
+
+  useEffect(() => () => frameObserverRef.current?.disconnect(), []);
+
   const loadSession = useCallback(async () => {
     const res = await fetch('/api/admin/editor', { cache: 'no-store' });
     if (!res.ok) return false;
@@ -229,8 +252,8 @@ export default function EditorPage() {
   }
 
   return (
-    <main className="flex h-screen flex-col bg-zinc-100">
-      <header className="flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
+    <main className="flex min-h-screen flex-col bg-zinc-100">
+      <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
         <h1 className="mr-2 text-base font-bold text-zinc-900">Visual Editor</h1>
         <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to replace it · Drag ☰ Move section or catalogue cards to reorder</span>
         <div className="ml-auto flex flex-wrap items-center gap-3">
@@ -253,7 +276,7 @@ export default function EditorPage() {
       {(notice || error) && (
         <div className={`px-4 py-2 text-sm ${error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{error || notice}</div>
       )}
-      <iframe key={frameKey} ref={frameRef} src="/index.html?cms=editor" title="Live page editor" className="w-full flex-1 border-0 bg-white" />
+      <iframe key={frameKey} ref={frameRef} onLoad={onFrameLoad} src="/index.html?cms=editor" title="Live page editor" scrolling="no" className="block w-full border-0 bg-white" style={{ height: frameHeight }} />
     </main>
   );
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { EDITOR_COOKIE, sanitizeSiteDoc } from '../../_lib/site-content-logic';
+import { EDITOR_COOKIE, EDITOR_SESSION_MS, sanitizeSiteDoc, signEditorSession } from '../../_lib/site-content-logic';
 import { editorChatFromRequest, loadSiteDoc, saveSiteDoc } from '../../_lib/site-content';
 import { getSupabaseAdmin } from '../../_lib/integrations';
 
@@ -9,13 +9,23 @@ function unauthorized() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
+// Sliding session: every authenticated load renews the cookie so an active CEO is never logged out.
 export async function GET(request: Request) {
   const chatId = editorChatFromRequest(request);
   if (!chatId) return unauthorized();
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
   const doc = await loadSiteDoc(supabase);
-  return NextResponse.json({ chatId, doc }, { headers: { 'Cache-Control': 'no-store' } });
+  const expiresAt = Date.now() + EDITOR_SESSION_MS;
+  const response = NextResponse.json({ chatId, doc }, { headers: { 'Cache-Control': 'no-store' } });
+  response.cookies.set(EDITOR_COOKIE, signEditorSession(chatId, expiresAt, process.env.EDITOR_PASSWORD as string), {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    path: '/',
+    maxAge: Math.floor(EDITOR_SESSION_MS / 1000),
+  });
+  return response;
 }
 
 export async function POST(request: Request) {
