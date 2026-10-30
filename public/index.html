@@ -98,7 +98,6 @@
 <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
 <script defer src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
 
-<script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -1245,24 +1244,10 @@
       <button @click="showAdmin=false" class="text-navy-400 hover:text-navy"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
 
-    <template x-if="!adminAuthed">
-      <div>
-        <p class="text-sm text-navy-400 mb-4">This panel is protected by real, server-side login (Netlify Identity) — not a password stored in this page's code.</p>
-
-        <div x-show="!identityReady" x-cloak class="bg-red-50 border border-red-200 rounded-md p-3 mb-4 text-[11px] text-red-700">
-          ⚠ Admin login isn't available in this preview/chat window — the identity script is intentionally blocked here for security. This button will work correctly once the site is deployed live on Netlify (see the Deployment Guide, Part 1).
-        </div>
-
-        <button @click="openAdminOrExplain()" class="w-full bg-navy text-white font-semibold py-2.5 rounded-md flex items-center justify-center gap-2">
-          <i data-lucide="lock" class="w-4 h-4"></i> Log In as Admin
-        </button>
-        <div class="bg-navy-50 rounded-md p-3 mt-4 text-[11px] text-navy-400 space-y-1.5">
-          <p class="font-semibold text-navy">One-time setup needed (do this once before this button works):</p>
-          <p>1. In your Netlify dashboard, go to Site settings → Identity → Enable Identity.</p>
-          <p>2. Under Identity → Invite users, invite your own CEO email.</p>
-          <p>3. Accept the invite email — that becomes your real login.</p>
-        </div>
-        <p class="text-[11px] text-navy-400 mt-3">Nobody can read your password from the page source anymore — Netlify's own servers verify your login, the same system used by real production websites.</p>
+    <template x-if="showAdmin && !adminAuthed">
+      <div class="flex flex-col h-[calc(100%-4rem)] min-h-[60vh]">
+        <p class="text-[11px] text-navy-400 mb-3">Sign in with the admin password, then enter the 6-digit code sent to the CEO's Telegram. Editing tools load after sign-in.</p>
+        <iframe src="/admin/editor" title="Admin sign-in and visual editor" class="w-full flex-1 border hairline rounded-md bg-white"></iframe>
       </div>
     </template>
 
@@ -1713,9 +1698,6 @@
         </div>
         <p class="text-[11px] text-navy-400 mb-6">Replace the sample names above with your real, permission-cleared client list before making this public.</p>
 
-        <div class="border-t hairline mt-6 pt-5 text-[11px] text-navy-400">
-          <p>Logged in as <span class="font-semibold text-navy" x-text="netlifyUserEmail"></span> via Netlify Identity. To add another admin (e.g. a manager), invite them from Netlify → Identity → Invite users — no password sharing needed.</p>
-        </div>
       </div>
     </template>
     </div>
@@ -1724,9 +1706,7 @@
       <button @click="saveAllChanges()" class="w-full bg-gold hover:bg-gold-600 text-navy font-display font-bold py-3 rounded-md flex items-center justify-center gap-2">
         <i data-lucide="save" class="w-4 h-4"></i> Save All Changes
       </button>
-      <button @click="window.netlifyIdentity && window.netlifyIdentity.logout()" class="w-full border hairline text-navy-400 font-semibold py-2.5 rounded-md">Log Out</button>
-    </div>
-  </div>
+    </div>  </div>
 </div>
 
 <!-- ============ CHAT WIDGET (rule-based instant answers, not a full LLM) ============ -->
@@ -1890,7 +1870,7 @@ function mjApp(){
     set(key, val){ try{ sessionStorage.setItem(key, JSON.stringify(val)); return true; }catch(e){ return false; } }
   };
   return {
-    mobileMenu:false, showAdmin:false, adminAuthed:false, netlifyUserEmail:'', identityReady:false, adminPanelWidth:60, showCartPreview:false, autoHealReport:'',
+    mobileMenu:false, showAdmin:false, adminAuthed:false, adminPanelWidth:60, showCartPreview:false, autoHealReport:'',
     swarmLastRun:'', swarmRecommendations:[], swarmAgents:[
       {id:'news',name:'News Scout',scope:'WTA, NBA, public news feeds'},
       {id:'design',name:'Design Advisor',scope:'catalog, fabrics, UI suggestions'},
@@ -2139,7 +2119,6 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
     },
 
     init(){
-      // Real server-side admin auth via Netlify Identity — no password lives in this file.
       Object.assign(this.siteSettings, {
         brandName: this.siteSettings.brandName || 'CUSTOMIZED JACKETS',
         brandTagline: this.siteSettings.brandTagline || 'AND MORE',
@@ -2157,14 +2136,6 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
         this.ealaNextMatch = {event:'Singapore Tennis Open 2026 (WTA 500) — Round of 16', opponent:'Tatiana Prozorova', watchLink:'https://www.wtatennis.com/tournaments/1152/singapore/2026/scores', targetDate:'2026-09-24T11:00:00+08:00', isLive:false, liveScore:'', lastVerified:'September 22, 2026 (Philippine time)'};
         safeLS.set('mji_eala_match_v2', this.ealaNextMatch);
       }
-      if(window.netlifyIdentity){
-        this.identityReady = true;
-        netlifyIdentity.on('init', user => { if(user){ this.adminAuthed = true; this.netlifyUserEmail = user.email; } });
-        netlifyIdentity.on('login', user => { this.adminAuthed = true; this.netlifyUserEmail = user.email; this.showAdmin = true; netlifyIdentity.close(); this.showToast('Logged in as '+user.email); });
-        netlifyIdentity.on('logout', () => { this.adminAuthed = false; this.showAdmin = false; this.netlifyUserEmail = ''; });
-        netlifyIdentity.init();
-      }
-
       const defaultProducts = this.defaultProducts();
       const storedProducts = safeLS.get('mji_products', null);
       this.products = storedProducts || defaultProducts;
@@ -2294,9 +2265,7 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
     },
 
     openAdminOrExplain(){
-      if(this.adminAuthed){ this.showAdmin = true; return; }
-      if(window.netlifyIdentity){ window.netlifyIdentity.open('login'); }
-      else { this.showToast('Admin login only works once deployed live on Netlify — not in this preview.'); }
+      this.showAdmin = true;
     },
 
     // Free, no-API-key weather via Open-Meteo — genuinely live, works from any browser.
