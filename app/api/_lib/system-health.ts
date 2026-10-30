@@ -3,12 +3,11 @@ import { runStaleSampleRetrieval } from './sample-retrieval';
 import { sendTelegramMessage, getSupabaseAdmin } from './integrations';
 import { getCashBalance } from './ceo-finance';
 import { selectStaleSamplesToAlert, type StaleSampleRow } from './sample-return-logic';
+import { evaluateJobs, JOBS } from './coo-logic';
 
 type SupabaseLike = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 export type HealthLevel = 'ok' | 'warn' | 'red';
 export type HealthCheck = { feature: string; level: HealthLevel; detail: string; selfHeal?: string };
-
-const HEARTBEAT_STALE_HOURS = 36;
 
 // Each feature reports one check. Red means the feature needs attention; warn means it is incomplete but not broken.
 export async function runSystemHealthAudit(supabase: SupabaseLike, today: string): Promise<HealthCheck[]> {
@@ -57,30 +56,33 @@ export async function runSystemHealthAudit(supabase: SupabaseLike, today: string
     selfHeal: fund.level === 'red' ? 'Ipadala ulit ang Red Alert sa owner group (isang beses kada araw).' : undefined,
   });
 
+  // Each job is judged against its own cadence (weekly/monthly jobs are not stale after 36h).
   const heartbeats = heartbeatsResult.data || [];
-  const nowMs = Date.parse(`${today}T23:59:59+08:00`);
-  const staleJobs = heartbeats.filter((row) => {
-    if (!row.last_run_at) return true;
-    return (nowMs - Date.parse(String(row.last_run_at))) / 3_600_000 > HEARTBEAT_STALE_HOURS;
-  });
+  const jobReports = evaluateJobs(
+    heartbeats.map((row) => ({ job: String(row.job), last_run_at: String(row.last_run_at), last_status: String(row.last_status) })),
+    Date.now(),
+    JOBS,
+  );
+  const staleJobs = jobReports.filter((row) => row.state === 'stale');
   const failedJobs = heartbeats.filter((row) => row.last_status && String(row.last_status).toLowerCase() === 'error');
   checks.push({
     feature: 'Background jobs (cron)',
     level: heartbeatsResult.error ? 'red' : failedJobs.length ? 'red' : staleJobs.length ? 'warn' : 'ok',
     detail: heartbeatsResult.error
       ? heartbeatsResult.error.message
-      : `${heartbeats.length} job ang naitala; ${failedJobs.length} may error; ${staleJobs.length} ang lampas ${HEARTBEAT_STALE_HOURS} oras na walang tala.`,
+      : `${heartbeats.length} job ang naitala; ${failedJobs.length} may error; ${staleJobs.length} ang lampas sa inaasahang iskedyul.`,
   });
 
+  // ANNE_MANALO_TELEGRAM_CHAT_ID is optional: retrieval alerts fall back to the owner group.
   const envChecks = [
-    { name: 'TELEGRAM_BOT_TOKEN', ok: Boolean(process.env.TELEGRAM_BOT_TOKEN) },
-    { name: 'ANNE_MANALO_TELEGRAM_CHAT_ID', ok: Boolean(process.env.ANNE_MANALO_TELEGRAM_CHAT_ID) },
-    { name: 'CRON_SECRET', ok: Boolean(process.env.CRON_SECRET) },
+    { name: 'TELEGRAM_BOT_TOKEN', ok: Boolean(process.env.TELEGRAM_BOT_TOKEN), required: true },
+    { name: 'CRON_SECRET', ok: Boolean(process.env.CRON_SECRET), required: true },
   ];
   const missing = envChecks.filter((row) => !row.ok).map((row) => row.name);
+  const missingRequired = envChecks.filter((row) => row.required && !row.ok);
   checks.push({
     feature: 'Environment config',
-    level: envChecks[0].ok ? (missing.length ? 'warn' : 'ok') : 'red',
+    level: missingRequired.length ? 'red' : missing.length ? 'warn' : 'ok',
     detail: missing.length ? `Kulang: ${missing.join(', ')}` : 'Kumpleto ang kailangang env variables.',
   });
 
