@@ -181,6 +181,9 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
       const media = picked.media!;
+      // Instant ack so the CEO never sees silence while the download/vision parse runs (failures ignored).
+      const ackText = media.kind === 'photo' || media.kind === 'image-file' ? 'Na-receive ko ang larawan, pinoproseso na...' : 'Na-receive ko ang voice note, pinoproseso na...';
+      await sendTelegramDirectMessage(String(chatId), ackText).catch(() => undefined);
       after(async () => {
         const stopTyping = startTyping(String(chatId));
         let answer: string;

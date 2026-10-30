@@ -1,6 +1,6 @@
 // Seed the MJIC Client Project Status template into mjic_knowledge_items (category 'template').
-// Idempotent: skips if a 'template' item with the same title already exists.
-// Usage: node scripts/seed-status-template.mjs [path/to/client_project_status_template.md]
+// Idempotent: inserts when missing; if the stored copy differs it is NOT overwritten unless --update is passed.
+// Usage: node scripts/seed-status-template.mjs [path/to/client_project_status_template.md] [--update]
 import { readFileSync } from 'node:fs';
 
 const envPath = new URL('../.env.local', import.meta.url);
@@ -21,9 +21,17 @@ if (!supabaseUrl || !serviceKey) {
   process.exit(1);
 }
 
-const templatePath = process.argv[2] || 'C:/Users/pc2/Desktop/client_project_status_template.md';
+const args = process.argv.slice(2);
+const allowUpdate = args.includes('--update');
+const templatePath = args.find((arg) => !arg.startsWith('--')) || 'C:/Users/pc2/Desktop/client_project_status_template.md';
 const title = 'Client Project Status Template (11-milestone production tracker)';
-const content = readFileSync(templatePath, 'utf8').slice(0, 20000);
+
+// Strict UTF-8 (throws on invalid bytes instead of writing U+FFFD garbage), strips BOM, normalizes CRLF.
+const content = new TextDecoder('utf-8', { fatal: true }).decode(readFileSync(templatePath)).replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+if (content.length > 20000) {
+  console.error(`Template is ${content.length} chars (limit 20000). Refusing to truncate silently.`);
+  process.exit(1);
+}
 
 const headers = {
   apikey: serviceKey,
@@ -32,7 +40,7 @@ const headers = {
 };
 
 const existing = await fetch(
-  `${supabaseUrl}/rest/v1/mjic_knowledge_items?category=eq.template&title=eq.${encodeURIComponent(title)}&select=id`,
+  `${supabaseUrl}/rest/v1/mjic_knowledge_items?category=eq.template&title=eq.${encodeURIComponent(title)}&select=id,content`,
   { headers, signal: AbortSignal.timeout(20000) },
 );
 if (!existing.ok) {
@@ -41,7 +49,26 @@ if (!existing.ok) {
 }
 const found = await existing.json();
 if (found.length) {
-  console.log(`Already seeded (id ${found[0].id}). Nothing to do.`);
+  const [row] = found;
+  if (row.content === content) {
+    console.log(`Already seeded and up to date (id ${row.id}). Nothing to do.`);
+    process.exit(0);
+  }
+  if (!allowUpdate) {
+    console.log(`Seeded template (id ${row.id}) differs from ${templatePath}. Not overwritten; re-run with --update to replace it.`);
+    process.exit(0);
+  }
+  const patch = await fetch(`${supabaseUrl}/rest/v1/mjic_knowledge_items?id=eq.${encodeURIComponent(row.id)}`, {
+    method: 'PATCH',
+    headers: { ...headers, Prefer: 'return=minimal' },
+    body: JSON.stringify({ content }),
+    signal: AbortSignal.timeout(20000),
+  });
+  if (!patch.ok) {
+    console.error(`Update failed: ${patch.status} ${await patch.text()}`);
+    process.exit(1);
+  }
+  console.log(`✅ Updated template knowledge item ${row.id} from ${templatePath}.`);
   process.exit(0);
 }
 

@@ -25,7 +25,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ orders: data || [] });
 }
 
-// POST { action: 'create', costingId?, contactId?, clientName?, projectName?, contactPhone?, deliveryAddress?, quantity?, totalAmount, depositAmount? }
+// POST { action: 'create', costingId?, contactId?, clientName?, projectName?, contactPhone?, deliveryAddress?, quantity?, totalAmount, depositAmount?, spec? | flat spec fields }
 // POST { action: 'confirm_deposit', orderId, verificationId? }   (manual override of the payment webhook)
 // POST { action: 'advance', orderId, stage, note? }
 export async function POST(request: Request) {
@@ -33,7 +33,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     if (body.action === 'create') {
-      const result = await createOrder(body);
+      // Spec fields may arrive nested under `spec` or flat on the body (organizationName, targetDeadline, ...).
+      const result = await createOrder({ ...body, spec: body.spec ?? body });
       if (!result.order) return NextResponse.json({ error: result.error }, { status: 400 });
       return NextResponse.json({ success: true, order: result.order });
     }

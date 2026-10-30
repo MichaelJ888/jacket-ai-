@@ -1,6 +1,6 @@
 ﻿import { draftPurchaseOrders } from './bom';
 import { completeSubconJobsForOrder } from './payroll';
-import { canTransition, DEFAULT_ORDER_STAGE, defaultDepositAmount, requiresDepositFirst } from './order-stages';
+import { canTransition, DEFAULT_ORDER_STAGE, DEPOSIT_STAGE_NO, defaultDepositAmount, requiresDepositFirst, stageNumber } from './order-stages';
 import { normalizeOrderSpec, orderSpecToColumns, type OrderSpec } from './order-spec';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from './integrations';
 
@@ -18,6 +18,7 @@ type OrderRow = {
   stage: string;
   po_drafted_at: string | null;
   dispatch_id: string | null;
+  deposit_verification_id: string | null;
 };
 
 type CostingMaterials = Array<{ material: string; quantity: number; unit: string; unitCost: number; supplier?: string | null }>;
@@ -122,12 +123,22 @@ export async function holdOrder(orderId: string, note: string) {
   return setStage(order, 'ON_HOLD', note);
 }
 
+// True once the order has been past Stage 05 (deposit verified) at any point, including before a hold.
+async function depositWasVerified(order: OrderRow): Promise<boolean> {
+  if (order.deposit_verification_id) return true;
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return false;
+  const { data } = await supabase.from('order_events').select('from_stage, to_stage').eq('order_id', order.id);
+  const past = (stage: string | null) => stage === 'COMPLETED' || stageNumber(stage || '') > DEPOSIT_STAGE_NO;
+  return (data || []).some((event) => past(event.to_stage) || past(event.from_stage));
+}
+
 export async function advanceOrder(orderId: string, to: string, note = '') {
   const supabase = getSupabaseAdmin();
   const order = await loadOrder(orderId);
   if (!supabase || !order) return { ok: false, error: 'Order not found' };
   if (!canTransition(order.stage, to)) return { ok: false, error: `Cannot move ${order.stage} → ${to}` };
-  if (requiresDepositFirst(order.stage, to)) {
+  if (requiresDepositFirst(order.stage, to, order.stage === 'ON_HOLD' ? await depositWasVerified(order) : false)) {
     return { ok: false, error: 'Deposit not verified yet — confirm the down payment before Stage 06 and beyond' };
   }
 

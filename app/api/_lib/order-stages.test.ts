@@ -28,6 +28,13 @@ test('hold and cancel are reachable, closed orders are final', () => {
   assert.equal(canTransition('S08_PRODUCTION', 'BOGUS'), false);
 });
 
+test('resumed ON_HOLD orders must pass the deposit gate unless deposit was verified', () => {
+  assert.equal(requiresDepositFirst('ON_HOLD', 'S08_PRODUCTION'), true);
+  assert.equal(requiresDepositFirst('ON_HOLD', 'S06_SIZING'), true);
+  assert.equal(requiresDepositFirst('ON_HOLD', 'S08_PRODUCTION', true), false);
+  assert.equal(requiresDepositFirst('ON_HOLD', 'S05_DEPOSIT'), false);
+});
+
 test('default deposit is 50% rounded to centavos', () => {
   assert.equal(defaultDepositAmount(10001), 5000.5);
   assert.equal(defaultDepositAmount(-5), 0);

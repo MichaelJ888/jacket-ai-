@@ -51,9 +51,12 @@ export function stageNumber(stage: string): number {
   return isPipelineStage(stage) ? ORDER_STAGES.indexOf(stage) + 1 : 0;
 }
 
-// Production can't start before the down payment is confirmed (Stage 05).
-export function requiresDepositFirst(from: string, to: string): boolean {
-  return isPipelineStage(from) && stageNumber(from) <= DEPOSIT_STAGE_NO && stageNumber(to) > DEPOSIT_STAGE_NO;
+// Production can't start before the down payment is confirmed (Stage 05). A resumed ON_HOLD order
+// is gated the same way unless its deposit was already verified (`depositVerified`).
+export function requiresDepositFirst(from: string, to: string, depositVerified = false): boolean {
+  if (stageNumber(to) <= DEPOSIT_STAGE_NO) return false;
+  if (from === 'ON_HOLD') return !depositVerified;
+  return isPipelineStage(from) && stageNumber(from) <= DEPOSIT_STAGE_NO;
 }
 
 // Stages only move forward (skipping is allowed); COMPLETED follows Stage 11. ON_HOLD/CANCELLED are
