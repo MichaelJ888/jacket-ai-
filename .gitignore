@@ -48,4 +48,7 @@ next-env.d.ts
 .projectmem/events.jsonl
 .projectmem/watch.pid
 .projectmem/watch.log
+
+# autonomous watchdog state and logs
+.watchdog/
 .projectmem/structure.json

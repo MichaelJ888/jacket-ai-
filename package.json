@@ -7,6 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+  "watchdog": "node scripts/autonomous-watchdog.mjs",
+  "watchdog:watch": "node scripts/autonomous-watchdog.mjs --watch",
     "db:push": "node scripts/apply-schema.mjs",
     "crm:sync": "node scripts/sync-crm-orders.mjs",
     "devq": "node scripts/devq.mjs",

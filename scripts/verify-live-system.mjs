@@ -64,6 +64,9 @@ async function main() {
   await checkAuthed('production quota', '/api/production-quota', ADMIN_TOKEN, 'ADMIN_TOKEN');
   await checkAuthed('sample tracker', '/api/samples', ADMIN_TOKEN, 'ADMIN_TOKEN');
   await checkAuthed('cron samples (overdue alerts)', '/api/cron/samples', CRON_SECRET, 'CRON_SECRET');
+  // Same bearer-token calls the admin panel makes after login; no session bypass.
+  await checkAuthed('admin panel: overview', '/api/admin/overview', ADMIN_TOKEN, 'ADMIN_TOKEN');
+  await checkAuthed('admin panel: prices', '/api/admin/prices', ADMIN_TOKEN, 'ADMIN_TOKEN');
 
   const crm = await call('/api/crm', ADMIN_TOKEN);
   if (!ADMIN_TOKEN) record('CRM client count', false, 'missing ADMIN_TOKEN');
