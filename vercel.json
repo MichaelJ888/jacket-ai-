@@ -4,6 +4,7 @@
     { "path": "/api/cron/memory-archive", "schedule": "0 3 * * *" },
     { "path": "/api/cron/content-plan", "schedule": "0 22 * * *" },
     { "path": "/api/cron/swarm-worker", "schedule": "0 5 * * *" },
-    { "path": "/api/cron/meta-health", "schedule": "0 1 * * *" }
+    { "path": "/api/cron/meta-health", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/samples", "schedule": "30 0 * * *" }
   ]
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../../_lib/auth';
 
 import { getSupabaseAdmin } from '../../_lib/integrations';
+import { getCashBalance } from '../../_lib/ceo-finance';
 import { buildFinancialDashboard, type FinancialProjectInput } from '../../../dashboard/financials/financial-logic';
 
 function toNumber(value: unknown, fallback = 0) {
@@ -17,15 +18,26 @@ export async function GET(req: Request) {
   }
 
   try {
-    const [costingsResult, payrollResult, dispatchResult] = await Promise.all([
+    const [costingsResult, payrollResult, dispatchResult, locksResult, cashBalance] = await Promise.all([
       supabase.from('project_costings').select('project_name, total_cost, costing'),
       supabase.from('staff_attendance').select('total_earned'),
       supabase.from('dispatch_requests').select('project_name, status, approved_at'),
+      supabase.from('material_fund_locks').select('order_number, project_name, amount, status, locked_at').eq('status', 'LOCKED'),
+      getCashBalance(),
     ]);
 
     const costings = costingsResult.data || [];
     const payroll = payrollResult.data || [];
     const dispatches = dispatchResult.data || [];
+    const locks = locksResult.data || [];
+    const lockedTotal = locks.reduce((sum, row) => sum + toNumber(row.amount), 0);
+    const fundLock = {
+      purpose: 'raw_materials',
+      lockedTotal,
+      cashBalance,
+      availableForOperations: cashBalance === null ? null : cashBalance - lockedTotal,
+      locks,
+    };
 
     const materialByProject = new Map<string, number>();
     for (const row of costings) {
@@ -60,7 +72,7 @@ export async function GET(req: Request) {
       { projectName: 'No active projects', salesRevenue: 0, materialCosts: 0, laborPayrollExpenses: 0, deliveryFees: 0 },
     ]);
 
-    return NextResponse.json({ success: true, dashboard });
+    return NextResponse.json({ success: true, dashboard, fundLock });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Financial dashboard failed' }, { status: 500 });
   }

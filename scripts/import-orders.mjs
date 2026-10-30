@@ -31,7 +31,9 @@ const ALIASES = {
   design: 'S03_DESIGN_APPROVAL', mockup: 'S03_DESIGN_APPROVAL', artwork: 'S03_DESIGN_APPROVAL',
   quote: 'S04_QUOTATION', quotation: 'S04_QUOTATION',
   deposit: 'S05_DEPOSIT', dp: 'S05_DEPOSIT', downpayment: 'S05_DEPOSIT', awaiting_deposit: 'S05_DEPOSIT',
-  sizing: 'S06_SIZING', size: 'S06_SIZING', names: 'S06_SIZING', deposit_verified: 'S06_SIZING', paid: 'S06_SIZING', verified: 'S06_SIZING',
+  sizing: 'S06_SIZING', size: 'S06_SIZING', names: 'S06_SIZING', deposit_verified: 'S06_SIZING', verified: 'S06_SIZING',
+  paid: 'S10_BALANCE', fullpaid: 'S10_BALANCE', 'full paid': 'S10_BALANCE', binayaran: 'S10_BALANCE',
+  dp: 'S05_DEPOSIT', downpayment: 'S05_DEPOSIT', 'down payment': 'S05_DEPOSIT',
   sample: 'S07_SAMPLE', prototype: 'S07_SAMPLE',
   production: 'S08_PRODUCTION', cutting: 'S08_PRODUCTION', cut: 'S08_PRODUCTION', embroidery: 'S08_PRODUCTION', burda: 'S08_PRODUCTION', sewing: 'S08_PRODUCTION', tahi: 'S08_PRODUCTION', po_drafted: 'S08_PRODUCTION',
   qc: 'S09_QC', checking: 'S09_QC',
@@ -160,6 +162,21 @@ await fetch(`${supabaseUrl}/rest/v1/order_events`, {
   method: 'POST',
   headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json' },
   body: JSON.stringify(inserted.map((order) => ({ order_id: order.id, to_stage: order.stage, note: 'Imported from CSV' }))),
+  signal: AbortSignal.timeout(30000),
+});
+await fetch(`${supabaseUrl}/rest/v1/crm_contacts?on_conflict=channel,external_id`, {
+  method: 'POST',
+  headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+  body: JSON.stringify(orders.map((order) => ({
+    channel: 'csv_import',
+    external_id: order.contact_phone || order.client_name,
+    name: order.client_name,
+    phone: order.contact_phone,
+    stage: 'won',
+    orders_count: 1,
+    lifetime_value: order.total_amount,
+    notes: `Imported from CSV: ${order.project_name || order.order_number}`,
+  }))),
   signal: AbortSignal.timeout(30000),
 });
 console.log(`✅ Imported ${inserted.length} order(s). They will appear in the next 6AM/1PM client pulse.`);

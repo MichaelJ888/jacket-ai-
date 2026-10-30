@@ -1,4 +1,5 @@
 ﻿import { draftPurchaseOrders } from './bom';
+import { recordLedgerEntry } from './ceo-finance';
 import { completeSubconJobsForOrder } from './payroll';
 import { canTransition, DEFAULT_ORDER_STAGE, DEPOSIT_STAGE_NO, defaultDepositAmount, requiresDepositFirst, stageNumber } from './order-stages';
 import { normalizeOrderSpec, orderSpecToColumns, type OrderSpec } from './order-spec';
@@ -97,6 +98,24 @@ export async function confirmDeposit(orderId: string, verificationId: string | n
   if (!supabase || !order) return { ok: false, error: 'Order not found' };
   if (order.stage === 'S05_DEPOSIT' || order.stage === 'ON_HOLD') {
     await setStage(order, 'S06_SIZING', 'Deposit verified by staff', verificationId ? { deposit_verification_id: verificationId } : {});
+  }
+
+  // Cash-in and the materials reserve: book the D.P. as income once (reference is unique) and lock it for raw materials only.
+  const depositAmount = Number(order.deposit_amount || 0);
+  if (depositAmount > 0) {
+    await recordLedgerEntry({
+      type: 'income',
+      category: 'down_payment',
+      amount: depositAmount,
+      projectName: order.project_name,
+      description: `D.P. verified for ${order.order_number}`,
+      source: 'deposit',
+      reference: `dp:${order.id}`,
+    });
+    await supabase.from('material_fund_locks').upsert(
+      { order_id: order.id, order_number: order.order_number, project_name: order.project_name, amount: depositAmount, purpose: 'raw_materials', status: 'LOCKED' },
+      { onConflict: 'order_id', ignoreDuplicates: true },
+    );
   }
 
   let drafted: string[] = [];

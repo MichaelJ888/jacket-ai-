@@ -27,6 +27,11 @@ export type OrderStage = PipelineStage | 'COMPLETED' | 'ON_HOLD' | 'CANCELLED';
 export const LEGACY_STAGE_MAP: Record<string, PipelineStage> = {
   AWAITING_DEPOSIT: 'S05_DEPOSIT',
   DEPOSIT_VERIFIED: 'S06_SIZING',
+  // Status-word legacy aliases: "paid"/"full paid" = full balance (S10); "dp"/"downpayment" = S05 only.
+  PAID: 'S10_BALANCE',
+  FULL_PAID: 'S10_BALANCE',
+  DP: 'S05_DEPOSIT',
+  DOWNPAYMENT: 'S05_DEPOSIT',
   PO_DRAFTED: 'S08_PRODUCTION',
   CUTTING: 'S08_PRODUCTION',
   EMBROIDERY: 'S08_PRODUCTION',

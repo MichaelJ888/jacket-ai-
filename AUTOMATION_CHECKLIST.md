@@ -139,3 +139,11 @@ Env: optional `ADMIN_PASSWORD` (separate admin login).
 - The env checker now identifies shared Supabase URL metadata. Production, Preview and Development currently share one URL setting; missing webhook secrets do **not** prove database isolation. No nonproduction credentials were enabled and no nonproduction writes were tested.
 - Follow-up delivery failures no longer consume successful follow-up counts or mark a review request sent. Subcontractor payroll recovery, sewer attendance accrual exclusion and the synchronous swarm's 100-agent ceiling have focused regression coverage; none of those tests issues payments or runs paid models.
 - See `docs/CAPABILITY_AUDIT_2026-10-27.md` for the requested 27-feature matrix, remaining blockers, physical/provider test requirements and exact verification boundaries. Existing schedules were not changed.
+
+### MJIC operations batch (stage aliases, quota, subcons, samples, D.P. lock)
+- Payment aliases: `paid`/`full paid`/`fullpaid`/`binayaran`/`full balance` → S10 (balance). Only `dp`/`downpayment`/`down payment`/`deposit` → S05. Applied in `client-pulse.ts`, `vision-parse.ts`, `order-stages.ts` legacy map, and `scripts/import-orders.mjs`.
+- D.P. lock: `confirmDeposit` books the down payment as ledger income (`dp:<orderId>`) and upserts `material_fund_locks`. Operational payments (non-`raw_materials`) that would dip into locked funds are rejected in `createPaymentRequest` (`fund-guard.ts`). `GET /api/dashboard/financials` returns `fundLock`. Orders verified before this change have no lock until backfilled.
+- New admin routes (Bearer `ADMIN_TOKEN`/`ADMIN_PASSWORD`): `GET|POST /api/production-quota` (targets are unset until set; never invented), `GET|POST /api/subcons` (upsert by name, Telegram notice), `GET|POST|PATCH /api/samples` (LOST/DAMAGED alert). UI: `/dashboard/operations`.
+- New cron: `GET /api/cron/samples` (CRON_SECRET/SCHEDULER_TOKEN), daily 00:30 UTC in `vercel.json`, Telegram alert for OUT samples past `expected_return_at`, once per day per sample.
+- Tables added to `supabase/schema.sql`: `production_quotas`, `subcon_directory`, `sample_items`, `material_fund_locks` (all RLS-locked).
+- `scripts/import-orders.mjs --apply` now also upserts `crm_contacts` (channel `csv_import`, external_id = phone or client name) so CSV clients appear in the admin CRM list.

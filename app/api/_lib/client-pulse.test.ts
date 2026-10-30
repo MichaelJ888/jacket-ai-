@@ -7,7 +7,8 @@ import { ORDER_STAGES, PIPELINE_STAGES, stageNumber } from './order-stages.ts';
 test('resolveStageInput accepts aliases and canonical names', () => {
   assert.equal(resolveStageInput('sewing'), 'S08_PRODUCTION');
   assert.equal(resolveStageInput('qc'), 'S09_QC');
-  assert.equal(resolveStageInput('paid'), 'DEPOSIT_RECEIVED');
+  assert.equal(resolveStageInput('paid'), 'S10_BALANCE');
+  assert.equal(resolveStageInput('dp'), 'S05_DEPOSIT');
   assert.equal(resolveStageInput('READY'), 'S11_DISPATCH');
   assert.equal(resolveStageInput('done'), 'COMPLETED');
   assert.equal(resolveStageInput('hold'), 'ON_HOLD');

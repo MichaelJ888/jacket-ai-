@@ -11,6 +11,7 @@ import {
   type AllocationLine,
   type AllocationRule,
 } from './finance-logic';
+import { evaluateOperationalPayment } from './fund-guard';
 import {
   enqueueOutboundRequest,
   escapeTelegramHtml,
@@ -125,6 +126,14 @@ function lastDayOf(period: string) {
 
 // ---------------- Payments (always CEO-approved) ----------------
 
+// Total down payments still locked for raw materials (LOCKED status only).
+export async function getLockedMaterialFunds() {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return 0;
+  const { data } = await supabase.from('material_fund_locks').select('amount').eq('status', 'LOCKED');
+  return (data || []).reduce((sum, row) => sum + Number(row.amount), 0);
+}
+
 async function paidTodayTotal() {
   const supabase = getSupabaseAdmin();
   if (!supabase) return 0;
@@ -150,6 +159,14 @@ export async function createPaymentRequest(input: {
   const amount = Number(Number(input.amount).toFixed(2));
   const risk = classifyPaymentRisk(amount, { paidTodayTotal: await paidTodayTotal(), highThreshold: HIGH_RISK_THRESHOLD(), dailyCap: DAILY_CAP() });
   if (risk === 'blocked') return { data: null, error: `Blocked by safety limits (daily cap ${formatPeso(DAILY_CAP())}). Ask the CEO to raise PAYMENT_DAILY_CAP if this is intended.` };
+
+  const fund = evaluateOperationalPayment({
+    amount,
+    category: input.category || 'operations',
+    cashBalance: await getCashBalance(),
+    lockedTotal: await getLockedMaterialFunds(),
+  });
+  if (!fund.allowed) return { data: null, error: fund.reason };
 
   const idempotencyKey = createHash('sha256').update(`${input.payee.toLowerCase()}|${amount}|${input.purpose.toLowerCase()}|${manilaToday()}`).digest('hex').slice(0, 40);
   const { data, error } = await supabase.from('payment_requests').insert({

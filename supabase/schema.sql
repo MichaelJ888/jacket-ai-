@@ -974,3 +974,66 @@ begin
   end if;
 end;
 $$;
+
+-- Production quota targets per period (daily, week, half_month, month, quarter=3m, semester=6m, nine_month=9m, year=12m).
+-- Targets stay NULL until the CEO sets them; progress is computed from sewer_output and ledger_entries.
+create table if not exists public.production_quotas (
+  period_kind text primary key check (period_kind in ('daily', 'week', 'half_month', 'month', 'quarter', 'semester', 'nine_month', 'year')),
+  target_pcs numeric check (target_pcs is null or target_pcs >= 0),
+  target_revenue numeric check (target_revenue is null or target_revenue >= 0),
+  updated_at timestamptz not null default now()
+);
+alter table public.production_quotas enable row level security;
+revoke all on public.production_quotas from anon, authenticated;
+
+-- External tahian / subcontractors used when daily volume exceeds the quota.
+create table if not exists public.subcon_directory (
+  id uuid default gen_random_uuid() primary key,
+  name text not null unique,
+  specialty text,
+  contact_phone text,
+  location text,
+  daily_capacity_pcs integer check (daily_capacity_pcs is null or daily_capacity_pcs >= 0),
+  rate_per_pc numeric check (rate_per_pc is null or rate_per_pc >= 0),
+  active boolean not null default true,
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+alter table public.subcon_directory enable row level security;
+revoke all on public.subcon_directory from anon, authenticated;
+
+-- Sample jackets/uniforms/items sent to clients, tracked until returned.
+create table if not exists public.sample_items (
+  id uuid default gen_random_uuid() primary key,
+  item text not null,
+  quantity integer not null default 1 check (quantity > 0),
+  client_name text not null,
+  contact_phone text,
+  order_id uuid,
+  status text not null default 'OUT' check (status in ('OUT', 'RETURNED', 'LOST', 'DAMAGED')),
+  sent_at date not null default ((now() at time zone 'Asia/Manila')::date),
+  expected_return_at date,
+  returned_at timestamptz,
+  overdue_alert_on date,
+  notes text,
+  created_at timestamptz not null default now()
+);
+create index if not exists sample_items_status_idx on public.sample_items (status, expected_return_at);
+alter table public.sample_items enable row level security;
+revoke all on public.sample_items from anon, authenticated;
+
+-- Down payment reserved for raw materials procurement only (one lock per order).
+create table if not exists public.material_fund_locks (
+  order_id uuid primary key,
+  order_number text,
+  project_name text,
+  amount numeric not null check (amount > 0),
+  purpose text not null default 'raw_materials' check (purpose = 'raw_materials'),
+  status text not null default 'LOCKED' check (status in ('LOCKED', 'RELEASED')),
+  locked_at timestamptz not null default now(),
+  released_at timestamptz
+);
+alter table public.material_fund_locks enable row level security;
+revoke all on public.material_fund_locks from anon, authenticated;
+
