@@ -1,12 +1,7 @@
-import { escapeTelegramHtml, sendTelegramMessage } from './integrations';
+import { escapeTelegramHtml, getAnneChatId, sendTelegramMessage } from './integrations';
 import { selectStaleSamplesToAlert, staleSampleDays, STALE_SAMPLE_DAYS, type StaleSampleRow } from './sample-return-logic';
 
 type SupabaseLike = NonNullable<ReturnType<typeof import('./integrations').getSupabaseAdmin>>;
-
-// Ms. Anne Manalo receives the sample retrieval pushes. Uses ANNE_MANALO_TELEGRAM_CHAT_ID when set; otherwise null (owner group fallback).
-export function resolveSampleRetrievalChatId(): string | null {
-  return process.env.ANNE_MANALO_TELEGRAM_CHAT_ID?.trim() || null;
-}
 
 export function buildRetrievalMessage(samples: StaleSampleRow[], today: string) {
   const lines = samples.map((sample) => {
@@ -33,9 +28,10 @@ export async function runStaleSampleRetrieval(supabase: SupabaseLike, today: str
   const due = selectStaleSamplesToAlert((data || []) as StaleSampleRow[], today);
   if (!due.length) return { stale: 0, alerted: 0, recipient: 'none' as const };
 
-  const chatId = resolveSampleRetrievalChatId();
+  // Ms. Anne's chat ID (env, or auto-detected/saved in /admin). Without it, the owner group still gets the alert.
+  const { chatId } = await getAnneChatId();
   const text = buildRetrievalMessage(due, today);
-  await sendTelegramMessage(chatId ? text : `⚠️ Walang Telegram chat ID si Ms. Anne Manalo (set ANNE_MANALO_TELEGRAM_CHAT_ID).\n${text}`);
+  await sendTelegramMessage(chatId ? text : `⚠️ Walang Telegram chat ID si Ms. Anne Manalo (i-save sa /admin o set ANNE_MANALO_TELEGRAM_CHAT_ID).\n${text}`);
 
   await supabase.from('sample_items').update({ stale_alert_on: today }).in('id', due.map((row) => row.id));
   return { stale: due.length, alerted: due.length, recipient: chatId ? ('anne' as const) : ('owner' as const) };

@@ -21,6 +21,7 @@ import {
   createStaffTask,
   answerTelegramCallbackQuery,
   decideMediaAdApproval,
+  detectAndBindAnneChat,
   generateStaffLinkCode,
   getPayrollSummary,
   getStaffByChatId,
@@ -162,6 +163,9 @@ export async function POST(req: Request) {
 
     if (!chatId || (!text && !picked.media && !picked.rejected)) return NextResponse.json({ ok: true });
     if (update?.update_id !== undefined && !(await claimTelegramUpdate(update.update_id))) return NextResponse.json({ ok: true });
+    if (chatType === 'private' && !allowedChatId(chatId)) {
+      await detectAndBindAnneChat(chatId, message.from, chatType).catch((error) => console.error('Anne chat auto-detect failed:', error));
+    }
 
     if (picked.media || picked.rejected) {
       // Voice notes and photos are CEO-only; everyone else's media is ignored.

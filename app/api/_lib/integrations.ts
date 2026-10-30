@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { randomBytes } from 'node:crypto';
 import { sanitizeTelegramText } from './telegram-text.ts';
+import { isMsAnneSender, type TelegramSender } from './anne-chat-logic.ts';
 
 export function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -169,16 +170,58 @@ type TelegramInlineKeyboard = {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
 };
 
-// Ops broadcast recipients: the CEO's group chat first, then Ms. Anne Manalo (when her chat ID is configured).
+export const ANNE_CHAT_SETTING_KEY = 'anne_manalo_chat_id';
+const TELEGRAM_CHAT_ID_PATTERN = /^-?\d{5,20}$/;
+
+export function isValidTelegramChatId(value: string) {
+  return TELEGRAM_CHAT_ID_PATTERN.test(value.trim());
+}
+
+export type AnneChatSource = 'env' | 'saved' | 'none';
+
+// Ms. Anne Manalo's chat ID: the env var wins, otherwise the value saved in ceo_settings
+// (auto-detected from her first private message, or entered in /admin). A DB error degrades to 'none'
+// so the CEO group keeps receiving alerts.
+export async function getAnneChatId(): Promise<{ chatId: string | null; source: AnneChatSource }> {
+  const envId = process.env.ANNE_MANALO_TELEGRAM_CHAT_ID?.trim();
+  if (envId && isValidTelegramChatId(envId)) return { chatId: envId, source: 'env' };
+  try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) return { chatId: null, source: 'none' };
+    const { data, error } = await supabase.from('ceo_settings').select('value').eq('key', ANNE_CHAT_SETTING_KEY).maybeSingle();
+    if (error) throw new Error(error.message);
+    const saved = typeof data?.value === 'string' ? data.value.trim() : '';
+    return saved && isValidTelegramChatId(saved) ? { chatId: saved, source: 'saved' } : { chatId: null, source: 'none' };
+  } catch (error) {
+    console.error('Anne chat ID lookup failed; falling back to owner group:', error instanceof Error ? error.message : error);
+    return { chatId: null, source: 'none' };
+  }
+}
+
+// Saves (or clears, when chatId is null) the DB copy of Ms. Anne's chat ID.
+export async function saveAnneChatId(chatId: string | null) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) throw new Error('Supabase is not configured');
+  if (chatId === null) {
+    const { error } = await supabase.from('ceo_settings').delete().eq('key', ANNE_CHAT_SETTING_KEY);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const { error } = await supabase.from('ceo_settings').upsert({ key: ANNE_CHAT_SETTING_KEY, value: chatId, updated_at: new Date().toISOString() });
+  if (error) throw new Error(error.message);
+}
+
+// Ops broadcast recipients: the CEO's group chat first, then Ms. Anne Manalo (when her chat ID is known).
 // Deduplicated so the same chat never receives a message twice.
-export function getOpsChatIds(): string[] {
-  const ids = [process.env.TELEGRAM_CHAT_ID?.trim(), process.env.ANNE_MANALO_TELEGRAM_CHAT_ID?.trim()].filter((id): id is string => Boolean(id));
+export async function getOpsChatIds(): Promise<string[]> {
+  const anne = await getAnneChatId();
+  const ids = [process.env.TELEGRAM_CHAT_ID?.trim(), anne.chatId].filter((id): id is string => Boolean(id));
   return [...new Set(ids)];
 }
 
 export async function sendTelegramMessage(text: string, replyMarkup?: TelegramInlineKeyboard) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = getOpsChatIds();
+  const chatIds = await getOpsChatIds();
   if (!token || !chatIds.length) return false;
   // Inline buttons only go to the primary (CEO) chat; the copy to Ms. Anne is plain text so she can't trigger CEO-only callbacks.
   const sends = chatIds.map(async (chatId, index) => {
@@ -227,7 +270,7 @@ export async function removeTelegramInlineKeyboard(chatId: string, messageId: nu
 // a public http(s) URL (sent directly) or a data: URL (uploaded as multipart).
 export async function sendTelegramPhoto(imageSource: string, caption: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = getOpsChatIds();
+  const chatIds = await getOpsChatIds();
   if (!token || !chatIds.length || !imageSource) return;
 
   const isUrl = /^https?:\/\//i.test(imageSource);
@@ -636,6 +679,22 @@ export async function sendTelegramDirectMessage(chatId: string, text: string) {
   }
 }
 
+// Auto-links Ms. Anne Manalo from her first private message to the bot. Never overwrites a saved ID,
+// and an env-configured ID stays authoritative. Returns true only when a new ID was saved.
+export async function detectAndBindAnneChat(chatId: string | number, from: TelegramSender, chatType: string | undefined) {
+  if (chatType !== 'private' || !isMsAnneSender(from)) return false;
+  const current = await getAnneChatId();
+  if (current.source === 'env' || current.chatId) return false;
+  const id = String(chatId);
+  if (!isValidTelegramChatId(id)) return false;
+  await saveAnneChatId(id);
+  await sendTelegramDirectMessage(id, 'Salamat po! Naka-link na ang Telegram ninyo sa MJIC. Makakatanggap na po kayo ng mga alerto para sa sample retrieval.');
+  const ceoChat = process.env.TELEGRAM_CHAT_ID?.trim();
+  const name = [from?.first_name, from?.last_name].filter(Boolean).join(' ');
+  if (ceoChat) await sendTelegramDirectMessage(ceoChat, `✅ Auto-detect: naka-link na si ${name} (chat ${id}). Makakatanggap na siya ng mga alerto. Pwede itong palitan sa /admin.`);
+  return true;
+}
+
 const bossVoiceModel = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
 // Rewrites a plain instruction into the boss's natural, personal Taglish texting
@@ -747,7 +806,7 @@ export async function deductInventoryForOrder(materials: Array<{ material: strin
 
 export async function sendTelegramDocument(file: Uint8Array, filename: string, caption: string, mimeType = 'application/pdf') {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatIds = getOpsChatIds();
+  const chatIds = await getOpsChatIds();
   if (!token || !chatIds.length) return;
   await Promise.all(chatIds.map(async (chatId) => {
     try {
