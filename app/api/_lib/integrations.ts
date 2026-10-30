@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { randomBytes } from 'node:crypto';
 import { sanitizeTelegramText } from './telegram-text.ts';
-import { isMsAnneSender, type TelegramSender } from './anne-chat-logic.ts';
+import { isAnneFirstNameSender, isMsAnneSender, type TelegramSender } from './anne-chat-logic.ts';
 
 export function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -665,33 +665,44 @@ export async function completeLatestTaskForStaff(staffName: string) {
 
 // Sends a message to a specific Telegram chat (e.g. a linked staff member's DM),
 // distinct from sendTelegramMessage/sendTelegramPhoto which broadcast to the ops chat.
-export async function sendTelegramDirectMessage(chatId: string, text: string) {
+// Returns true when Telegram accepted the message. A user who never started a private chat with the bot is refused.
+export async function sendTelegramDirectMessage(chatId: string, text: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token || !chatId) return;
+  if (!token || !chatId) return false;
   try {
-    await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const response = await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: chatId, text: sanitizeTelegramText(text) }),
     });
+    return Boolean(response?.ok);
   } catch (error) {
     console.error('Telegram direct message failed:', error);
+    return false;
   }
 }
 
-// Auto-links Ms. Anne Manalo from her first private message to the bot. Never overwrites a saved ID,
+// Auto-links Ms. Anne Manalo. Matches her exact full name in a private chat with the bot, or her first name
+// when she posts in the CEO group. The saved ID is her user ID (her private-chat ID). Never overwrites a saved ID,
 // and an env-configured ID stays authoritative. Returns true only when a new ID was saved.
 export async function detectAndBindAnneChat(chatId: string | number, from: TelegramSender, chatType: string | undefined) {
-  if (chatType !== 'private' || !isMsAnneSender(from)) return false;
+  const ceoChat = process.env.TELEGRAM_CHAT_ID?.trim();
+  const privateMatch = chatType === 'private' && isMsAnneSender(from);
+  const ceoGroupMatch = chatType !== 'private' && !!ceoChat && String(chatId) === ceoChat && isAnneFirstNameSender(from);
+  if (!privateMatch && !ceoGroupMatch) return false;
   const current = await getAnneChatId();
   if (current.source === 'env' || current.chatId) return false;
-  const id = String(chatId);
+  const id = String(ceoGroupMatch ? from?.id : chatId);
   if (!isValidTelegramChatId(id)) return false;
   await saveAnneChatId(id);
-  await sendTelegramDirectMessage(id, 'Salamat po! Naka-link na ang Telegram ninyo sa MJIC. Makakatanggap na po kayo ng mga alerto para sa sample retrieval.');
-  const ceoChat = process.env.TELEGRAM_CHAT_ID?.trim();
+  const delivered = await sendTelegramDirectMessage(id, 'Salamat po! Naka-link na ang Telegram ninyo sa MJIC. Makakatanggap na po kayo ng mga alerto para sa sample retrieval.');
   const name = [from?.first_name, from?.last_name].filter(Boolean).join(' ');
-  if (ceoChat) await sendTelegramDirectMessage(ceoChat, `✅ Auto-detect: naka-link na si ${name} (chat ${id}). Makakatanggap na siya ng mga alerto. Pwede itong palitan sa /admin.`);
+  if (ceoChat) {
+    const status = delivered
+      ? 'Makakatanggap na siya ng mga alerto.'
+      : 'Naka-save na ang ID pero hindi pa ma-DM. Kailangan muna niyang i-/start ang bot sa private chat.';
+    await sendTelegramDirectMessage(ceoChat, `✅ Auto-detect: naka-link na si ${name} (chat ${id}). ${status} Pwede itong palitan sa /admin.`);
+  }
   return true;
 }
 

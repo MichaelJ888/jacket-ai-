@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { isMsAnneSender } from './anne-chat-logic.ts';
+import { isAnneFirstNameSender, isMsAnneSender } from './anne-chat-logic.ts';
+
+test('matches a first name "Anne" posted in the CEO group, case-insensitive', () => {
+  assert.equal(isAnneFirstNameSender({ first_name: 'Anne' }), true);
+  assert.equal(isAnneFirstNameSender({ first_name: ' anne ', last_name: 'Cruz' }), true);
+  assert.equal(isAnneFirstNameSender({ first_name: 'Joanne' }), false);
+  assert.equal(isAnneFirstNameSender({ first_name: 'Juan' }), false);
+  assert.equal(isAnneFirstNameSender(undefined), false);
+});
 
 test('matches the exact full name "Anne Manalo", case-insensitive', () => {
   assert.equal(isMsAnneSender({ first_name: 'Anne', last_name: 'Manalo' }), true);
