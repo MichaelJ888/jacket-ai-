@@ -106,7 +106,21 @@ Env: optional `ADMIN_PASSWORD` (separate admin login).
 - `TELEGRAM_WEBHOOK_SECRET` — if set, `/api/telegram-webhook` requires the matching `X-Telegram-Bot-Api-Secret-Token` (re-run Telegram `setWebhook` with `secret_token`).
 - All guards fail closed when no token is configured. Rate limits (Postgres `rate_limit_hit`, fail-open): chat 20/min, leads 5/5min, payment-verify 6/5min, telegram-notify 5/5min, proofs 30/5min, telegram-webhook 120/min, per IP.
 
-## Cloud pull-request validation
+## Visual editor & analytics dashboard (2026-era batch)
+| Route | Auth | Purpose |
+|---|---|---|
+| `/admin/editor` (page) | Editor session cookie | Visual CMS: inline text, image swap, card reorder, theme colours, Publish. Stage 1 password (`EDITOR_PASSWORD`), stage 2 Telegram OTP to chat 7329264426 or `TELEGRAM_CEO_USER_ID`. |
+| `/api/site` | Public, `no-store` | Published site document. `public/site-cms.js` polls it every 20 s. |
+| `/api/admin/editor/login`, `/verify` | Password (+ OTP) | Issues the 6-digit OTP via Telegram DM, then sets the httpOnly `mjic_editor` cookie (8 h). |
+| `/api/admin/editor` GET / POST / DELETE | Editor cookie | Read draft, publish (sanitised), sign out. |
+| `/api/admin/editor/media` | Editor cookie | Image upload (PNG/JPEG/WebP/GIF, 5 MB) to public bucket `site-media`. |
+| `/api/admin/analytics` | Admin bearer | 14-day Manila-time enquiries, orders, sample status, log severity, job heartbeats, alert metrics. Feeds the `/admin` Dashboard tab. |
+
+- Storage: table `site_content` (key `site` for the document, `editor_otp:<chatId>` for OTP hashes). RLS on, service role only.
+- `EDITOR_PASSWORD` must be set in `.env.local` and on Vercel production. It is in `PRODUCTION_SYNC_KEYS`. Session and OTP keys are derived from it.
+- Cron run history is not stored as a table. The dashboard uses `job_heartbeats` (last run and status). Alert metrics are derived from `system_logs` and `outbound_request_queue`.
+- Tests: `app/api/_lib/site-content-logic.test.ts`, `app/api/_lib/analytics-logic.test.ts`. Run with `node --test <file>` (Node 24 strips types).
+
 - `.github/workflows/ci.yml` runs `npm ci`, lint, tests, and `next build --webpack` on pull requests. It needs no application secrets, does not deploy, and does not let an agent change code.
 - To make it a merge gate, configure the target branch's GitHub ruleset/branch protection to require one approving review and the `CI / Validate` status check. Workflow runs alone do not enforce either rule.
 - The workflow uses GitHub-hosted runners and caches npm/Next.js build data. AI reviewer/model calls are intentionally not enabled; add them only after selecting a provider, budget, and token permissions.

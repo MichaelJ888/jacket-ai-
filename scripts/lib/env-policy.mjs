@@ -8,7 +8,7 @@ export const REQUIRED_ENV = [
 ];
 
 export const META_ENV = ['META_PAGE_ID', 'META_PAGE_ACCESS_TOKEN'];
-export const PRODUCTION_SYNC_KEYS = [...REQUIRED_ENV, ...META_ENV, 'APP_BASE_URL'];
+export const PRODUCTION_SYNC_KEYS = [...REQUIRED_ENV, ...META_ENV, 'APP_BASE_URL', 'EDITOR_PASSWORD'];
 export const TARGETS = ['production', 'preview', 'development'];
 
 export function auditEnvironment(local, envs) {

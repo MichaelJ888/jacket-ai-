@@ -1051,3 +1051,12 @@ alter table public.sample_items add column if not exists stale_alert_on date;
 -- Subcon quick-dispatch: Facebook Page username / id used to build an m.me link.
 alter table public.subcon_directory add column if not exists messenger_handle text;
 
+-- Visual editor: one JSON document per key ('site' = live page content; 'editor_otp:<chatId>' = short-lived login codes).
+create table if not exists public.site_content (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.site_content enable row level security;
+revoke all on public.site_content from anon, authenticated;
+
