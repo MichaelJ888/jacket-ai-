@@ -44,6 +44,23 @@ test('sanitizeSiteDoc rejects non-object input and oversized text', () => {
   assert.equal(sanitizeSiteDoc({ texts: { k: 'x'.repeat(2001) } }).ok, false);
 });
 
+test('sanitizeSiteDoc keeps section order and defaults it when absent', () => {
+  const result = sanitizeSiteDoc({ sectionOrder: ['#catalog', 'section:3', '#faq'] });
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.doc.sectionOrder, ['#catalog', 'section:3', '#faq']);
+  const missing = sanitizeSiteDoc({});
+  assert.equal(missing.ok, true);
+  if (missing.ok) assert.deepEqual(missing.doc.sectionOrder, []);
+});
+
+test('sanitizeSiteDoc rejects malformed section order', () => {
+  assert.equal(sanitizeSiteDoc({ sectionOrder: '#top' }).ok, false);
+  assert.equal(sanitizeSiteDoc({ sectionOrder: [1] }).ok, false);
+  assert.equal(sanitizeSiteDoc({ sectionOrder: Array.from({ length: 201 }, (_, i) => `s${i}`) }).ok, false);
+  assert.equal(sanitizeSiteDoc({ sectionOrder: ['x'.repeat(301)] }).ok, false);
+});
+
 test('isEditorChatAllowed allows only the CEO and Anne Manalo', () => {
   assert.equal(isEditorChatAllowed('7329264426', '111'), true);
   assert.equal(isEditorChatAllowed('111', '111'), true);

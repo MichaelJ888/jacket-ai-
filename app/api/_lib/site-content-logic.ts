@@ -6,6 +6,7 @@ export type SiteDoc = {
   texts: Record<string, string>;
   images: Record<string, string>;
   catalogOrder: string[];
+  sectionOrder: string[];
   updatedAt: string | null;
 };
 
@@ -27,7 +28,7 @@ const MAX_URL = 2000;
 export const DEFAULT_THEME: SiteTheme = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF' };
 
 export function emptySiteDoc(): SiteDoc {
-  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], updatedAt: null };
+  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], sectionOrder: [], updatedAt: null };
 }
 
 type SanitizeResult = { ok: true; doc: SiteDoc } | { ok: false; error: string };
@@ -53,12 +54,23 @@ export function sanitizeSiteDoc(input: unknown): SanitizeResult {
     if (!IMAGE_URL.test(url)) return { ok: false, error: 'Image URLs must be https:// or start with /.' };
   }
 
-  const order = Array.isArray(raw.catalogOrder) ? raw.catalogOrder : [];
-  if (order.length > 200 || order.some((id) => typeof id !== 'string' || id.length > MAX_KEY)) {
-    return { ok: false, error: 'Invalid catalog order.' };
-  }
+  const catalog = pickKeyList(raw.catalogOrder, 'catalog order');
+  if (!catalog.ok) return catalog;
+  const sections = pickKeyList(raw.sectionOrder, 'section order');
+  if (!sections.ok) return sections;
 
-  return { ok: true, doc: { theme, texts: texts.value, images: images.value, catalogOrder: order as string[], updatedAt: null } };
+  return {
+    ok: true,
+    doc: { theme, texts: texts.value, images: images.value, catalogOrder: catalog.value, sectionOrder: sections.value, updatedAt: null },
+  };
+}
+
+function pickKeyList(value: unknown, label: string): { ok: true; value: string[] } | { ok: false; error: string } {
+  if (value === undefined || value === null) return { ok: true, value: [] };
+  if (!Array.isArray(value) || value.length > 200 || value.some((id) => typeof id !== 'string' || id.length > MAX_KEY)) {
+    return { ok: false, error: `Invalid ${label}.` };
+  }
+  return { ok: true, value: value as string[] };
 }
 
 function pickStrings(value: unknown, maxEntries: number, maxLength: number, label: string): { ok: true; value: Record<string, string> } | { ok: false; error: string } {

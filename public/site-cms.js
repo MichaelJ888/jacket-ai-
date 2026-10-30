@@ -12,6 +12,63 @@
   var lastJson = '';
   var scheduled = false;
   var dragged = null;
+  var dragSection = null;
+  var sectionDragging = false;
+  var sectionSlots = null;
+
+  function sectionNodes() {
+    return [].slice.call(document.body.children).filter(function (el) { return el.tagName === 'SECTION'; });
+  }
+
+  // Keys are taken from the original DOM order once, so later moves never change the keys of the text/images inside a section.
+  function stampSections() {
+    if (sectionSlots || !document.body) return;
+    sectionSlots = [];
+    var secs = sectionNodes();
+    for (var i = 0; i < secs.length; i++) {
+      if (!secs[i].hasAttribute('data-cms-section')) secs[i].setAttribute('data-cms-section', secs[i].id ? '#' + secs[i].id : 'section:' + i);
+      var slot = document.createComment('cms-slot');
+      secs[i].parentNode.insertBefore(slot, secs[i]);
+      sectionSlots.push(slot);
+    }
+  }
+
+  function applySectionOrder(order) {
+    if (!sectionSlots || sectionDragging) return;
+    var secs = sectionNodes();
+    var byKey = {};
+    for (var i = 0; i < secs.length; i++) byKey[secs[i].getAttribute('data-cms-section')] = secs[i];
+    var target = [];
+    var seen = {};
+    for (var j = 0; j < order.length; j++) {
+      var s = byKey[order[j]];
+      if (s && !seen[order[j]]) { seen[order[j]] = true; target.push(s); }
+    }
+    for (var k = 0; k < secs.length; k++) {
+      if (!seen[secs[k].getAttribute('data-cms-section')]) target.push(secs[k]);
+    }
+    var same = true;
+    for (var m = 0; m < secs.length; m++) if (secs[m] !== target[m]) { same = false; break; }
+    if (same) return;
+    for (var n = 0; n < target.length && n < sectionSlots.length; n++) {
+      if (sectionSlots[n].parentNode) sectionSlots[n].parentNode.insertBefore(target[n], sectionSlots[n]);
+    }
+  }
+
+  function decorateSections() {
+    var secs = sectionNodes();
+    for (var i = 0; i < secs.length; i++) {
+      if (secs[i].querySelector('[data-cms-handle]')) continue;
+      if (getComputedStyle(secs[i]).position === 'static') secs[i].style.position = 'relative';
+      var handle = document.createElement('div');
+      handle.setAttribute('data-cms-ignore', '');
+      handle.setAttribute('data-cms-handle', '');
+      handle.setAttribute('draggable', 'true');
+      handle.textContent = '\u2630 Move section';
+      handle.style.cssText = 'position:absolute;top:8px;right:8px;z-index:60;background:#B8912F;color:#fff;font:600 12px/1 sans-serif;padding:6px 10px;border-radius:6px;cursor:grab;user-select:none;box-shadow:0 2px 6px rgba(0,0,0,.25)';
+      secs[i].appendChild(handle);
+    }
+  }
 
   function stampCards() {
     var cards = document.querySelectorAll('#catalog > div.grid > div');
@@ -27,6 +84,7 @@
     var node = el;
     while (node && node.nodeType === 1 && node !== document.body) {
       if (node.hasAttribute('data-cms-card')) { segs.unshift('card:' + node.getAttribute('data-cms-card')); break; }
+      if (node.hasAttribute('data-cms-section')) { segs.unshift(node.getAttribute('data-cms-section')); break; }
       if (node.id) { segs.unshift('#' + node.id); break; }
       var parent = node.parentElement;
       if (!parent) break;
@@ -90,13 +148,16 @@
     }
     var cards = document.querySelectorAll('#catalog > div.grid > div[data-cms-card]');
     for (var j = 0; j < cards.length; j++) cards[j].setAttribute('draggable', 'true');
+    decorateSections();
   }
 
   function apply() {
     stampCards();
+    stampSections();
     if (doc) {
       var active = document.activeElement;
       applyTheme(doc.theme || DEFAULT_THEME);
+      applySectionOrder(doc.sectionOrder || []);
       var byKey = {};
       var texts = textCandidates();
       for (var i = 0; i < texts.length; i++) byKey[pathKey(texts[i])] = texts[i];
@@ -133,6 +194,7 @@
     doc.texts = doc.texts || {};
     doc.images = doc.images || {};
     doc.catalogOrder = doc.catalogOrder || [];
+    doc.sectionOrder = doc.sectionOrder || [];
     apply();
   }
 
@@ -210,6 +272,15 @@
     }, true);
 
     document.addEventListener('dragstart', function (e) {
+      var handle = e.target.closest && e.target.closest('[data-cms-handle]');
+      if (handle && handle.parentElement) {
+        dragSection = handle.parentElement;
+        sectionDragging = true;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', dragSection.getAttribute('data-cms-section'));
+        dragSection.style.opacity = '0.6';
+        return;
+      }
       var card = cardAt(e.target);
       if (!card) return;
       dragged = card;
@@ -219,6 +290,16 @@
     });
 
     document.addEventListener('dragover', function (e) {
+      if (dragSection) {
+        var over = e.target.closest && e.target.closest('body > section');
+        if (!over || over === dragSection) return;
+        e.preventDefault();
+        var box = over.getBoundingClientRect();
+        var before = e.clientY < box.top + box.height / 2;
+        if (before) over.parentNode.insertBefore(dragSection, over);
+        else over.parentNode.insertBefore(dragSection, over.nextSibling);
+        return;
+      }
       if (!dragged) return;
       var target = cardAt(e.target);
       if (!target || target === dragged) return;
@@ -231,9 +312,18 @@
       list.forEach(function (c, i) { c.style.order = String(i); });
     });
 
-    document.addEventListener('drop', function (e) { if (dragged) e.preventDefault(); });
+    document.addEventListener('drop', function (e) { if (dragged || dragSection) e.preventDefault(); });
 
     document.addEventListener('dragend', function () {
+      if (dragSection) {
+        dragSection.style.opacity = '';
+        var order = sectionNodes().map(function (s) { return s.getAttribute('data-cms-section'); });
+        dragSection = null;
+        sectionDragging = false;
+        if (doc) doc.sectionOrder = order;
+        emit({ type: 'sections', sectionOrder: order });
+        return;
+      }
       if (!dragged) return;
       dragged.style.opacity = '';
       var keys = currentCards().map(function (c) { return c.getAttribute('data-cms-card'); });
@@ -251,6 +341,7 @@
   var observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
+  stampSections();
   if (EDITOR) {
     emit({ type: 'ready' });
   } else {

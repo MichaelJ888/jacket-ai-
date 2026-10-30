@@ -12,6 +12,7 @@ type FrameMessage = {
   value?: string;
   url?: string;
   catalogOrder?: string[];
+  sectionOrder?: string[];
 };
 
 async function readJson<T>(response: Response): Promise<T & { error?: string }> {
@@ -94,6 +95,9 @@ export default function EditorPage() {
         }
         if (message.type === 'order' && Array.isArray(message.catalogOrder)) {
           return { ...prev, catalogOrder: message.catalogOrder };
+        }
+        if (message.type === 'sections' && Array.isArray(message.sectionOrder)) {
+          return { ...prev, sectionOrder: message.sectionOrder };
         }
         return prev;
       });
@@ -228,7 +232,7 @@ export default function EditorPage() {
     <main className="flex h-screen flex-col bg-zinc-100">
       <header className="flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
         <h1 className="mr-2 text-base font-bold text-zinc-900">Visual Editor</h1>
-        <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to replace it · Drag catalogue cards to reorder</span>
+        <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to replace it · Drag ☰ Move section or catalogue cards to reorder</span>
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {draft && (
             <>
