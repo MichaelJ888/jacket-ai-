@@ -16,6 +16,7 @@
     "voice:setup": "node scripts/retell-setup.mjs",
     "bootstrap": "node scripts/bootstrap.mjs",
     "smoke": "node scripts/smoke.mjs",
+    "verify:live": "node scripts/verify-live-system.mjs",
     "meta:heal": "node scripts/meta-heal.mjs",
     "env:check": "node scripts/sync-env-check.mjs",
     "runner:check": "node scripts/bootstrap-secrets.mjs",
