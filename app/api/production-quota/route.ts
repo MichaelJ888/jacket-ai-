@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../_lib/auth';
 import { buildQuotaProgress, isQuotaKind, manilaToday, planSubconOverflow, quotaWindow, type QuotaTarget } from '../_lib/production-quota-logic';
 import { getSupabaseAdmin } from '../_lib/integrations';
+import { buildQuotaFormulaRows } from '../_lib/quota-engine-logic';
 
 // GET: progress for every quota period (targets vs. actual sewer output and income). Optional ?date=YYYY-MM-DD.
 export async function GET(req: Request) {
@@ -34,7 +35,8 @@ export async function GET(req: Request) {
 
   const dailyRow = progress.find((row) => row.kind === 'daily');
   const subcon = planSubconOverflow(dailyRow?.actualPcs || 0, dailyRow?.targetPcs ?? null, subconsResult.data || []);
-  return NextResponse.json({ success: true, today, progress, subcon });
+  const formula = buildQuotaFormulaRows(today, targets);
+  return NextResponse.json({ success: true, today, progress, subcon, formula });
 }
 
 // POST: set or clear a target. Body: { period_kind, target_pcs?, target_revenue? } (null clears a value).

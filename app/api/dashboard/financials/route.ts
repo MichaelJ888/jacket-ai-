@@ -3,6 +3,7 @@ import { isAdminAuthorized } from '../../_lib/auth';
 
 import { getSupabaseAdmin } from '../../_lib/integrations';
 import { getCashBalance } from '../../_lib/ceo-finance';
+import { evaluateFundLockAlert } from '../../_lib/fund-lock-alert-logic';
 import { buildFinancialDashboard, type FinancialProjectInput } from '../../../dashboard/financials/financial-logic';
 
 function toNumber(value: unknown, fallback = 0) {
@@ -37,6 +38,7 @@ export async function GET(req: Request) {
       cashBalance,
       availableForOperations: cashBalance === null ? null : cashBalance - lockedTotal,
       locks,
+      alert: evaluateFundLockAlert({ cashBalance, lockedTotal }),
     };
 
     const materialByProject = new Map<string, number>();
