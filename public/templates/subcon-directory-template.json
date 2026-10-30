@@ -1,0 +1,12 @@
+[
+  {
+    "name": "HALIMBAWA - palitan o burahin bago i-import",
+    "specialty": "embroidery",
+    "contact_phone": "09XXXXXXXXX",
+    "location": "Quezon City",
+    "daily_capacity_pcs": 100,
+    "rate_per_pc": 25,
+    "messenger_handle": "example.page.username",
+    "notes": "Ito ay halimbawang row lamang. Burahin ang object na ito bago mag-import."
+  }
+]

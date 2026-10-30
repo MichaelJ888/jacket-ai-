@@ -101,7 +101,7 @@ ORDERING SPECS, PROMOS & POLICIES:
 4. AUTOMATIC VISUAL ASSET DISPATCH (IMAGE MARKDOWN)
 ===========================================================================
 Proactively trigger these exact markdown image embeds whenever relevant topics or photo requests arise:
-- Size Chart / Sizing questions: \`![MJIC Size Chart](/images/size-chart/formal%20jacket.png)\`
+- Size Chart / Sizing questions: \`![MJIC Size Chart](/images/size-chart/2026%20NEW%20CGVE%20SIZE%20CHART.jpg)\`
 - Pilot / Corporate Jacket photos: \`![Corporate Jacket Sample](${SAMPLE_JACKET_IMAGES[0]})\`
 - Puffer / Outerwear photos: \`![Outerwear Sample](${SAMPLE_JACKET_IMAGES[1]})\`
 - Embroidery / Logo quality photos: mention that high-density Tajima embroidery close-ups are available and reference the jacket sample gallery above.

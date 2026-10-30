@@ -976,7 +976,8 @@ end;
 $$;
 
 -- Production quota targets per period (daily, week, half_month, month, quarter=3m, semester=6m, nine_month=9m, year=12m).
--- Targets stay NULL until the CEO sets them; progress is computed from sewer_output and ledger_entries.
+-- Progress is computed from sewer_output and ledger_entries. Mock starting targets below are seeded once
+-- (on conflict do nothing), so any target the CEO already set or cleared is never overwritten.
 create table if not exists public.production_quotas (
   period_kind text primary key check (period_kind in ('daily', 'week', 'half_month', 'month', 'quarter', 'semester', 'nine_month', 'year')),
   target_pcs numeric check (target_pcs is null or target_pcs >= 0),
@@ -985,6 +986,12 @@ create table if not exists public.production_quotas (
 );
 alter table public.production_quotas enable row level security;
 revoke all on public.production_quotas from anon, authenticated;
+
+-- Mock starting quota (pcs only; revenue stays unset). Daily quota is derived from these by quota-engine-logic.
+insert into public.production_quotas (period_kind, target_pcs) values
+  ('month', 1000),
+  ('year', 12000)
+on conflict (period_kind) do nothing;
 
 -- External tahian / subcontractors used when daily volume exceeds the quota.
 create table if not exists public.subcon_directory (

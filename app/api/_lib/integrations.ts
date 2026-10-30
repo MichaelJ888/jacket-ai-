@@ -169,26 +169,38 @@ type TelegramInlineKeyboard = {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
 };
 
+// Ops broadcast recipients: the CEO's group chat first, then Ms. Anne Manalo (when her chat ID is configured).
+// Deduplicated so the same chat never receives a message twice.
+export function getOpsChatIds(): string[] {
+  const ids = [process.env.TELEGRAM_CHAT_ID?.trim(), process.env.ANNE_MANALO_TELEGRAM_CHAT_ID?.trim()].filter((id): id is string => Boolean(id));
+  return [...new Set(ids)];
+}
+
 export async function sendTelegramMessage(text: string, replyMarkup?: TelegramInlineKeyboard) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return false;
-  try {
-    const response = await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: sanitizeTelegramText(text),
-        parse_mode: 'HTML',
-        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
-      }),
-    });
-    return Boolean(response?.ok);
-  } catch (error) {
-    console.error('Telegram sendMessage failed:', error);
-    return false;
-  }
+  const chatIds = getOpsChatIds();
+  if (!token || !chatIds.length) return false;
+  // Inline buttons only go to the primary (CEO) chat; the copy to Ms. Anne is plain text so she can't trigger CEO-only callbacks.
+  const sends = chatIds.map(async (chatId, index) => {
+    try {
+      const response = await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: sanitizeTelegramText(text),
+          parse_mode: 'HTML',
+          ...(replyMarkup && index === 0 ? { reply_markup: replyMarkup } : {}),
+        }),
+      });
+      return Boolean(response?.ok);
+    } catch (error) {
+      console.error('Telegram sendMessage failed:', error);
+      return false;
+    }
+  });
+  const results = await Promise.all(sends);
+  return results[0] === true;
 }
 
 export async function answerTelegramCallbackQuery(callbackQueryId: string, text: string) {
@@ -215,32 +227,35 @@ export async function removeTelegramInlineKeyboard(chatId: string, messageId: nu
 // a public http(s) URL (sent directly) or a data: URL (uploaded as multipart).
 export async function sendTelegramPhoto(imageSource: string, caption: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId || !imageSource) return;
+  const chatIds = getOpsChatIds();
+  if (!token || !chatIds.length || !imageSource) return;
 
-  try {
-    if (/^https?:\/\//i.test(imageSource)) {
-      await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, photo: imageSource, caption: sanitizeTelegramText(caption), parse_mode: 'HTML' }),
-      });
-      return;
+  const isUrl = /^https?:\/\//i.test(imageSource);
+  const dataMatch = isUrl ? null : imageSource.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!isUrl && !dataMatch) return;
+
+  await Promise.all(chatIds.map(async (chatId) => {
+    try {
+      if (isUrl) {
+        await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, photo: imageSource, caption: sanitizeTelegramText(caption), parse_mode: 'HTML' }),
+        });
+        return;
+      }
+      const [, mimeType, base64Data] = dataMatch as RegExpMatchArray;
+      const buffer = Buffer.from(base64Data, 'base64');
+      const form = new FormData();
+      form.set('chat_id', chatId);
+      form.set('caption', sanitizeTelegramText(caption));
+      form.set('parse_mode', 'HTML');
+      form.set('photo', new Blob([buffer], { type: mimeType }), `logo.${mimeType.split('/')[1] || 'png'}`);
+      await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form });
+    } catch (error) {
+      console.error('Telegram sendPhoto failed:', error);
     }
-
-    const match = imageSource.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
-    if (!match) return;
-    const [, mimeType, base64Data] = match;
-    const buffer = Buffer.from(base64Data, 'base64');
-    const form = new FormData();
-    form.set('chat_id', chatId);
-    form.set('caption', sanitizeTelegramText(caption));
-    form.set('parse_mode', 'HTML');
-    form.set('photo', new Blob([buffer], { type: mimeType }), `logo.${mimeType.split('/')[1] || 'png'}`);
-    await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form });
-  } catch (error) {
-    console.error('Telegram sendPhoto failed:', error);
-  }
+  }));
 }
 
 export async function recordChatMessage(message: {
@@ -732,16 +747,18 @@ export async function deductInventoryForOrder(materials: Array<{ material: strin
 
 export async function sendTelegramDocument(file: Uint8Array, filename: string, caption: string, mimeType = 'application/pdf') {
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!token || !chatId) return;
-  try {
-    const form = new FormData();
-    form.set('chat_id', chatId);
-    form.set('caption', sanitizeTelegramText(caption));
-    form.set('parse_mode', 'HTML');
-    form.set('document', new Blob([new Uint8Array(file)], { type: mimeType }), filename);
-    await fetch(`https://api.telegram.org/bot${token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(20000) });
-  } catch (error) {
-    console.error('Telegram document send failed:', error instanceof Error ? error.message : error);
-  }
+  const chatIds = getOpsChatIds();
+  if (!token || !chatIds.length) return;
+  await Promise.all(chatIds.map(async (chatId) => {
+    try {
+      const form = new FormData();
+      form.set('chat_id', chatId);
+      form.set('caption', sanitizeTelegramText(caption));
+      form.set('parse_mode', 'HTML');
+      form.set('document', new Blob([new Uint8Array(file)], { type: mimeType }), filename);
+      await fetch(`https://api.telegram.org/bot${token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(20000) });
+    } catch (error) {
+      console.error('Telegram document send failed:', error instanceof Error ? error.message : error);
+    }
+  }));
 }

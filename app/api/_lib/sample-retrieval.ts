@@ -1,4 +1,4 @@
-import { escapeTelegramHtml, sendTelegramDirectMessage, sendTelegramMessage } from './integrations';
+import { escapeTelegramHtml, sendTelegramMessage } from './integrations';
 import { selectStaleSamplesToAlert, staleSampleDays, STALE_SAMPLE_DAYS, type StaleSampleRow } from './sample-return-logic';
 
 type SupabaseLike = NonNullable<ReturnType<typeof import('./integrations').getSupabaseAdmin>>;
@@ -21,7 +21,8 @@ export function buildRetrievalMessage(samples: StaleSampleRow[], today: string) 
   ].join('\n');
 }
 
-// Alerts once per sample per day. Sends to Ms. Anne when a chat ID is known, otherwise falls back to the staff group.
+// Alerts once per sample per day. Goes out through the shared ops fan-out, so the CEO group and Ms. Anne both receive it.
+// The warning prefix is only added when Ms. Anne's chat ID is missing.
 export async function runStaleSampleRetrieval(supabase: SupabaseLike, today: string) {
   const { data, error } = await supabase
     .from('sample_items')
@@ -34,9 +35,9 @@ export async function runStaleSampleRetrieval(supabase: SupabaseLike, today: str
 
   const chatId = resolveSampleRetrievalChatId();
   const text = buildRetrievalMessage(due, today);
-  if (chatId) await sendTelegramDirectMessage(chatId, text);
-  else await sendTelegramMessage(`⚠️ Walang Telegram chat ID si Ms. Anne Manalo (set ANNE_MANALO_TELEGRAM_CHAT_ID).\n${text}`);
+  await sendTelegramMessage(chatId ? text : `⚠️ Walang Telegram chat ID si Ms. Anne Manalo (set ANNE_MANALO_TELEGRAM_CHAT_ID).\n${text}`);
 
   await supabase.from('sample_items').update({ stale_alert_on: today }).in('id', due.map((row) => row.id));
   return { stale: due.length, alerted: due.length, recipient: chatId ? ('anne' as const) : ('owner' as const) };
 }
+

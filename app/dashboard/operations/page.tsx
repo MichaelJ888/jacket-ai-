@@ -5,6 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 type Progress = { kind: string; label: string; targetPcs: number | null; actualPcs: number; targetRevenue: number | null; actualRevenue: number; pcsPct: number | null; revenuePct: number | null };
 type Subcon = { id: string; name: string; specialty: string | null; contact_phone: string | null; daily_capacity_pcs: number | null; rate_per_pc: number | null; active: boolean };
 type Sample = { id: string; item: string; quantity: number; client_name: string; expected_return_at: string | null; status: string };
+type ImportResult = {
+  applied: boolean;
+  dryRun: boolean;
+  preview?: string;
+  errors?: Array<{ row: number; column: string; message: string }>;
+  links?: Array<{ name: string; quick_dispatch_url: string | null }>;
+};
 
 function authHeaders(): HeadersInit {
   const token = typeof window !== "undefined" ? sessionStorage.getItem("mjic_admin") || "" : "";
@@ -34,6 +41,8 @@ export default function OperationsPage() {
   const [error, setError] = useState("");
   const [sample, setSample] = useState({ item: "", client_name: "", quantity: "1", expected_return_at: "" });
   const [subcon, setSubcon] = useState({ name: "", daily_capacity_pcs: "", rate_per_pc: "", contact_phone: "" });
+  const [importFile, setImportFile] = useState<{ name: string; format: "csv" | "json"; content: string } | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
   const applyPanel = useCallback((data: { unauthorized: boolean; progress: Progress[]; subcons: Subcon[]; samples: Sample[] }) => {
     if (data.unauthorized) {
@@ -65,6 +74,41 @@ export default function OperationsPage() {
   async function setSampleStatus(id: string, status: string) {
     await fetch("/api/samples", { method: "PATCH", headers: authHeaders(), body: JSON.stringify({ id, status }) });
     load();
+  }
+
+  async function readImportFile(file: File) {
+    setError("");
+    setImportResult(null);
+    const format = file.name.toLowerCase().endsWith(".json") ? "json" : "csv";
+    setImportFile({ name: file.name, format, content: await file.text() });
+  }
+
+  // Always previews first (dryRun); only a second, explicit run writes to subcon_directory.
+  async function runImport(dryRun: boolean) {
+    if (!importFile) return;
+    setError("");
+    let body: Record<string, unknown>;
+    if (importFile.format === "json") {
+      try {
+        body = { format: "json", rows: JSON.parse(importFile.content), dryRun };
+      } catch {
+        setError("Hindi valid na JSON ang file.");
+        return;
+      }
+    } else {
+      body = { format: "csv", content: importFile.content, dryRun };
+    }
+    const res = await fetch("/api/subcons/import", { method: "POST", headers: authHeaders(), body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "Hindi na-import ang file.");
+      return;
+    }
+    setImportResult(data as ImportResult);
+    if (data.applied) {
+      setImportFile(null);
+      load();
+    }
   }
 
   async function submitSubcon(e: React.FormEvent) {
@@ -118,6 +162,48 @@ export default function OperationsPage() {
           <input placeholder="Phone" className="border p-1" value={subcon.contact_phone} onChange={(e) => setSubcon({ ...subcon, contact_phone: e.target.value })} />
           <button className="rounded bg-black px-3 py-1 text-white">I-save</button>
         </form>
+
+        <div className="mt-4 space-y-2 text-sm">
+          <p className="font-medium">I-import ang directory (CSV o JSON)</p>
+          <p className="text-xs text-gray-500">
+            Kumuha ng template:{" "}
+            <a className="underline" href="/templates/subcon-directory-template.csv" download>CSV</a>
+            {" · "}
+            <a className="underline" href="/templates/subcon-directory-template.json" download>JSON</a>
+            . Burahin ang halimbawang row bago i-import. Hanggang 500 rows bawat file.
+          </p>
+          <input
+            type="file"
+            accept=".csv,.json,text/csv,application/json"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) readImportFile(file);
+              e.target.value = "";
+            }}
+          />
+          {importFile && (
+            <div className="flex gap-2">
+              <span className="self-center">{importFile.name}</span>
+              <button type="button" onClick={() => runImport(true)} className="rounded border px-3 py-1">I-preview</button>
+              <button type="button" onClick={() => runImport(false)} className="rounded bg-black px-3 py-1 text-white">I-import</button>
+            </div>
+          )}
+          {importResult && (
+            <div className="rounded border p-2">
+              {importResult.errors && importResult.errors.length > 0 && (
+                <ul className="mb-2 list-disc pl-5 text-red-700">
+                  {importResult.errors.map((err, i) => (
+                    <li key={i}>Row {err.row} ({err.column}): {err.message}</li>
+                  ))}
+                </ul>
+              )}
+              {importResult.preview && <pre className="whitespace-pre-wrap text-xs">{importResult.preview}</pre>}
+              {importResult.applied && (
+                <p className="text-green-700">Na-import na ang directory.</p>
+              )}
+            </div>
+          )}
+        </div>
       </section>
 
       <section>
