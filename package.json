@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:push": "node scripts/apply-schema.mjs",
+    "crm:sync": "node scripts/sync-crm-orders.mjs",
     "devq": "node scripts/devq.mjs",
     "devq:worker": "node scripts/devq-worker.mjs",
     "memory": "node scripts/memory.mjs",

@@ -16,6 +16,7 @@ Next.js 16 (App Router) + React 19 + Tailwind 4 + Supabase app automating MJIC's
 - `npm run dev` / `npm run lint` — dev server / eslint
 - `npm run build` — MUST stay `next build --webpack`; Turbopack panics on this project's global CSS
 - `npm run db:push` — apply `supabase/schema.sql` via Supabase Management API (needs `SUPABASE_ACCESS_TOKEN` in `.env.local`)
+- `npm run crm:sync` — idempotent upsert of every `orders` client into `crm_contacts` + backfill `orders.contact_id` (so the COO admin panel lists them); `-- --dry-run` previews
 - `npm run memory -- <note|decision|issue|attempt|fix|summary|archive>` — cloud agent memory (see bridge below)
 - Deploy: `npx vercel --prod --yes` (builds from local files; does not need `git push`)
 
