@@ -13,6 +13,8 @@ const STATE_DIR = join(ROOT, '.watchdog');
 const STATE_FILE = join(STATE_DIR, 'state.json');
 const LOG_FILE = join(STATE_DIR, 'watchdog.log');
 const LOCK_FILE = join(STATE_DIR, 'lock');
+export const ROLLING_TAG = 'stable-rolling-latest';
+// Only used if no rolling tag exists yet (before the first green run).
 export const STABLE_TAG = process.env.WATCHDOG_STABLE_TAG || 'stable-2026-10-30';
 export const MAX_FIX_ATTEMPTS = 2;
 export const LIVE_RETRIES = 3;
@@ -49,6 +51,12 @@ export function decideRun({ head, state, now, fullRunIntervalMs = FULL_RUN_INTER
   if (state.lastHead !== head) return { run: true, reason: 'new commit detected' };
   if (now - state.lastRunAt >= fullRunIntervalMs) return { run: true, reason: 'hourly full run' };
   return { run: false, reason: 'no new commit and last run is recent' };
+}
+
+export function pickRollbackTag(existingTags) {
+  if (existingTags.includes(ROLLING_TAG)) return ROLLING_TAG;
+  if (existingTags.includes(STABLE_TAG)) return STABLE_TAG;
+  return null;
 }
 
 export function buildFixPrompt(codeFailures) {
@@ -163,13 +171,30 @@ function rollback(reason) {
   log(`ROLLBACK: ${reason}`);
   git(['checkout', '--', '.']);
   git(['clean', '-fd']);
-  const co = git(['checkout', STABLE_TAG]);
-  if (co.code !== 0) {
-    log(`rollback checkout of ${STABLE_TAG} failed: ${co.out.trim()}`);
+  const target = pickRollbackTag(git(['tag', '--list']).out.split(/\r?\n/).map((t) => t.trim()));
+  if (!target) {
+    log('rollback aborted: no rolling or stable tag exists');
     return false;
   }
-  log(`HEAD parked on ${STABLE_TAG} (detached). Run "git checkout main" to resume normal operation.`);
+  const co = git(['checkout', target]);
+  if (co.code !== 0) {
+    log(`rollback checkout of ${target} failed: ${co.out.trim()}`);
+    return false;
+  }
+  // Record the parked HEAD so the next poll does not re-run the broken main every 2 minutes.
+  writeState({ parkedOnTag: target, lastHead: git(['rev-parse', 'HEAD']).out.trim() });
+  log(`HEAD parked on ${target} (detached). Watchdog resumes main on its next full run.`);
   return true;
+}
+
+function advanceRollingTag(sha) {
+  const current = git(['rev-parse', '-q', '--verify', `refs/tags/${ROLLING_TAG}`]).out.trim();
+  if (current === sha) return;
+  git(['tag', '-f', ROLLING_TAG, sha]);
+  const p = git(['push', '-f', 'origin', `refs/tags/${ROLLING_TAG}`]);
+  log(p.code === 0
+    ? `rolling saving point -> ${ROLLING_TAG} = ${sha.slice(0, 7)} (pushed)`
+    : `rolling saving point -> ${ROLLING_TAG} = ${sha.slice(0, 7)} (local only; push failed: ${p.out.trim().slice(0, 200)})`);
 }
 
 async function pushWithRetry() {
@@ -184,20 +209,31 @@ async function pushWithRetry() {
 
 // Main cycle
 
-export async function runCycle({ dryRun = false } = {}) {
+export async function runCycle({ dryRun = false, force = false } = {}) {
   if (!acquireLock()) return { status: 'skipped', reason: 'another watchdog run holds the lock' };
   try {
     const state = readState();
-    const head = git(['rev-parse', 'HEAD']).out.trim();
-    const branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out.trim();
+    let head = git(['rev-parse', 'HEAD']).out.trim();
+    let branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out.trim();
     const dirty = git(['status', '--porcelain']).out.trim();
 
     const decision = decideRun({ head, state, now: Date.now() });
-    if (!decision.run) return { status: 'idle', reason: decision.reason };
+    if (!decision.run && !force) return { status: 'idle', reason: decision.reason };
     if (dirty) {
       log('skip: uncommitted changes present; not touching human work');
       writeState({ lastRunAt: Date.now(), lastResult: 'skipped-dirty' });
       return { status: 'skipped', reason: 'dirty working tree' };
+    }
+    if (branch === 'HEAD' && state.parkedOnTag) {
+      const co = git(['checkout', 'main']);
+      if (co.code !== 0) {
+        log(`cannot resume main from ${state.parkedOnTag}: ${co.out.trim().slice(0, 200)}`);
+        return { status: 'skipped', reason: 'parked and main checkout failed' };
+      }
+      log(`resumed main after rollback (was parked on ${state.parkedOnTag})`);
+      writeState({ parkedOnTag: null });
+      head = git(['rev-parse', 'HEAD']).out.trim();
+      branch = git(['rev-parse', '--abbrev-ref', 'HEAD']).out.trim();
     }
     log(`cycle start (${decision.reason}) branch=${branch} head=${head.slice(0, 7)}${dryRun ? ' [dry-run]' : ''}`);
 
@@ -214,7 +250,7 @@ export async function runCycle({ dryRun = false } = {}) {
     const { codeFailures, liveFailures } = classifyFailures(results);
     if (codeFailures.length) {
       if (!dryRun) rollback(`code checks still failing after ${fixAttempt} auto-fix attempt(s): ${codeFailures.map((f) => f.name).join(', ')}`);
-      writeState({ lastHead: head, lastRunAt: Date.now(), lastResult: dryRun ? 'dry-run-code-failure' : 'rolled-back' });
+      writeState({ lastRunAt: Date.now(), lastResult: dryRun ? 'dry-run-code-failure' : 'rolled-back', ...(dryRun ? { lastHead: head } : {}) });
       return { status: dryRun ? 'dry-run-failed' : 'rolled-back', failures: codeFailures.map((f) => f.name) };
     }
     if (liveFailures.length) {
@@ -241,7 +277,7 @@ export async function runCycle({ dryRun = false } = {}) {
       const c = git(['commit', '-m', msg, '-m', COAUTHOR]);
       if (c.code !== 0) {
         rollback(`commit failed: ${c.out.trim().slice(0, 300)}`);
-        writeState({ lastHead: head, lastRunAt: Date.now(), lastResult: 'rolled-back' });
+        writeState({ lastRunAt: Date.now(), lastResult: 'rolled-back' });
         return { status: 'rolled-back', failures: ['commit'] };
       }
       currentHead = git(['rev-parse', 'HEAD']).out.trim();
@@ -249,6 +285,7 @@ export async function runCycle({ dryRun = false } = {}) {
     }
 
     if (state.lastDeployedSha === currentHead) {
+      advanceRollingTag(currentHead);
       writeState({ lastHead: currentHead, lastRunAt: Date.now(), lastResult: 'ok-already-deployed' });
       return { status: 'ok-already-deployed' };
     }
@@ -276,6 +313,7 @@ export async function runCycle({ dryRun = false } = {}) {
       lastDeployedSha: currentHead,
       lastResult: postOk ? 'deployed-verified' : 'deployed-verify-failed',
     });
+    if (postOk) advanceRollingTag(currentHead);
     return { status: postOk ? 'deployed-verified' : 'deployed-verify-failed' };
   } finally {
     releaseLock();
@@ -301,7 +339,7 @@ if (isMain) {
   if (process.argv.includes('--watch')) {
     await watch();
   } else {
-    const r = await runCycle({ dryRun });
+    const r = await runCycle({ dryRun, force: process.argv.includes('--force') });
     log(`result: ${r.status}${r.reason ? ` (${r.reason})` : ''}`);
     if (!['ok-already-deployed', 'deployed-verified', 'idle', 'ok-not-main', 'dry-run-ok', 'skipped'].includes(r.status)) process.exitCode = 1;
   }

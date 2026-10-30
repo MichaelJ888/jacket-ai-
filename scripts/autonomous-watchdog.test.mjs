@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyFailures, isTransientLiveFailure, decideRun, buildFixPrompt } from './autonomous-watchdog.mjs';
+import { classifyFailures, isTransientLiveFailure, decideRun, buildFixPrompt, pickRollbackTag, ROLLING_TAG, STABLE_TAG } from './autonomous-watchdog.mjs';
+
+test('rollback prefers the rolling tag and only falls back to the first stable tag', () => {
+  assert.equal(pickRollbackTag([STABLE_TAG, ROLLING_TAG]), ROLLING_TAG);
+  assert.equal(pickRollbackTag([STABLE_TAG]), STABLE_TAG);
+  assert.equal(pickRollbackTag([]), null);
+});
 
 test('classifyFailures separates code failures from live failures', () => {
   const { codeFailures, liveFailures } = classifyFailures([
