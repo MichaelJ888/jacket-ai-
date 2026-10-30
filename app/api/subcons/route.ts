@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../_lib/auth';
 import { getSupabaseAdmin, sendTelegramMessage, escapeTelegramHtml } from '../_lib/integrations';
+import { buildMessengerLink } from '../_lib/subcon-import-logic';
 
 // GET: all subcons in the directory. POST: add or update one (upsert by name).
 export async function GET(req: Request) {
@@ -9,7 +10,8 @@ export async function GET(req: Request) {
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
   const { data, error } = await supabase.from('subcon_directory').select('*').order('active', { ascending: false }).order('name');
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true, subcons: data || [] });
+  const subcons = (data || []).map((row) => ({ ...row, quick_dispatch_url: buildMessengerLink(row.messenger_handle) }));
+  return NextResponse.json({ success: true, subcons });
 }
 
 export async function POST(req: Request) {
@@ -37,11 +39,15 @@ export async function POST(req: Request) {
     rate_per_pc: rate,
     active: body?.active === false ? false : true,
     notes: typeof body?.notes === 'string' ? body.notes.slice(0, 500) : null,
+    messenger_handle: typeof body?.messenger_handle === 'string' ? body.messenger_handle.trim().slice(0, 120) || null : null,
     updated_at: new Date().toISOString(),
   };
+  if (row.messenger_handle && !buildMessengerLink(row.messenger_handle)) {
+    return NextResponse.json({ error: 'messenger_handle must be a Page username, numeric id, or m.me link' }, { status: 400 });
+  }
   const { data, error } = await supabase.from('subcon_directory').upsert(row, { onConflict: 'name' }).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   void sendTelegramMessage(`🧵 <b>SUBCON saved</b>: ${escapeTelegramHtml(data.name)}${data.daily_capacity_pcs ? ` · kapasidad ${data.daily_capacity_pcs} pcs/araw` : ''}${data.rate_per_pc ? ` · ₱${data.rate_per_pc}/pc` : ''}`);
-  return NextResponse.json({ success: true, subcon: data });
+  return NextResponse.json({ success: true, subcon: { ...data, quick_dispatch_url: buildMessengerLink(data.messenger_handle) } });
 }
