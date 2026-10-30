@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
 import { manilaToday } from '../../_lib/production-quota-logic';
+import { runStaleSampleRetrieval } from '../../_lib/sample-retrieval';
 
-// Daily: alert once per day for every OUT sample past its expected return date.
+// Daily: (1) alert once per day for every OUT sample past its expected return date;
+// (2) push a retrieval message to Ms. Anne Manalo for OUT samples with no client movement for 30+ days.
 export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
@@ -23,5 +25,7 @@ export async function GET(req: Request) {
     await sendTelegramMessage(`⏰ <b>OVERDUE SAMPLES (${due.length})</b>\n${lines.join('\n')}\nKulitin ang client para maibalik.`);
     await supabase.from('sample_items').update({ overdue_alert_on: today }).in('id', due.map((row) => row.id));
   }
-  return NextResponse.json({ success: true, overdue: (data || []).length, alerted: due.length });
+
+  const retrieval = await runStaleSampleRetrieval(supabase, today);
+  return NextResponse.json({ success: true, overdue: (data || []).length, alerted: due.length, retrieval });
 }

@@ -3,8 +3,9 @@ import { isAdminAuthorized } from '../_lib/auth';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../_lib/integrations';
 import { manilaToday } from '../_lib/production-quota-logic';
 import { SAMPLE_STATUSES, summarizeSamples, type SampleRow } from '../_lib/sample-logic';
+import { isSampleStale, STALE_SAMPLE_DAYS, type StaleSampleRow } from '../_lib/sample-return-logic';
 
-// GET: samples (newest first) plus summary counts.
+// GET: samples (newest first) plus summary counts, including samples stale for 30+ days with no client movement.
 export async function GET(req: Request) {
   if (!isAdminAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
@@ -12,7 +13,15 @@ export async function GET(req: Request) {
   const { data, error } = await supabase.from('sample_items').select('*').order('created_at', { ascending: false }).limit(200);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const today = manilaToday();
-  return NextResponse.json({ success: true, today, summary: summarizeSamples((data || []) as SampleRow[], today), samples: data || [] });
+  const rows = (data || []) as Array<SampleRow & StaleSampleRow>;
+  const staleCount = rows.filter((row) => isSampleStale(row, today)).length;
+  return NextResponse.json({
+    success: true,
+    today,
+    staleAfterDays: STALE_SAMPLE_DAYS,
+    summary: { ...summarizeSamples(rows, today), staleCount },
+    samples: data || [],
+  });
 }
 
 // POST: log a sample sent out. Body: { item, client_name, quantity?, contact_phone?, order_id?, expected_return_at?, notes? }
@@ -48,15 +57,29 @@ export async function POST(req: Request) {
   return NextResponse.json({ success: true, sample: data });
 }
 
-// PATCH: record return or loss. Body: { id, status: 'OUT' | 'RETURNED' | 'LOST' | 'DAMAGED' }
+// PATCH: record return or loss, or client activity that resets the 30-day stale clock.
+// Body: { id, status?: 'OUT' | 'RETURNED' | 'LOST' | 'DAMAGED', client_activity?: true }
 export async function PATCH(req: Request) {
   if (!isAdminAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
 
-  const body = (await req.json().catch(() => null)) as { id?: unknown; status?: unknown } | null;
-  const status = typeof body?.status === 'string' ? body.status.toUpperCase() : '';
-  if (typeof body?.id !== 'string' || !(SAMPLE_STATUSES as readonly string[]).includes(status)) {
+  const body = (await req.json().catch(() => null)) as { id?: unknown; status?: unknown; client_activity?: unknown } | null;
+  if (typeof body?.id !== 'string') return NextResponse.json({ error: 'id is required' }, { status: 400 });
+
+  if (body.client_activity === true) {
+    const { data, error } = await supabase
+      .from('sample_items')
+      .update({ last_client_activity_at: new Date().toISOString(), stale_alert_on: null })
+      .eq('id', body.id)
+      .select()
+      .single();
+    if (error || !data) return NextResponse.json({ error: error?.message || 'Sample not found' }, { status: 404 });
+    return NextResponse.json({ success: true, sample: data });
+  }
+
+  const status = typeof body.status === 'string' ? body.status.toUpperCase() : '';
+  if (!(SAMPLE_STATUSES as readonly string[]).includes(status)) {
     return NextResponse.json({ error: `status must be one of ${SAMPLE_STATUSES.join(', ')}` }, { status: 400 });
   }
   const { data, error } = await supabase

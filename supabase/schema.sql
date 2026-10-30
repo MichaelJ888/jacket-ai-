@@ -1037,3 +1037,10 @@ create table if not exists public.material_fund_locks (
 alter table public.material_fund_locks enable row level security;
 revoke all on public.material_fund_locks from anon, authenticated;
 
+-- Sample return tracker: last client movement (stale after 30 days) and the day the retrieval alert was sent.
+alter table public.sample_items add column if not exists last_client_activity_at timestamptz;
+alter table public.sample_items add column if not exists stale_alert_on date;
+
+-- Subcon quick-dispatch: Facebook Page username / id used to build an m.me link.
+alter table public.subcon_directory add column if not exists messenger_handle text;
+
