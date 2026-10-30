@@ -22,7 +22,7 @@ async function readJson<T>(response: Response): Promise<T & { error?: string }> 
 export default function EditorPage() {
   const [stage, setStage] = useState<Stage>('checking');
   const [password, setPassword] = useState('');
-  const [chatId, setChatId] = useState('');
+  const [chatId, setChatId] = useState('7329264426');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
