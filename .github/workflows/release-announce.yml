@@ -1,0 +1,35 @@
+name: Release announcements to Ms. Anne
+
+# Runs after a push to main that changes the release registry. Waits until the deployment serves the new
+# registry head, then asks the app to DM Ms. Anne once per release (idempotent via ceo_settings).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/api/_lib/release-notes.json'
+  workflow_dispatch: {}
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Wait for deployment and dispatch announcements
+        env:
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          SCHEDULER_TOKEN: ${{ secrets.SCHEDULER_TOKEN }}
+        run: |
+          EXPECT=$(jq -r '.[0].id' app/api/_lib/release-notes.json)
+          echo "Expecting release head: $EXPECT"
+          for attempt in $(seq 1 30); do
+            CODE=$(curl -s -o response.json -w "%{http_code}" \
+              "$APP_BASE_URL/api/cron/release-announcements?expect=$EXPECT" \
+              -H "Authorization: Bearer $SCHEDULER_TOKEN")
+            echo "Attempt $attempt: HTTP $CODE $(cat response.json)"
+            if [ "$CODE" = "200" ]; then exit 0; fi
+            if [ "$CODE" != "409" ]; then exit 1; fi
+            sleep 60
+          done
+          echo "Deployment never served release $EXPECT"
+          exit 1

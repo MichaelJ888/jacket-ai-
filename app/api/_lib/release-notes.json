@@ -1,0 +1,11 @@
+[
+  {
+    "id": "anne-daily-updates-v1",
+    "title": "Bagong automation para kay Ms. Anne",
+    "items": [
+      "Araw-araw na 8:00 AM: isang Telegram update bawat active/pending na client (status, huling galaw, at nakabinbin).",
+      "Sample retrieval: alerto kapag DP bayad na ang client, o 2 linggo (14 araw) nang walang galaw ang client.",
+      "Feature announcements: makakatanggap ka ng alerto tuwing may bagong feature o automation na ina-deploy."
+    ]
+  }
+]

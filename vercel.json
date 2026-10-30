@@ -6,6 +6,7 @@
     { "path": "/api/cron/swarm-worker", "schedule": "0 5 * * *" },
     { "path": "/api/cron/meta-health", "schedule": "0 1 * * *" },
     { "path": "/api/cron/samples", "schedule": "30 0 * * *" },
+    { "path": "/api/cron/anne-daily-updates", "schedule": "0 0 * * *" },
     { "path": "/api/cron/quota-reminder", "schedule": "0 10 * * 1-6" },
     { "path": "/api/cron/system-health", "schedule": "0 23 * * *" }
   ]
