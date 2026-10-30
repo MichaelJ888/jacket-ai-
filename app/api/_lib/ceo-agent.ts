@@ -154,7 +154,7 @@ function buildTools() {
         }).select().single();
         if (error || !data) return { error: error?.message || 'Could not create dispatch' };
         await sendTelegramMessage(
-          `ðŸšš <b>${input.urgent ? 'URGENT ' : ''}DELIVERY REQUEST</b>\nProject: ${escapeTelegramHtml(input.projectName || 'n/a')}\nPickup: ${escapeTelegramHtml(input.pickupAddress)}\nDeliver to: ${escapeTelegramHtml(input.deliveryAddress)}\nContact: ${escapeTelegramHtml(input.contactName)} ${escapeTelegramHtml(input.contactPhone)}`,
+          `🚚 <b>${input.urgent ? 'URGENT ' : ''}DELIVERY REQUEST</b>\nProject: ${escapeTelegramHtml(input.projectName || 'n/a')}\nPickup: ${escapeTelegramHtml(input.pickupAddress)}\nDeliver to: ${escapeTelegramHtml(input.deliveryAddress)}\nContact: ${escapeTelegramHtml(input.contactName)} ${escapeTelegramHtml(input.contactPhone)}`,
           { inline_keyboard: [[{ text: 'âœ… Book now', callback_data: `disp:approve:${data.id}` }, { text: 'âŒ Cancel', callback_data: `disp:reject:${data.id}` }]] },
         );
         return { dispatchId: data.id, status: 'PENDING_APPROVAL' };

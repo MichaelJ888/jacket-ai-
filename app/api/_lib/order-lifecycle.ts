@@ -129,7 +129,7 @@ export async function confirmDeposit(orderId: string, verificationId: string | n
       drafted = result.drafted.map((po) => po.poNumber);
       skipped = result.skipped;
       if (drafted.length) await supabase.from('purchase_orders').update({ order_id: order.id }).in('po_number', drafted);
-      void sendTelegramMessage(`ðŸ“¦ <b>POs DRAFTED</b> for ${label(order)}: ${drafted.length}${skipped.length ? `\nâš ï¸ Skipped: ${escapeTelegramHtml(skipped.join(', '))}` : ''}\nApprove them before sending to suppliers.`);
+      void sendTelegramMessage(`📦 <b>POs DRAFTED</b> for ${label(order)}: ${drafted.length}${skipped.length ? `\n⚠️ Skipped: ${escapeTelegramHtml(skipped.join(', '))}` : ''}\nApprove them before sending to suppliers.`);
     }
   }
   return { ok: true, stage: order.stage, drafted, skipped, error: null };
@@ -200,6 +200,6 @@ export async function advanceOrder(orderId: string, to: string, note = '') {
     if (subconPayrolls) notices.push(`${subconPayrolls} subcon payroll(s) generated.`);
   }
 
-  void sendTelegramMessage(`ðŸ­ <b>ORDER ${escapeTelegramHtml(to.replaceAll('_', ' '))}</b>\n${label(order)}${notices.length ? `\n${notices.join('\n')}` : ''}`);
+  void sendTelegramMessage(`🏭 <b>ORDER ${escapeTelegramHtml(to.replaceAll('_', ' '))}</b>\n${label(order)}${notices.length ? `\n${notices.join('\n')}` : ''}`);
   return { ok: true, from, stage: to, error: null };
 }

@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { randomBytes } from 'node:crypto';
+import { sanitizeTelegramText } from './telegram-text.ts';
 
 export function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -178,7 +179,7 @@ export async function sendTelegramMessage(text: string, replyMarkup?: TelegramIn
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: chatId,
-        text,
+        text: sanitizeTelegramText(text),
         parse_mode: 'HTML',
         ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
@@ -222,7 +223,7 @@ export async function sendTelegramPhoto(imageSource: string, caption: string) {
       await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: chatId, photo: imageSource, caption, parse_mode: 'HTML' }),
+        body: JSON.stringify({ chat_id: chatId, photo: imageSource, caption: sanitizeTelegramText(caption), parse_mode: 'HTML' }),
       });
       return;
     }
@@ -233,7 +234,7 @@ export async function sendTelegramPhoto(imageSource: string, caption: string) {
     const buffer = Buffer.from(base64Data, 'base64');
     const form = new FormData();
     form.set('chat_id', chatId);
-    form.set('caption', caption);
+    form.set('caption', sanitizeTelegramText(caption));
     form.set('parse_mode', 'HTML');
     form.set('photo', new Blob([buffer], { type: mimeType }), `logo.${mimeType.split('/')[1] || 'png'}`);
     await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form });
@@ -613,7 +614,7 @@ export async function sendTelegramDirectMessage(chatId: string, text: string) {
     await fetchWithRetry(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text }),
+      body: JSON.stringify({ chat_id: chatId, text: sanitizeTelegramText(text) }),
     });
   } catch (error) {
     console.error('Telegram direct message failed:', error);
@@ -736,7 +737,7 @@ export async function sendTelegramDocument(file: Uint8Array, filename: string, c
   try {
     const form = new FormData();
     form.set('chat_id', chatId);
-    form.set('caption', caption);
+    form.set('caption', sanitizeTelegramText(caption));
     form.set('parse_mode', 'HTML');
     form.set('document', new Blob([new Uint8Array(file)], { type: mimeType }), filename);
     await fetch(`https://api.telegram.org/bot${token}/sendDocument`, { method: 'POST', body: form, signal: AbortSignal.timeout(20000) });
