@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin, sendTelegramDirectMessage } from '../../../_lib/integrations';
-import { checkEditorPassword, generateOtp, hashOtp, isEditorChatAllowed, OTP_TTL_MS } from '../../../_lib/site-content-logic';
+import { checkEditorPassword, editorDeliveryChat, generateOtp, hashOtp, isEditorChatAllowed, OTP_TTL_MS } from '../../../_lib/site-content-logic';
 import { writeOtpRow } from '../../../_lib/site-content';
 
 export const dynamic = 'force-dynamic';
@@ -17,10 +17,11 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
 
+  const target = editorDeliveryChat(chatId, process.env.TELEGRAM_CEO_USER_ID);
   const code = generateOtp();
-  await writeOtpRow(supabase, chatId, { hash: hashOtp(code, chatId, envPassword as string), expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
-  const sent = await sendTelegramDirectMessage(chatId, `MJIC editor login code: ${code}\nExpires in 5 minutes. If you did not request this, ignore it.`);
-  if (!sent) return NextResponse.json({ error: 'Could not send the code. Make sure this Telegram account has started the MJIC bot.' }, { status: 502 });
+  await writeOtpRow(supabase, target, { hash: hashOtp(code, target, envPassword as string), expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
+  const sent = await sendTelegramDirectMessage(target, `MJIC editor login code: ${code}\nExpires in 5 minutes. If you did not request this, ignore it.`);
+  if (!sent) return NextResponse.json({ error: 'Could not send the code. Make sure the CEO Telegram account has started the MJIC bot.' }, { status: 502 });
 
   return NextResponse.json({ ok: true });
 }

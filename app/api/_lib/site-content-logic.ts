@@ -92,6 +92,11 @@ export function isEditorChatAllowed(chatId: string, ceoUserId: string | undefine
   return allowed.includes(chatId.trim());
 }
 
+// Codes go to the CEO chat, which has already started the bot; a bot cannot DM users who never messaged it (403).
+export function editorDeliveryChat(chatId: string, ceoUserId: string | undefined) {
+  return ceoUserId?.trim() || chatId.trim();
+}
+
 function safeEqual(a: string, b: string) {
   const da = createHash('sha256').update(a).digest();
   const db = createHash('sha256').update(b).digest();

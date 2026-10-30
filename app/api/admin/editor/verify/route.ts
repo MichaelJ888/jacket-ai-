@@ -4,6 +4,7 @@ import {
   checkEditorPassword,
   EDITOR_COOKIE,
   EDITOR_SESSION_MS,
+  editorDeliveryChat,
   hashOtp,
   isEditorChatAllowed,
   OTP_MAX_ATTEMPTS,
@@ -16,11 +17,12 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as { password?: unknown; chatId?: unknown; code?: unknown } | null;
   const password = typeof body?.password === 'string' ? body.password : '';
-  const chatId = typeof body?.chatId === 'string' ? body.chatId.trim() : '';
+  const submittedChatId = typeof body?.chatId === 'string' ? body.chatId.trim() : '';
+  const chatId = editorDeliveryChat(submittedChatId, process.env.TELEGRAM_CEO_USER_ID);
   const code = typeof body?.code === 'string' ? body.code.trim() : '';
   const envPassword = process.env.EDITOR_PASSWORD;
 
-  if (!checkEditorPassword(password, envPassword) || !isEditorChatAllowed(chatId, process.env.TELEGRAM_CEO_USER_ID)) {
+  if (!checkEditorPassword(password, envPassword) || !isEditorChatAllowed(submittedChatId, process.env.TELEGRAM_CEO_USER_ID)) {
     return NextResponse.json({ error: 'Invalid credentials.' }, { status: 401 });
   }
   const supabase = getSupabaseAdmin();
