@@ -661,6 +661,19 @@ export async function enqueueOutboundRequest(kind: string, payload: Record<strin
   return { data, error: error?.message || null };
 }
 
+// Non-alerting event log (info/warning) to system_logs. Never throws.
+export async function logSystemEvent(context: string, severity: 'info' | 'warning', message: string, details?: Record<string, unknown>) {
+  try {
+    const supabase = getSupabaseAdmin();
+    if (supabase) {
+      const { error } = await supabase.from('system_logs').insert({ severity, context, message: message.slice(0, 1000), details: details || null });
+      if (error) console.error('system_logs insert failed:', error.message);
+    }
+  } catch (logError) {
+    console.error('system_logs insert threw:', logError);
+  }
+}
+
 // ---- Critical error reporting: persist to system_logs AND alert the ops Telegram chat. ----
 // Best-effort by design: never throws, so it is safe to call from any catch block.
 export async function reportCriticalError(context: string, error: unknown, details?: Record<string, unknown>) {

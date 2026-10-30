@@ -27,6 +27,7 @@ import {
   getStaffProfile,
   getSupabaseAdmin,
   linkStaffTelegramChat,
+  logSystemEvent,
   removeTelegramInlineKeyboard,
   reportCriticalError,
   setEmbroideryPickupCommitment,
@@ -146,7 +147,7 @@ export async function POST(req: Request) {
 
     // Diagnostic: log every incoming message with media to trace photo processing
     if (picked.media || picked.rejected) {
-      await reportCriticalError('telegram-webhook-entry', new Error('Message with media received'), {
+      await logSystemEvent('telegram-webhook-entry', 'info', 'Message with media received', {
         chatId: String(chatId),
         chatType,
         fromId: String(message?.from?.id),
@@ -166,7 +167,7 @@ export async function POST(req: Request) {
       // Voice notes and photos are CEO-only; everyone else's media is ignored.
       const ceoOnly = allowedChatId(chatId) && !isAttendanceChat(chatId) && (!!process.env.TELEGRAM_CEO_USER_ID && String(message.from?.id) === process.env.TELEGRAM_CEO_USER_ID);
       if (!ceoOnly) {
-        await reportCriticalError('telegram-media-ignored', new Error('Media received but not from CEO chat'), {
+        await logSystemEvent('telegram-media-ignored', 'warning', 'Media received but not from CEO chat', {
           chatId: String(chatId),
           fromId: String(message.from?.id),
           expectedCeoId: process.env.TELEGRAM_CEO_USER_ID ? 'set' : 'NOT SET',
@@ -188,7 +189,7 @@ export async function POST(req: Request) {
         const stopTyping = startTyping(String(chatId));
         let answer: string;
         try {
-          await reportCriticalError('telegram-media-received', new Error('Media processing started'), { kind: media.kind, mediaType: media.mediaType, size: media.size });
+          await logSystemEvent('telegram-media-received', 'info', 'Media processing started', { kind: media.kind, mediaType: media.mediaType, size: media.size });
           const file = await downloadTelegramMedia(media);
           if ('error' in file) {
             await reportCriticalError('telegram-media-download-failed', new Error(`downloadTelegramMedia failed: ${file.error}`), { kind: media.kind, size: media.size, mediaType: media.mediaType });
@@ -200,7 +201,7 @@ export async function POST(req: Request) {
               const applied = await applyClientUpdates(parsed.clients);
               answer = `📸 Nabasa ko ang screenshot — ${applied.created} new, ${applied.updated} updated, ${applied.failed} failed:\n${applied.lines.join('\n')}`;
             } else if (parsed.error) {
-              await reportCriticalError('telegram-vision-parse', new Error(parsed.error), { kind: media.kind });
+              await logSystemEvent('telegram-vision-parse', 'warning', parsed.error, { kind: media.kind });
               answer = await runCeoAgent(text, file); // fall back to the full CEO agent
             } else {
               answer = await runCeoAgent(text, file); // no clients found — let the CEO agent describe/act
