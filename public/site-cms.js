@@ -265,28 +265,118 @@
       .catch(function () {});
   }
 
-  function pickImage(img) {
-    var input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/png,image/jpeg,image/webp,image/gif';
-    input.onchange = function () {
-      var file = input.files && input.files[0];
-      if (!file) return;
-      if (file.size > MAX_IMAGE_BYTES) { alert('Image must be 5 MB or smaller.'); return; }
+  function setImage(img, url) {
+    var key = pathKey(img);
+    doc.images[key] = url;
+    img.setAttribute('src', url);
+    emit({ type: 'image', key: key, url: url });
+  }
+
+  var IMAGE_BUDGET = 200 * 1024;
+
+  // Re-encodes oversized uploads to WebP (<= 200 KB) in the browser; falls back to the original file.
+  function toBudgetWebp(file) {
+    if (file.size <= IMAGE_BUDGET || file.type === 'image/gif') return Promise.resolve(file);
+    return new Promise(function (resolve) {
+      var url = URL.createObjectURL(file);
+      var image = new Image();
+      image.onload = function () {
+        var scale = Math.min(1, 1600 / image.naturalWidth);
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(image.naturalWidth * scale);
+        canvas.height = Math.round(image.naturalHeight * scale);
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        var qualities = [0.82, 0.7, 0.58, 0.46];
+        (function next(i) {
+          if (i >= qualities.length) return resolve(file);
+          canvas.toBlob(function (blob) {
+            if (blob && blob.type === 'image/webp' && blob.size <= IMAGE_BUDGET) {
+              resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' }));
+            } else next(i + 1);
+          }, 'image/webp', qualities[i]);
+        })(0);
+      };
+      image.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+      image.src = url;
+    });
+  }
+
+  function uploadImage(img, file) {
+    if (!file || file.type.indexOf('image/') !== 0) { alert('Please choose an image file.'); return; }
+    if (file.size > MAX_IMAGE_BYTES) { alert('Image must be 5 MB or smaller.'); return; }
+    toBudgetWebp(file).then(function (optimized) {
       var form = new FormData();
-      form.append('file', file);
-      fetch('/api/admin/editor/media', { method: 'POST', body: form })
-        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-        .then(function (res) {
-          if (!res.ok) { alert(res.body.error || 'Upload failed'); return; }
-          var key = pathKey(img);
-          doc.images[key] = res.body.url;
-          img.setAttribute('src', res.body.url);
-          emit({ type: 'image', key: key, url: res.body.url });
-        })
-        .catch(function () { alert('Upload failed'); });
+      form.append('file', optimized);
+      return fetch('/api/admin/editor/media', { method: 'POST', body: form });
+    })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+      .then(function (res) {
+        if (!res.ok) { alert(res.body.error || 'Upload failed'); return; }
+        setImage(img, res.body.url);
+      })
+      .catch(function () { alert('Upload failed'); });
+  }
+
+  var libraryItems = null;
+  function loadLibrary() {
+    if (libraryItems) return Promise.resolve(libraryItems);
+    return fetch('/image-library.json', { cache: 'force-cache' })
+      .then(function (r) { return r.ok ? r.json() : { items: [] }; })
+      .then(function (j) { libraryItems = j.items || []; return libraryItems; })
+      .catch(function () { libraryItems = []; return libraryItems; });
+  }
+
+  // Pairs a slot with an existing local asset (or uploads a new file). Opened by clicking an image.
+  function pickImage(img) {
+    var overlay = document.createElement('div');
+    overlay.setAttribute('data-cms-picker', '');
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px;font-family:sans-serif';
+    var panel = document.createElement('div');
+    panel.style.cssText = 'background:#fff;color:#111;border-radius:12px;width:min(720px,100%);max-height:88vh;display:flex;flex-direction:column;overflow:hidden';
+    panel.innerHTML = '<div style="display:flex;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb;flex-wrap:wrap">' +
+      '<strong style="font-size:15px">Choose image for this slot</strong>' +
+      '<input data-role="search" placeholder="Search local images" style="flex:1;min-width:160px;border:1px solid #d4d4d8;border-radius:6px;padding:6px 8px;font-size:13px">' +
+      '<label style="font-size:13px;background:#0f172a;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">Upload new<input type="file" accept="image/*" style="display:none" data-role="upload"></label>' +
+      '<button type="button" data-role="close" style="font-size:13px;border:1px solid #d4d4d8;border-radius:6px;padding:6px 10px;background:#fff;cursor:pointer">Close</button>' +
+      '</div><div data-role="grid" style="overflow:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;font-size:12px">Loading…</div>';
+    overlay.appendChild(panel);
+    document.body.appendChild(overlay);
+
+    function close() { overlay.remove(); document.removeEventListener('keydown', onKey, true); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+    panel.querySelector('[data-role="close"]').onclick = close;
+    panel.querySelector('[data-role="upload"]').onchange = function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (file) { close(); uploadImage(img, file); }
     };
-    input.click();
+
+    var grid = panel.querySelector('[data-role="grid"]');
+    function render(items, query) {
+      grid.innerHTML = '';
+      var q = (query || '').toLowerCase();
+      items.filter(function (item) { return !q || item.label.toLowerCase().indexOf(q) !== -1; }).forEach(function (item) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.title = item.label;
+        b.style.cssText = 'border:1px solid #e4e4e7;border-radius:8px;padding:4px;background:#fafafa;cursor:pointer;text-align:left;overflow:hidden';
+        b.innerHTML = '<img loading="lazy" src="' + item.src + '" alt="" style="width:100%;height:90px;object-fit:cover;border-radius:4px;display:block"><span style="display:block;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#52525b">' + item.label.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }) + '</span>';
+        b.onclick = function () { close(); setImage(img, item.src); };
+        grid.appendChild(b);
+      });
+      if (!items.length) grid.textContent = 'No local images found.';
+    }
+    loadLibrary().then(function (items) {
+      render(items, '');
+      panel.querySelector('[data-role="search"]').oninput = function (e) { render(items, e.target.value); };
+    });
+  }
+
+  // Dropping an image file onto a slot replaces it directly.
+  function hasFiles(e) {
+    return !!(e.dataTransfer && e.dataTransfer.types && [].indexOf.call(e.dataTransfer.types, 'Files') !== -1);
   }
 
   function currentCards() {
@@ -366,6 +456,19 @@
     });
 
     document.addEventListener('drop', function (e) { if (dragged || dragSection) e.preventDefault(); });
+
+    document.addEventListener('dragover', function (e) {
+      if (dragged || dragSection || !hasFiles(e)) return;
+      e.preventDefault();
+      if (e.target.closest && e.target.closest('img')) e.dataTransfer.dropEffect = 'copy';
+    });
+
+    document.addEventListener('drop', function (e) {
+      if (dragged || dragSection || !hasFiles(e)) return;
+      e.preventDefault();
+      var img = e.target.closest && e.target.closest('img');
+      if (img) uploadImage(img, e.dataTransfer.files[0]);
+    });
 
     document.addEventListener('dragend', function () {
       if (dragSection) {

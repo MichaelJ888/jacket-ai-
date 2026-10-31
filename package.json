@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/build-image-library.mjs",
     "build": "next build --webpack",
+    "images:optimize": "node scripts/optimize-images.mjs",
     "start": "next start",
     "lint": "eslint",
   "watchdog": "node scripts/autonomous-watchdog.mjs",

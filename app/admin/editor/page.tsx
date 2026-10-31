@@ -263,7 +263,7 @@ export default function EditorPage() {
     <main className="flex min-h-screen flex-col bg-zinc-100">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
         <h1 className="mr-2 text-base font-bold text-zinc-900">Visual Editor</h1>
-        <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to replace it · Drag ☰ Move section or catalogue cards to reorder</span>
+        <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to pick a local photo (or upload) · Drop an image file onto a slot · Drag ☰ Move section or catalogue cards to reorder</span>
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {draft && (
             <>
