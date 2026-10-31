@@ -24,6 +24,7 @@ export default function ConnectPage() {
   const [request, setRequest] = useState({ name: "", contact: "", note: "" });
   const [requested, setRequested] = useState(false);
   const resultReceived = useRef(false);
+  const popupTimer = useRef<number | null>(null);
 
   const checkHealth = useCallback(async (pageId: string, resubscribe = false) => {
     const r = await fetch(resubscribe ? "/api/meta/connections/health" : `/api/meta/connections/health?pageId=${encodeURIComponent(pageId)}`, resubscribe ? { method: "POST", headers: json, body: JSON.stringify({ pageId }) } : { cache: "no-store" });
@@ -72,6 +73,10 @@ export default function ConnectPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => () => {
+    if (popupTimer.current) window.clearInterval(popupTimer.current);
+  }, []);
+
   useEffect(() => {
     const listener = (event: MessageEvent) => handleResult(parseOAuthMessage(event.data, event.origin, window.location.origin));
     window.addEventListener("message", listener);
@@ -93,16 +98,19 @@ export default function ConnectPage() {
     resultReceived.current = false;
     if (popup) {
       popup.location.href = data.url;
+      if (popupTimer.current) window.clearInterval(popupTimer.current);
       const timer = window.setInterval(() => {
         if (!popup.closed) return;
         window.clearInterval(timer);
+        popupTimer.current = null;
         setConnecting(false);
         // Give the callback's postMessage a moment to arrive before deciding the window was abandoned.
         window.setTimeout(() => {
           if (!resultReceived.current) setNotice({ kind: "error", text: CLOSED_WITHOUT_RESULT_TEXT });
           void load();
         }, 1500);
-      }, 800);
+      }, 1000);
+      popupTimer.current = timer;
     } else window.location.href = data.url;
   }
 

@@ -2223,13 +2223,37 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
       this.loadNews();
       this.loadWeather();
       this.loadLiveSports();
-      const timers = [
-        setInterval(()=> lucide.createIcons(), 800),
-        setInterval(()=> { if(!document.hidden) this.updateCountdown(); }, 60000),
-        setInterval(()=> { if(!document.hidden) this.loadLiveSports(); }, 60000),
-        setInterval(()=> { if(document.hidden) return; this.ealaSlide = (this.ealaSlide+1) % this.ealaSlides.length; this.nbaSlide = (this.nbaSlide+1) % this.nbaSlides.length; }, 5000),
+      // Icons: convert only when Alpine inserts a new <i data-lucide>, batched to one frame.
+      let iconFrame = 0;
+      const iconObserver = new MutationObserver(mutations=>{
+        if(iconFrame || !window.lucide) return;
+        const hasIcon = mutations.some(m=> [...m.addedNodes].some(n=> n.nodeType===1 && (n.matches('i[data-lucide]') || n.querySelector('i[data-lucide]'))));
+        if(!hasIcon) return;
+        iconFrame = requestAnimationFrame(()=>{ iconFrame = 0; lucide.createIcons(); });
+      });
+      iconObserver.observe(document.body, {childList:true, subtree:true});
+      // Timers run only while the tab is visible: they stop when hidden and restart on return.
+      const schedules = [
+        {ms:60000, fn:()=> this.updateCountdown()},
+        {ms:60000, fn:()=> this.loadLiveSports()},
+        {ms:5000, fn:()=> { this.ealaSlide = (this.ealaSlide+1) % this.ealaSlides.length; this.nbaSlide = (this.nbaSlide+1) % this.nbaSlides.length; }},
       ];
-      window.addEventListener('pagehide', ()=> timers.forEach(clearInterval), { once: true });
+      let timerIds = [];
+      const startTimers = ()=>{ if(!timerIds.length) timerIds = schedules.map(s=> setInterval(s.fn, s.ms)); };
+      const stopTimers = ()=>{ timerIds.forEach(clearInterval); timerIds = []; };
+      const onVisibilityChange = ()=>{
+        if(document.hidden){ stopTimers(); return; }
+        this.updateCountdown();
+        startTimers();
+      };
+      document.addEventListener('visibilitychange', onVisibilityChange);
+      startTimers();
+      window.addEventListener('pagehide', ()=>{
+        stopTimers();
+        iconObserver.disconnect();
+        cancelAnimationFrame(iconFrame);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }, { once: true });
       if(window.AOS) AOS.init({duration:600, once:true, offset:80});
       window.addEventListener('scroll', ()=>{ this.showBackToTop = window.scrollY > 600; });
       if(!safeLS.get('mji_cookies_accepted', false)) this.showCookieNotice = true;
