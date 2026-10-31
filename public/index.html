@@ -373,14 +373,14 @@
       <img :src="siteSettings.heroImg1" class="absolute top-0 right-0 w-64 rounded-lg shadow-2xl rotate-2 border-4 border-white/10" alt="Custom jacket sample">
       <img :src="siteSettings.heroImg2" class="absolute bottom-16 right-24 w-56 rounded-lg shadow-2xl -rotate-3 border-4 border-white/10" alt="Custom jacket sample">
       <img :src="siteSettings.heroImg3" class="absolute bottom-0 left-0 w-52 rounded-lg shadow-2xl rotate-1 border-4 border-white/10" alt="Custom jacket sample">
-      <div class="absolute top-20 left-4 bg-white rounded-lg shadow-2xl p-4 w-36 text-center">
+      <div class="absolute top-20 left-4 p-4 w-36 text-center">
         <svg viewBox="0 0 64 64" class="w-10 h-10 mx-auto mb-1">
           <circle cx="32" cy="32" r="30" fill="#0B1E3D"/>
           <circle cx="32" cy="32" r="30" fill="none" stroke="#B8912F" stroke-width="1.5"/>
           <path d="M32 4 L34.5 10 L41 10.5 L36 14.8 L37.6 21 L32 17.5 L26.4 21 L28 14.8 L23 10.5 L29.5 10 Z" fill="#E0A458"/>
           <text x="32" y="41" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="19" fill="#F3E7C6">CJ</text>
         </svg>
-        <p class="text-[10px] font-bold text-navy leading-tight">FREE LOGO<br>ON FIRST ORDER</p>
+        <p class="text-[10px] font-bold text-gold-100 leading-tight">FREE LOGO<br>ON FIRST ORDER</p>
       </div>
     </div>
   </div>
@@ -446,6 +446,7 @@
           </template>
           <h3 class="font-display font-bold text-white text-2xl sm:text-3xl mb-3" x-text="ealaNextMatch.isLive ? 'Alex Eala — LIVE' : &quot;Alex Eala's Next WTA Match&quot;"></h3>
           <p class="text-white/60 text-sm max-w-md" x-text="ealaNextMatch.event + ' — vs. ' + ealaNextMatch.opponent"></p>
+          <p class="text-gold-400 text-xs mt-1" x-text="phtLabel(ealaNextMatch.targetDate)"></p>
           <p x-show="ealaNextMatch.isLive && ealaNextMatch.liveScore" x-cloak class="font-display font-bold text-3xl text-red-400 mt-3" x-text="ealaNextMatch.liveScore"></p>
           <a :href="ealaNextMatch.watchLink" target="_blank" class="inline-flex items-center gap-2 mt-4 font-semibold" :class="ealaNextMatch.isLive ? 'text-red-400 text-base' : 'text-gold-400 text-sm hover:text-gold-100'" x-text="ealaNextMatch.isLive ? 'Watch LIVE now on BlastTV →' : 'Watch live on BlastTV'"></a>
         </div>
@@ -455,6 +456,12 @@
           <div class="text-center bg-white/5 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-white text-3xl" x-text="countdown.mins"></p><p class="text-[10px] text-white/50 uppercase">Mins</p></div>
         </div>
       </div>
+    </div>
+    <div class="relative mt-6 h-56 sm:h-72 rounded-lg overflow-hidden bg-gradient-to-br from-navy-600 to-navy" aria-label="Alex Eala photo carousel">
+      <template x-for="(s,i) in ealaSlides" :key="'eala-'+i">
+        <img :src="s.src" :alt="s.alt" x-show="ealaSlide===i" x-cloak class="absolute inset-0 w-full h-full object-cover" loading="lazy" @error="$el.classList.add('hidden')">
+      </template>
+      <span class="absolute bottom-2 right-3 text-[10px] text-white/80 bg-black/40 rounded px-2 py-0.5" x-text="(ealaSlide+1)+' / 50'"></span>
     </div>
     <p class="text-white/30 text-[11px] mt-3">Match schedule shown is informational and updated periodically by our team — always confirm exact timing and where to watch through the official WTA app or the tournament's licensed broadcaster.</p>
   </div>
@@ -467,16 +474,51 @@
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
     <p class="text-gold-600 font-semibold text-sm mb-2 flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4"></i> Bonus — Basketball Fans</p>
     <h3 class="font-display font-bold text-navy text-2xl sm:text-3xl mb-6">Pick a team, see their next game.</h3>
-    <div class="flex items-center gap-3 mb-6" aria-label="NBA featured players">
-      <img src="https://cdn.nba.com/headshots/nba/latest/1040x760/2544.png" alt="LeBron James" class="h-20 w-20 object-contain object-bottom drop-shadow-lg">
-      <img src="https://cdn.nba.com/headshots/nba/latest/1040x760/201939.png" alt="Stephen Curry" class="h-20 w-20 object-contain object-bottom drop-shadow-lg">
-      <img src="https://cdn.nba.com/headshots/nba/latest/1040x760/1628369.png" alt="Jayson Tatum" class="h-20 w-20 object-contain object-bottom drop-shadow-lg">
-      <span class="text-xs text-navy-400 max-w-xs">Featured NBA stars and official team schedules. Select a team below for its next-game countdown.</span>
+    <div class="flex flex-col sm:flex-row items-start gap-6 mb-6">
+      <div class="relative w-full sm:w-64 h-40 rounded-lg overflow-hidden bg-gradient-to-br from-navy to-navy-600 shrink-0" aria-label="NBA star photo carousel">
+        <template x-for="(s,i) in nbaSlides" :key="'nba-'+i">
+          <img :src="s.src" :alt="s.alt" x-show="nbaSlide===i" x-cloak class="absolute inset-0 w-full h-full object-cover" loading="lazy" @error="$el.classList.add('hidden')">
+        </template>
+        <span class="absolute bottom-2 right-3 text-[10px] text-white/80 bg-black/40 rounded px-2 py-0.5" x-text="(nbaSlide+1)+' / 50'"></span>
+      </div>
+      <div class="flex-1 w-full">
+        <div class="bg-white border hairline rounded-lg p-4 mb-4" x-show="teamSchedules[selectedTeam]" x-cloak>
+          <p class="text-[11px] font-semibold text-navy-400 uppercase mb-2" x-text="teamSchedules[selectedTeam]?.event"></p>
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-3">
+              <img :src="teamSchedules[selectedTeam]?.teamLogo" class="w-10 h-10 object-contain" alt="" x-show="teamSchedules[selectedTeam]?.teamLogo">
+              <div><p class="font-bold text-navy text-sm" x-text="selectedTeam"></p><p class="text-[11px] text-navy-400" x-text="teamSchedules[selectedTeam]?.myRecord"></p></div>
+            </div>
+            <div class="text-center">
+              <p class="font-display font-bold text-navy text-lg" x-show="teamSchedules[selectedTeam]?.isLive" x-text="teamSchedules[selectedTeam]?.liveScore"></p>
+              <p class="text-[11px] text-navy-400">VS</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="text-right"><p class="font-bold text-navy text-sm" x-text="teamSchedules[selectedTeam]?.opponent"></p><p class="text-[11px] text-navy-400" x-text="teamSchedules[selectedTeam]?.oppRecord"></p></div>
+              <img :src="teamSchedules[selectedTeam]?.opponentLogo" class="w-10 h-10 object-contain" alt="" x-show="teamSchedules[selectedTeam]?.opponentLogo">
+            </div>
+          </div>
+          <p class="text-xs text-navy-400 mt-3" x-text="phtLabel(teamSchedules[selectedTeam]?.targetDate)"></p>
+          <div class="flex gap-3 mt-3">
+            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.days"></p><p class="text-[10px] text-navy-400 uppercase">Days</p></div>
+            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.hours"></p><p class="text-[10px] text-navy-400 uppercase">Hours</p></div>
+            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.mins"></p><p class="text-[10px] text-navy-400 uppercase">Mins</p></div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 text-[11px]" aria-label="Today's NBA scores">
+          <template x-for="g in nbaToday.slice(0,8)" :key="g.id">
+            <span class="bg-white border hairline rounded px-2 py-1 text-navy">
+              <span x-text="g.away+' '+g.awayScore"></span> @ <span x-text="g.home+' '+g.homeScore"></span>
+              <span class="text-navy-400" x-text="' · '+(g.state==='pre' ? g.time : g.detail)"></span>
+            </span>
+          </template>
+        </div>
+      </div>
     </div>
 
     <div class="flex flex-wrap items-center gap-3 mb-6">
       <label class="text-xs font-semibold text-navy-400 uppercase tracking-wide">Select team</label>
-      <select x-model="selectedTeam" @change="ensureTeam(); updateCountdown()" class="border hairline rounded-md px-4 py-2.5 text-sm font-semibold text-navy bg-white min-w-[260px]">
+      <select x-model="selectedTeam" @change="ensureTeam(); loadLiveSports()" class="border hairline rounded-md px-4 py-2.5 text-sm font-semibold text-navy bg-white min-w-[260px]">
         <optgroup label="Philippines">
           <option>Gilas Pilipinas</option>
         </optgroup>
@@ -1954,6 +1996,12 @@ function mjApp(){
       'Boston Celtics':   {event:'NBA Regular Season', opponent:'To be confirmed', watchLink:'https://www.nba.com/celtics', targetDate:'2026-10-05T09:00:00+08:00', photo:''}
     }),
     countdown:{days:0,hours:0,mins:0},
+    nbaToday: [],
+    // 50-slot carousels; drop real photos at these paths to replace the placeholders
+    ealaSlides: Array.from({length:50}, (_,i)=>({src:'/images/sports/eala-'+(i+1)+'.jpg', alt:'Alex Eala match moment '+(i+1)})),
+    nbaSlides: Array.from({length:50}, (_,i)=>({src:'/images/sports/nba-'+(i+1)+'.jpg', alt:'NBA star photo '+(i+1)})),
+    ealaSlide: 0,
+    nbaSlide: 0,
     newsItems: [
       {title:'Loading latest headlines…', link:'#'}
     ],
@@ -2180,6 +2228,9 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
       setInterval(()=> this.updateCountdown(), 60000);
       this.loadNews();
       this.loadWeather();
+      this.loadLiveSports();
+      setInterval(()=> this.loadLiveSports(), 60000);
+      setInterval(()=> { this.ealaSlide = (this.ealaSlide+1) % this.ealaSlides.length; this.nbaSlide = (this.nbaSlide+1) % this.nbaSlides.length; }, 5000);
       if(window.AOS) AOS.init({duration:600, once:true, offset:80});
       window.addEventListener('scroll', ()=>{ this.showBackToTop = window.scrollY > 600; });
       if(!safeLS.get('mji_cookies_accepted', false)) this.showCookieNotice = true;
@@ -2354,6 +2405,98 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
       } else {
         this.newsItems = [{title:'Live headlines are temporarily unavailable — check GMA News, ABS-CBN, Inquirer, or ESPN directly.', link:'#', ph:true}];
       }
+    },
+
+    // ---- Live sports: free ESPN public endpoints (no API key). Times shown in PHT. ----
+    phtLabel(iso){
+      if(!iso) return 'TBA';
+      return new Date(iso).toLocaleString('en-PH',{timeZone:'Asia/Manila',weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',hour12:true})+' PHT';
+    },
+
+    async espnJson(url){
+      try{
+        const r = await fetch(url, {signal: AbortSignal.timeout(8000)});
+        return r.ok ? await r.json() : null;
+      }catch(_){ return null; }
+    },
+
+    async loadLiveSports(){
+      const ESPN = 'https://site.api.espn.com/apis/site/v2/sports/';
+      const [wta, teamsRes, board] = await Promise.all([
+        this.espnJson(ESPN+'tennis/wta/scoreboard'),
+        this.espnJson(ESPN+'basketball/nba/teams'),
+        this.espnJson(ESPN+'basketball/nba/scoreboard')
+      ]);
+
+      // Today's NBA scores (live + final + upcoming, PHT start times)
+      if(board?.events){
+        this.nbaToday = board.events.map(e=>{
+          const c = e.competitions?.[0] || {};
+          const h = (c.competitors||[]).find(x=>x.homeAway==='home') || {};
+          const a = (c.competitors||[]).find(x=>x.homeAway==='away') || {};
+          return {
+            id: e.id,
+            away: a.team?.abbreviation || '', home: h.team?.abbreviation || '',
+            awayScore: a.score ?? '', homeScore: h.score ?? '',
+            state: c.status?.type?.state || 'pre',
+            detail: c.status?.type?.shortDetail || '',
+            time: this.phtLabel(e.date)
+          };
+        });
+      }
+
+      // Alex Eala: locate her event in the WTA scoreboard
+      const ev = wta?.events?.find(e=>JSON.stringify(e).includes('Eala'));
+      if(ev){
+        const comp = ev.competitions?.[0] || {};
+        const opp = (comp.competitors||[]).map(c=>c.athlete?.displayName || c.team?.displayName || '').find(n=>n && !n.includes('Eala'));
+        const isLive = comp.status?.type?.state === 'in';
+        this.ealaNextMatch = {
+          ...this.ealaNextMatch,
+          event: ev.name || ev.shortName || this.ealaNextMatch.event,
+          opponent: opp || this.ealaNextMatch.opponent,
+          targetDate: ev.date || this.ealaNextMatch.targetDate,
+          isLive,
+          liveScore: isLive ? (comp.status?.type?.shortDetail || '') : '',
+          watchLink: ev.links?.[0]?.href || this.ealaNextMatch.watchLink,
+          lastVerified: new Date().toLocaleString('en-PH',{timeZone:'Asia/Manila'})+' PHT (live)'
+        };
+      }
+
+      // Selected NBA team: next game, opponent logo, season records (head-to-head context)
+      const teams = (teamsRes?.sports?.[0]?.leagues?.[0]?.teams || []).map(x=>x.team);
+      const team = teams.find(t=>t.displayName===this.selectedTeam);
+      if(team){
+        const sch = await this.espnJson(ESPN+'basketball/nba/teams/'+team.id+'/schedule');
+        const next = (sch?.events||[]).find(e=>e.competitions?.[0]?.status?.type?.state !== 'post');
+        if(next){
+          const c = next.competitions[0];
+          const me = c.competitors.find(x=>x.team?.id===team.id) || {};
+          const op = c.competitors.find(x=>x.team?.id!==team.id) || {};
+          const isLive = c.status?.type?.state === 'in';
+          const prev = this.teamSchedules[this.selectedTeam] || {};
+          this.teamSchedules = {...this.teamSchedules, [this.selectedTeam]: {
+            ...prev,
+            event: 'NBA — ' + (next.name || 'Regular Season'),
+            opponent: op.team?.displayName || 'TBA',
+            opponentLogo: op.team?.logo || '',
+            teamLogo: team.logos?.[0]?.href || '',
+            myRecord: me.records?.[0]?.summary || '',
+            oppRecord: op.records?.[0]?.summary || '',
+            targetDate: next.date,
+            isLive,
+            liveScore: isLive ? (me.score+' - '+op.score) : '',
+            watchLink: next.links?.[0]?.href || prev.watchLink
+          }};
+        }
+      }
+      this.saveLiveSportsCache();
+      this.updateCountdown();
+    },
+
+    saveLiveSportsCache(){
+      safeLS.set('mji_eala_match_v2', this.ealaNextMatch);
+      safeLS.set('mji_team_schedules', this.teamSchedules);
     },
 
     updateCountdown(){
