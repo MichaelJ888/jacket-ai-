@@ -1,6 +1,6 @@
 import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 
-export type SiteTheme = { primary: string; secondary: string; background: string };
+export type SiteTheme = { primary: string; secondary: string; background: string; bgImage: string; bgOpacity: number };
 export type SitePosition = { x: number; y: number };
 export type SiteStyle = { w?: number; h?: number; rot?: number; hidden?: boolean };
 export type SiteDoc = {
@@ -32,7 +32,7 @@ const MAX_OFFSET = 2000;
 const MAX_SIZE = 2000;
 const MAX_ROTATION = 360;
 
-export const DEFAULT_THEME: SiteTheme = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF' };
+export const DEFAULT_THEME: SiteTheme = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF', bgImage: '', bgOpacity: 15 };
 
 export function emptySiteDoc(): SiteDoc {
   return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], sectionOrder: [], positions: {}, styles: {}, updatedAt: null };
@@ -51,6 +51,16 @@ export function sanitizeSiteDoc(input: unknown): SanitizeResult {
     if (value === undefined) continue;
     if (typeof value !== 'string' || !HEX.test(value)) return { ok: false, error: `Theme ${field} must be a #RRGGBB color.` };
     theme[field] = value.toUpperCase();
+  }
+  if (themeRaw.bgImage !== undefined) {
+    const url = themeRaw.bgImage;
+    if (typeof url !== 'string' || (url !== '' && (url.length > MAX_URL || !IMAGE_URL.test(url)))) return { ok: false, error: 'Background image must be an https:// or / path.' };
+    theme.bgImage = url;
+  }
+  if (themeRaw.bgOpacity !== undefined) {
+    const op = themeRaw.bgOpacity;
+    if (typeof op !== 'number' || !Number.isInteger(op) || op < 0 || op > 100) return { ok: false, error: 'Background opacity must be 0-100.' };
+    theme.bgOpacity = op;
   }
 
   const texts = pickStrings(raw.texts, MAX_TEXTS, MAX_TEXT, 'text');

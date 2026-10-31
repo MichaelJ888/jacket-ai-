@@ -5,6 +5,10 @@ import type { SiteDoc } from '../../api/_lib/site-content-logic';
 
 type Stage = 'checking' | 'login' | 'code' | 'editing';
 
+type LibraryItem = { src: string; label: string };
+
+const LIBRARY_MIME = 'application/x-mjic-library';
+
 type FrameMessage = {
   source?: string;
   type?: string;
@@ -35,10 +39,19 @@ export default function EditorPage() {
   const [frameKey, setFrameKey] = useState(0);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const draftRef = useRef<SiteDoc | null>(null);
+  const [library, setLibrary] = useState<LibraryItem[]>([]);
 
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+
+  useEffect(() => {
+    if (stage !== 'editing' || library.length) return;
+    fetch('/image-library.json', { cache: 'force-cache' })
+      .then((r) => (r.ok ? r.json() : { items: [] }))
+      .then((j: { items?: LibraryItem[] }) => setLibrary(j.items ?? []))
+      .catch(() => setLibrary([]));
+  }, [stage, library.length]);
 
   const pushToFrame = useCallback((doc: SiteDoc) => {
     frameRef.current?.contentWindow?.postMessage({ source: 'mjic-cms-editor', type: 'render', doc }, location.origin);
@@ -144,14 +157,26 @@ export default function EditorPage() {
     return () => window.removeEventListener('message', onMessage);
   }, [pushToFrame]);
 
-  function updateTheme(field: keyof SiteDoc['theme'], value: string) {
+  function updateTheme(field: 'primary' | 'secondary' | 'background' | 'bgImage', value: string) {
     setDirty(true);
-    setDraft((prev) => (prev ? { ...prev, theme: { ...prev.theme, [field]: value.toUpperCase() } } : prev));
+    const next = field === 'bgImage' ? value : value.toUpperCase();
+    setDraft((prev) => (prev ? { ...prev, theme: { ...prev.theme, [field]: next } } : prev));
+  }
+
+  function updateBgOpacity(value: number) {
+    setDirty(true);
+    setDraft((prev) => (prev ? { ...prev, theme: { ...prev.theme, bgOpacity: value } } : prev));
+  }
+
+  function startLibraryDrag(e: React.DragEvent<HTMLImageElement>, src: string) {
+    e.dataTransfer.effectAllowed = 'copy';
+    e.dataTransfer.setData(LIBRARY_MIME, src);
+    e.dataTransfer.setData('text/plain', src);
   }
 
   useEffect(() => {
     if (stage === 'editing' && draftRef.current) pushToFrame(draftRef.current);
-  }, [draft?.theme.primary, draft?.theme.secondary, draft?.theme.background, stage, pushToFrame]);
+  }, [draft?.theme.primary, draft?.theme.secondary, draft?.theme.background, draft?.theme.bgImage, draft?.theme.bgOpacity, stage, pushToFrame]);
 
   async function requestCode(e: React.FormEvent) {
     e.preventDefault();
@@ -270,13 +295,29 @@ export default function EditorPage() {
     <main className="flex min-h-screen flex-col bg-zinc-100">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
         <h1 className="mr-2 text-base font-bold text-zinc-900">Visual Editor</h1>
-        <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to pick a local photo (or upload) · Drop an image file onto a slot · Drag ☰ Move section or catalogue cards to reorder</span>
+        <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to pick a local photo (or upload) · Drag a library photo or image file onto a slot · Drag the corner handle to resize · Drag ☰ Move section or catalogue cards to reorder</span>
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {draft && (
             <>
               <ColorField label="Primary" value={draft.theme.primary} onChange={(v) => updateTheme('primary', v)} />
               <ColorField label="Secondary" value={draft.theme.secondary} onChange={(v) => updateTheme('secondary', v)} />
               <ColorField label="Background" value={draft.theme.background} onChange={(v) => updateTheme('background', v)} />
+              <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700">
+                Background photo
+                <select value={draft.theme.bgImage} onChange={(e) => updateTheme('bgImage', e.target.value)} className="max-w-[180px] rounded border border-zinc-300 bg-white px-1.5 py-1 text-xs">
+                  <option value="">None</option>
+                  {draft.theme.bgImage && !library.some((item) => item.src === draft.theme.bgImage) && <option value={draft.theme.bgImage}>Current image</option>}
+                  {library.map((item) => (
+                    <option key={item.src} value={item.src}>{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              {draft.theme.bgImage && (
+                <label className="flex items-center gap-1.5 text-xs font-medium text-zinc-700">
+                  Opacity {draft.theme.bgOpacity}%
+                  <input type="range" min={0} max={100} step={1} value={draft.theme.bgOpacity} onChange={(e) => updateBgOpacity(Number(e.target.value))} className="w-24" />
+                </label>
+              )}
             </>
           )}
           <span className="text-xs text-zinc-500">{dirty ? 'Unpublished changes' : 'All published'}</span>
@@ -290,6 +331,16 @@ export default function EditorPage() {
       </header>
       {(notice || error) && (
         <div className={`px-4 py-2 text-sm ${error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{error || notice}</div>
+      )}
+      {library.length > 0 && (
+        <details className="border-b border-zinc-200 bg-white px-4 py-2 text-sm">
+          <summary className="cursor-pointer font-semibold text-zinc-800">Image library ({library.length}) — drag a photo onto any image on the page</summary>
+          <div className="mt-3 grid max-h-72 grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-2 overflow-y-auto">
+            {library.map((item) => (
+              <img key={item.src} src={item.src} alt={item.label} title={item.label} draggable loading="lazy" decoding="async" onDragStart={(e) => startLibraryDrag(e, item.src)} className="h-20 w-full cursor-grab rounded object-cover ring-1 ring-zinc-200" />
+            ))}
+          </div>
+        </details>
       )}
       <iframe key={frameKey} ref={frameRef} onLoad={onFrameLoad} src="/index.html?cms=editor" title="Live page editor" scrolling="no" className="block w-full border-0 bg-white" style={{ height: frameHeight }} />
     </main>

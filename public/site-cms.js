@@ -6,6 +6,8 @@
   var POLL_MS = 20000;
   var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   var DEFAULT_THEME = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF' };
+  var DEFAULT_OPACITY = 15;
+  var LIBRARY_MIME = 'application/x-mjic-library';
   var TEXT_SELECTOR = 'h1,h2,h3,h4,h5,h6,p,span,a,li,label,figcaption,strong,em,small,blockquote,td,th,dt,dd';
   var CARD_SELECTOR = '#catalog > div.grid > div[data-cms-card]';
   var doc = null;
@@ -18,6 +20,8 @@
   var grip = null;
   var hovered = null;
   var drag = null;
+  var resizer = null;
+  var resize = null;
   var gripFrame = 0;
 
   function sectionNodes() {
@@ -134,6 +138,24 @@
       document.head.appendChild(style);
     }
     if (style.textContent !== css) style.textContent = css;
+    applyBackgroundImage(theme);
+  }
+
+  // A fixed layer behind the page content; opacity keeps the photo subtle.
+  function applyBackgroundImage(theme) {
+    var layer = document.getElementById('mjic-cms-bg');
+    if (!theme.bgImage) { if (layer) layer.remove(); return; }
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'mjic-cms-bg';
+      layer.setAttribute('aria-hidden', 'true');
+      layer.style.cssText = 'position:fixed;inset:0;z-index:-1;pointer-events:none;background-size:cover;background-position:center;background-repeat:no-repeat';
+      document.body.appendChild(layer);
+    }
+    var url = 'url("' + theme.bgImage + '")';
+    if (layer.style.backgroundImage !== url) layer.style.backgroundImage = url;
+    var opacity = String((typeof theme.bgOpacity === 'number' ? theme.bgOpacity : DEFAULT_OPACITY) / 100);
+    if (layer.style.opacity !== opacity) layer.style.opacity = opacity;
   }
 
   function applyOrder(order) {
@@ -278,6 +300,10 @@
     if (action === 'shrink') st.w = clampSize(rect.width * 0.9);
     if (action === 'hide') st.hidden = st.hidden ? undefined : true;
     if (action === 'reset') st = {};
+    writeStyle(key, st);
+  }
+
+  function writeStyle(key, st) {
     Object.keys(st).forEach(function (k) { if (st[k] === undefined) delete st[k]; });
     if (!doc.styles) doc.styles = {};
     if (Object.keys(st).length) doc.styles[key] = st;
@@ -468,6 +494,10 @@
     return !!(e.dataTransfer && e.dataTransfer.types && [].indexOf.call(e.dataTransfer.types, 'Files') !== -1);
   }
 
+  function hasLibrary(e) {
+    return !!(e.dataTransfer && e.dataTransfer.types && [].indexOf.call(e.dataTransfer.types, LIBRARY_MIME) !== -1);
+  }
+
   function currentCards() {
     var cards = [].slice.call(document.querySelectorAll(CARD_SELECTOR));
     return cards.sort(function (a, b) { return (a.style.order | 0) - (b.style.order | 0); });
@@ -559,6 +589,23 @@
       if (img) uploadImage(img, e.dataTransfer.files[0]);
     });
 
+    // Library thumbnails from the editor tray carry their path in LIBRARY_MIME.
+    document.addEventListener('dragover', function (e) {
+      if (!EDITOR || dragged || dragSection || !hasLibrary(e)) return;
+      if (!(e.target.closest && e.target.closest('img'))) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    });
+
+    document.addEventListener('drop', function (e) {
+      if (!EDITOR || dragged || dragSection || !hasLibrary(e)) return;
+      var img = e.target.closest && e.target.closest('img');
+      if (!img) return;
+      e.preventDefault();
+      var src = e.dataTransfer.getData(LIBRARY_MIME);
+      if (src && src.charAt(0) === '/' && src.charAt(1) !== '/' && doc) setImage(img, src);
+    });
+
     document.addEventListener('dragend', function () {
       if (dragSection) {
         dragSection.style.opacity = '';
@@ -595,10 +642,12 @@
   }
 
   function placeGrip() {
-    if (!hovered || !hovered.isConnected) { grip.style.display = 'none'; hovered = null; placeBar(); return; }
+    if (!hovered || !hovered.isConnected) { grip.style.display = 'none'; resizer.style.display = 'none'; hovered = null; placeBar(); return; }
     var r = hovered.getBoundingClientRect();
     grip.style.display = 'block';
     grip.style.transform = 'translate3d(' + Math.max(0, r.left - 10) + 'px,' + Math.max(0, r.top - 10) + 'px,0)';
+    resizer.style.display = 'block';
+    resizer.style.transform = 'translate3d(' + Math.max(0, r.right - 8) + 'px,' + Math.max(0, r.bottom - 8) + 'px,0)';
     placeBar();
   }
 
@@ -650,7 +699,45 @@
     document.body.style.userSelect = 'none';
   }
 
+  function onResizeDown(e) {
+    if (e.button !== 0 || !hovered || drag || resize) return;
+    e.preventDefault();
+    resize = { el: hovered, key: pathKey(hovered), id: e.pointerId, sx: e.clientX, sw: hovered.getBoundingClientRect().width, w: 0 };
+    resizer.setPointerCapture(e.pointerId);
+    resizer.addEventListener('pointermove', onResizeMove, { passive: true });
+    resizer.addEventListener('pointerup', onResizeUp);
+    resizer.addEventListener('pointercancel', onResizeUp);
+    document.body.style.userSelect = 'none';
+  }
+
+  function onResizeMove(e) {
+    if (!resize || e.pointerId !== resize.id) return;
+    resize.w = clampSize(resize.sw + e.clientX - resize.sx);
+    resize.el.style.width = resize.w + 'px';
+    queueGrip();
+  }
+
+  function onResizeUp(e) {
+    if (!resize || e.pointerId !== resize.id) return;
+    var r = resize;
+    resize = null;
+    resizer.removeEventListener('pointermove', onResizeMove);
+    resizer.removeEventListener('pointerup', onResizeUp);
+    resizer.removeEventListener('pointercancel', onResizeUp);
+    document.body.style.userSelect = '';
+    if (!r.w || !doc) return;
+    var cur = (doc.styles && doc.styles[r.key]) || {};
+    writeStyle(r.key, { w: r.w, h: cur.h, rot: cur.rot, hidden: cur.hidden });
+  }
+
   function setupFreeDrag() {
+    resizer = document.createElement('div');
+    resizer.setAttribute('data-cms-ignore', '');
+    resizer.title = 'Drag corner to resize';
+    resizer.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483000;display:none;width:14px;height:14px;border-radius:3px;background:#B8912F;border:2px solid #fff;box-sizing:border-box;cursor:nwse-resize;touch-action:none;box-shadow:0 2px 6px rgba(0,0,0,.3)';
+    resizer.addEventListener('pointerdown', onResizeDown);
+    document.body.appendChild(resizer);
+
     grip = document.createElement('div');
     grip.setAttribute('data-cms-ignore', '');
     grip.title = 'Drag to move';

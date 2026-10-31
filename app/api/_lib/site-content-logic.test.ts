@@ -81,6 +81,27 @@ test('sanitizeSiteDoc rejects malformed section order', () => {
   assert.equal(sanitizeSiteDoc({ sectionOrder: ['x'.repeat(301)] }).ok, false);
 });
 
+test('sanitizeSiteDoc accepts a background image and opacity, and rejects bad ones', () => {
+  const ok = sanitizeSiteDoc({ theme: { bgImage: '/images/fabrics/1.avif', bgOpacity: 40 } });
+  assert.equal(ok.ok, true);
+  if (ok.ok) {
+    assert.equal(ok.doc.theme.bgImage, '/images/fabrics/1.avif');
+    assert.equal(ok.doc.theme.bgOpacity, 40);
+  }
+  const none = sanitizeSiteDoc({ theme: { bgImage: '' } });
+  assert.equal(none.ok, true);
+  if (none.ok) assert.equal(none.doc.theme.bgImage, '');
+  const defaults = sanitizeSiteDoc({});
+  assert.equal(defaults.ok, true);
+  if (defaults.ok) assert.equal(defaults.doc.theme.bgOpacity, 15);
+  for (const bgImage of ['javascript:alert(1)', 'https://x.example.com/a.png)', '/a.png");x:', '/images/a b.png']) {
+    assert.equal(sanitizeSiteDoc({ theme: { bgImage } }).ok, false, bgImage);
+  }
+  for (const bgOpacity of [-1, 101, 12.5, '50']) {
+    assert.equal(sanitizeSiteDoc({ theme: { bgOpacity } }).ok, false, String(bgOpacity));
+  }
+});
+
 test('isEditorChatAllowed allows only the CEO and Anne Manalo', () => {
   assert.equal(isEditorChatAllowed('7329264426', '111'), true);
   assert.equal(isEditorChatAllowed('111', '111'), true);
