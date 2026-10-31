@@ -163,10 +163,6 @@
 
 <body class="bg-white text-navy-700 antialiased" x-data="mjApp()" x-init="init()">
 
-<!-- Hidden static forms so Netlify's build-time bot detects them (required for Netlify Forms to work).
-     Actual submission happens via JS fetch() in the real forms below — these never display to visitors. -->
-<form name="inquiry" data-netlify="true" hidden><input name="name"><input name="company"><input name="contact"><textarea name="message"></textarea></form>
-<form name="quotation" data-netlify="true" hidden><input name="client"><textarea name="items"></textarea><input name="total"><input name="payment"></form>
 
 <!-- ============ FREE PERKS TOP BANNER ============ -->
 <div class="bg-navy text-white text-xs sm:text-sm overflow-hidden border-b border-gold/40">
@@ -2126,7 +2122,6 @@ function mjApp(){
     clientIndustries:['Manufacturing','BPO & Call Centers','Retail Chains','Government Agencies','Construction & Engineering','Logistics & Trucking','Hospitals & Clinics','Schools & Universities','Hospitality & F&B'],
 
     defaultProducts(){
-      const productImages = {
 // One unique photo per design. Accessories have no photo in the library, so they use the branded placeholder (empty img).
       const productImages = {
 varsity1:'/images/site/varsity-letterman.jpg',
