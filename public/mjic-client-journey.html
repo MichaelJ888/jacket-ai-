@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MJIC Client Journey Showcase</title>
+<style>
+:root{--navy:#0b1e3d;--navy2:#12325e;--gold:#d7ad4f;--gold2:#b8912f;--cream:#f7f4ec;--ink:#172235}
+*{box-sizing:border-box}body{margin:0;background:var(--navy);font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+.stage{min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 82% 12%,#314c74 0,transparent 34%),linear-gradient(135deg,#07152e,#0b1e3d 52%,#111f36)}
+.frame{width:min(100vw,177.78vh);aspect-ratio:16/9;position:relative;overflow:hidden;background:var(--cream)}
+.slide{position:absolute;inset:0;padding:6% 7%;display:grid;align-content:center;gap:1.1rem;opacity:0;transform:translateX(6%);animation:show 20s infinite;color:var(--ink)}
+.slide:nth-child(2){animation-delay:5s}.slide:nth-child(3){animation-delay:10s}.slide:nth-child(4){animation-delay:15s}
+@keyframes show{0%{opacity:0;transform:translateX(6%)}2.5%,22%{opacity:1;transform:translateX(0)}25%,100%{opacity:0;transform:translateX(-6%)}}
+.eyebrow{color:var(--gold2);font-weight:700;text-transform:uppercase;letter-spacing:.2em;font-size:clamp(.6rem,1.4vw,.85rem)}
+h1,h2{margin:0;line-height:1.02;color:var(--navy)}h1{font-size:clamp(1.6rem,4.6vw,4rem);max-width:15em}h2{font-size:clamp(1.4rem,4vw,3.4rem);max-width:16em}
+.copy{max-width:34em;font-size:clamp(.75rem,1.6vw,1.15rem);line-height:1.5;color:#3c4a63}
+.pill{display:inline-block;background:var(--navy);color:#fff;padding:.7em 1.1em;border-radius:6px;font-weight:700;width:max-content;font-size:clamp(.65rem,1.4vw,1rem)}
+.brand{position:absolute;left:5%;bottom:5%;font-size:clamp(.55rem,1.1vw,.75rem);color:#3c4a63;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.brand b{color:var(--gold2)}
+.dots{position:absolute;right:5%;bottom:5.5%;display:flex;gap:.5em}
+.dots i{width:2.2em;height:.45em;border-radius:99px;background:#0b1e3d22;overflow:hidden;position:relative}
+.dots i::after{content:"";position:absolute;inset:0;background:var(--gold);transform:scaleX(0);transform-origin:left;animation:fill 20s infinite}
+.dots i:nth-child(2)::after{animation-delay:5s}.dots i:nth-child(3)::after{animation-delay:10s}.dots i:nth-child(4)::after{animation-delay:15s}
+@keyframes fill{0%,2.5%{transform:scaleX(0)}22%,22.5%{transform:scaleX(1)}25%,100%{transform:scaleX(0)}}
+/* Scene 1 — Idea */
+.s1{background:linear-gradient(120deg,var(--cream) 0 58%,var(--gold) 58%)}
+.bulb{position:absolute;right:11%;top:20%;width:22%;aspect-ratio:1/1.25}
+.bulb::before{content:"";position:absolute;inset:0 0 22% 0;background:var(--navy);border-radius:50% 50% 46% 46%;box-shadow:0 18px 40px #0b1e3d33}
+.bulb::after{content:"";position:absolute;left:32%;right:32%;bottom:0;height:24%;background:var(--navy);clip-path:polygon(0 0,100% 0,82% 100%,18% 100%)}
+.bulb i{position:absolute;left:50%;top:16%;width:26%;height:30%;transform:translateX(-50%);border:.35em solid var(--gold);border-bottom:none;border-radius:50% 50% 0 0}
+/* Scene 2 — Fabric selection */
+.s2{background:linear-gradient(120deg,var(--cream) 0 62%,#e9e2d2 62%)}
+.swatches{position:absolute;right:7%;top:16%;width:34%;display:grid;grid-template-columns:repeat(2,1fr);gap:4%;transform:rotate(-4deg)}
+.swatches b{aspect-ratio:4/3;border-radius:8px;box-shadow:0 10px 24px #0b1e3d26;border:3px solid #fff}
+.swatches b:nth-child(1){background:repeating-linear-gradient(45deg,#2a3b57 0 4px,#22314c 4px 8px)}
+.swatches b:nth-child(2){background:repeating-linear-gradient(0deg,#7a2433 0 3px,#5a1a26 3px 6px)}
+.swatches b:nth-child(3){background:repeating-linear-gradient(90deg,#55602a 0 5px,#424b1c 5px 10px)}
+.swatches b:nth-child(4){background:repeating-linear-gradient(135deg,#2560d8 0 4px,#1b49ae 4px 8px)}
+/* Scene 3 — Antipolo production */
+.s3{background:linear-gradient(135deg,#0b1e3d,#12325e);color:var(--cream)}
+.s3 h2,.s3 .copy{color:#fff}.s3 .copy{color:#c9d4e8}.s3 .eyebrow{color:var(--gold)}
+.s3 .brand{color:#c9d4e8}
+.stitch{position:absolute;left:7%;right:7%;bottom:16%;border-top:.35em dashed var(--gold);opacity:.8}
+.needle{position:absolute;right:10%;top:18%;width:26%;height:8%;transform:rotate(-18deg)}
+.needle::before{content:"";position:absolute;inset:40% 0;background:linear-gradient(90deg,#c9d4e8,#fff);border-radius:99px}
+.needle::after{content:"";position:absolute;right:-2%;top:0;border-style:solid;border-width:.5em 0 .5em 1.4em;border-color:transparent transparent transparent #e8ecf4}
+/* Scene 4 — Finished garments */
+.s4{background:linear-gradient(120deg,var(--cream) 0 55%,var(--navy) 55%)}
+.s4 .pill{background:var(--gold);color:var(--navy)}
+.jacket{position:absolute;right:9%;top:16%;width:26%;height:60%;background:var(--navy);clip-path:polygon(32% 0,45% 9%,55% 9%,68% 0,100% 22%,83% 38%,78% 28%,78% 100%,22% 100%,22% 28%,17% 38%,0 22%);filter:drop-shadow(0 20px 14px #0004)}
+.jacket::after{content:"";position:absolute;left:47%;top:12%;bottom:0;width:6%;background:var(--gold)}
+.check{position:absolute;right:32%;top:60%;width:7%;aspect-ratio:1;background:var(--gold);border-radius:50%;box-shadow:0 10px 24px #0b1e3d44}
+.check::after{content:"";position:absolute;left:26%;top:30%;width:44%;height:24%;border:solid var(--navy);border-width:0 0 .3em .3em;transform:rotate(-45deg)}
+</style>
+</head>
+<body>
+<main class="stage"><div class="frame" role="img" aria-label="Official MJIC client journey: idea, fabric selection, Antipolo production, finished garments">
+<section class="slide s1"><span class="eyebrow">MJIC Client Journey — 01 / Idea</span><h1>It starts with your idea.</h1><p class="copy">Tell Michael Jeffrey International Corporation what your team needs — varsity jackets, corporate uniforms, or full organization rollouts. We shape your concept into a production-ready design.</p><span class="pill">Custom jackets &amp; uniforms, made in the Philippines</span><div class="bulb"><i></i></div></section>
+<section class="slide s2"><span class="eyebrow">02 / Fabric Selection</span><h2>Choose your fabric and color.</h2><p class="copy">Microfiber, Michael Angelo, Diamond Ripstop, Taslan, Varsity Satin and more — every stock fabric with real feel, weight, and color options, matched to your budget and use.</p><span class="pill">Class B included · Class A premium</span><div class="swatches"><b></b><b></b><b></b><b></b></div></section>
+<section class="slide s3"><span class="eyebrow">03 / Antipolo Production</span><h2>Cut, sewn, and embroidered in Antipolo.</h2><p class="copy">Your order goes into our Antipolo, Rizal production line — precision cutting, in-house embroidery digitizing, and quality checks at every stage before packing.</p><span class="pill">In-house production since 2004</span><div class="needle"></div><div class="stitch"></div></section>
+<section class="slide s4"><span class="eyebrow">04 / Finished Garments</span><h2>Finished garments, delivered to your team.</h2><p class="copy">From a 20-piece pilot order to nationwide rollouts — inspected, packed, and shipped to your doorstep, anywhere in the Philippines and abroad.</p><span class="pill">Message MJIC to start your order</span><div class="jacket"></div><div class="check"></div></section>
+<span class="brand">Michael Jeffrey <b>International</b> Corporation · Antipolo, Rizal</span>
+<span class="dots"><i></i><i></i><i></i><i></i></span>
+</div></main>
+</body>
+</html>

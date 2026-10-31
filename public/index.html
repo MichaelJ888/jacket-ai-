@@ -429,132 +429,15 @@
   </div>
 </section>
 
-<!-- ============ ALEX EALA MATCH COUNTDOWN ============ -->
-<section class="bg-navy py-16" :class="ealaNextMatch.isLive ? 'ring-4 ring-red-500/60' : ''">
-  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
-    <div class="grid lg:grid-cols-5 gap-8 items-center border rounded-lg p-8 sm:p-10" :class="ealaNextMatch.isLive ? 'border-red-500 bg-red-500/5 animate-pulse' : 'border-white/10'">
-      <div class="lg:col-span-2" x-show="siteSettings.ealaPhoto" x-cloak>
-        <img :src="siteSettings.ealaPhoto" class="w-full rounded-lg object-cover max-h-60" alt="Alex Eala">
-      </div>
-      <div :class="siteSettings.ealaPhoto ? 'lg:col-span-3' : 'lg:col-span-5 flex flex-col lg:flex-row lg:items-center justify-between gap-8'">
-        <div>
-          <template x-if="ealaNextMatch.isLive">
-            <p class="text-red-400 font-bold text-sm mb-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block"></span> ALEX EALA IS PLAYING NOW</p>
-          </template>
-          <template x-if="!ealaNextMatch.isLive">
-            <p class="text-gold-400 font-semibold text-sm mb-2 flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4"></i> Proudly Cheering for the Philippines</p>
-          </template>
-          <h3 class="font-display font-bold text-white text-2xl sm:text-3xl mb-3" x-text="ealaNextMatch.isLive ? 'Alex Eala — LIVE' : &quot;Alex Eala's Next WTA Match&quot;"></h3>
-          <p class="text-white/60 text-sm max-w-md" x-text="ealaNextMatch.event + ' — vs. ' + ealaNextMatch.opponent"></p>
-          <p class="text-gold-400 text-xs mt-1" x-text="phtLabel(ealaNextMatch.targetDate)"></p>
-          <p x-show="ealaNextMatch.isLive && ealaNextMatch.liveScore" x-cloak class="font-display font-bold text-3xl text-red-400 mt-3" x-text="ealaNextMatch.liveScore"></p>
-          <a :href="ealaNextMatch.watchLink" target="_blank" class="inline-flex items-center gap-2 mt-4 font-semibold" :class="ealaNextMatch.isLive ? 'text-red-400 text-base' : 'text-gold-400 text-sm hover:text-gold-100'" x-text="ealaNextMatch.isLive ? 'Watch LIVE now on BlastTV →' : 'Watch live on BlastTV'"></a>
-        </div>
-        <div x-show="!ealaNextMatch.isLive" class="flex gap-4 mt-6">
-          <div class="text-center bg-white/5 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-white text-3xl" x-text="countdown.days"></p><p class="text-[10px] text-white/50 uppercase">Days</p></div>
-          <div class="text-center bg-white/5 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-white text-3xl" x-text="countdown.hours"></p><p class="text-[10px] text-white/50 uppercase">Hours</p></div>
-          <div class="text-center bg-white/5 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-white text-3xl" x-text="countdown.mins"></p><p class="text-[10px] text-white/50 uppercase">Mins</p></div>
-        </div>
-      </div>
-    </div>
-    <div class="relative mt-6 h-56 sm:h-72 rounded-lg overflow-hidden bg-gradient-to-br from-navy-600 to-navy" aria-label="Alex Eala photo carousel" data-cms-skip>
-      <img :src="ealaSlides[ealaSlide].src" :alt="ealaSlides[ealaSlide].alt" decoding="async" loading="lazy" class="absolute inset-0 w-full h-full object-cover" @error="$el.classList.add('hidden')" @load="$el.classList.remove('hidden')">
-      <span class="absolute bottom-2 right-3 text-[10px] text-white/80 bg-black/40 rounded px-2 py-0.5" x-text="(ealaSlide+1)+' / 50'"></span>
-    </div>
-    <p class="text-white/30 text-[11px] mt-3">Match schedule shown is informational and updated periodically by our team — always confirm exact timing and where to watch through the official WTA app or the tournament's licensed broadcaster.</p>
-  </div>
-</section>
-
-<!-- ============ NBA & GILAS COUNTDOWN (bonus section) ============ -->
-<section class="bg-navy-50/60 border-y hairline py-16 relative overflow-hidden" style="background-image:linear-gradient(rgba(238,241,246,.94),rgba(238,241,246,.94)),url('https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=1800&q=80');background-size:cover;background-position:center">
-            <p class="text-white/40 text-[11px] mt-2" x-show="ealaNextMatch.lastVerified" x-text="'Last checked: ' + ealaNextMatch.lastVerified"></p>
-            <a :href="ealaNextMatch.watchLink" target="_blank" rel="noopener" class="inline-flex items-center gap-2 mt-4 font-semibold" :class="ealaNextMatch.isLive ? 'text-red-400 text-base' : 'text-gold-400 text-sm hover:text-gold-100'" x-text="ealaNextMatch.isLive ? 'Watch LIVE now on BlastTV →' : 'Check official WTA scores →'"></a>
-  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
-    <p class="text-gold-600 font-semibold text-sm mb-2 flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4"></i> Bonus — Basketball Fans</p>
-    <h3 class="font-display font-bold text-navy text-2xl sm:text-3xl mb-6">Pick a team, see their next game.</h3>
-    <div class="flex flex-col sm:flex-row items-start gap-6 mb-6">
-      <div class="relative w-full sm:w-64 h-40 rounded-lg overflow-hidden bg-gradient-to-br from-navy to-navy-600 shrink-0" aria-label="NBA star photo carousel" data-cms-skip>
-        <img :src="nbaSlides[nbaSlide].src" :alt="nbaSlides[nbaSlide].alt" decoding="async" loading="lazy" class="absolute inset-0 w-full h-full object-cover" @error="$el.classList.add('hidden')" @load="$el.classList.remove('hidden')">
-        <span class="absolute bottom-2 right-3 text-[10px] text-white/80 bg-black/40 rounded px-2 py-0.5" x-text="(nbaSlide+1)+' / 50'"></span>
-      </div>
-      <div class="flex-1 w-full">
-        <div class="bg-white border hairline rounded-lg p-4 mb-4" x-show="teamSchedules[selectedTeam]" x-cloak>
-          <p class="text-[11px] font-semibold text-navy-400 uppercase mb-2" x-text="teamSchedules[selectedTeam]?.event"></p>
-          <div class="flex items-center justify-between gap-3 flex-wrap">
-            <div class="flex items-center gap-3">
-              <img :src="teamSchedules[selectedTeam]?.teamLogo" class="w-10 h-10 object-contain" alt="" x-show="teamSchedules[selectedTeam]?.teamLogo">
-              <div><p class="font-bold text-navy text-sm" x-text="selectedTeam"></p><p class="text-[11px] text-navy-400" x-text="teamSchedules[selectedTeam]?.myRecord"></p></div>
-            </div>
-            <div class="text-center">
-              <p class="font-display font-bold text-navy text-lg" x-show="teamSchedules[selectedTeam]?.isLive" x-text="teamSchedules[selectedTeam]?.liveScore"></p>
-              <p class="text-[11px] text-navy-400">VS</p>
-            </div>
-            <div class="flex items-center gap-3">
-              <div class="text-right"><p class="font-bold text-navy text-sm" x-text="teamSchedules[selectedTeam]?.opponent"></p><p class="text-[11px] text-navy-400" x-text="teamSchedules[selectedTeam]?.oppRecord"></p></div>
-              <img :src="teamSchedules[selectedTeam]?.opponentLogo" class="w-10 h-10 object-contain" alt="" x-show="teamSchedules[selectedTeam]?.opponentLogo">
-            </div>
-          </div>
-          <p class="text-xs text-navy-400 mt-3" x-text="phtLabel(teamSchedules[selectedTeam]?.targetDate)"></p>
-          <div class="flex gap-3 mt-3">
-            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.days"></p><p class="text-[10px] text-navy-400 uppercase">Days</p></div>
-            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.hours"></p><p class="text-[10px] text-navy-400 uppercase">Hours</p></div>
-            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.mins"></p><p class="text-[10px] text-navy-400 uppercase">Mins</p></div>
-          </div>
-        </div>
-        <div class="flex flex-wrap gap-2 text-[11px]" aria-label="Today's NBA scores">
-          <template x-for="g in nbaToday.slice(0,8)" :key="g.id">
-            <span class="bg-white border hairline rounded px-2 py-1 text-navy">
-              <span x-text="g.away+' '+g.awayScore"></span> @ <span x-text="g.home+' '+g.homeScore"></span>
-              <span class="text-navy-400" x-text="' · '+(g.state==='pre' ? g.time : g.detail)"></span>
-            </span>
-          </template>
-        </div>
-      </div>
-    </div>
-
-    <div class="flex flex-wrap items-center gap-3 mb-6">
-      <label class="text-xs font-semibold text-navy-400 uppercase tracking-wide">Select team</label>
-      <select x-model="selectedTeam" @change="ensureTeam(); loadLiveSports()" class="border hairline rounded-md px-4 py-2.5 text-sm font-semibold text-navy bg-white min-w-[260px]">
-        <optgroup label="Philippines">
-          <option>Gilas Pilipinas</option>
-        </optgroup>
-        <optgroup label="NBA — Eastern Conference">
-          <template x-for="t in nbaEast" :key="t"><option x-text="t" :value="t"></option></template>
-        </optgroup>
-        <optgroup label="NBA — Western Conference">
-          <template x-for="t in nbaWest" :key="t"><option x-text="t" :value="t"></option></template>
-        </optgroup>
-      </select>
-    </div>
-
-    <div class="grid lg:grid-cols-5 gap-8 items-center bg-white border hairline rounded-lg p-8 sm:p-10">
-      <div class="lg:col-span-2" x-show="(teamSchedules[selectedTeam]?.photo)" x-cloak>
-        <img :src="(teamSchedules[selectedTeam]?.photo)" class="w-full rounded-lg object-cover max-h-60" :alt="selectedTeam">
-      </div>
-      <div :class="(teamSchedules[selectedTeam]?.photo) ? 'lg:col-span-3' : 'lg:col-span-5 flex flex-col lg:flex-row lg:items-center justify-between gap-8'">
-        <div>
-          <h4 class="font-display font-bold text-navy text-xl mb-2" x-text="selectedTeam+' — Next Game'"></h4>
-          <p class="text-navy-400 text-sm" x-text="(teamSchedules[selectedTeam]?.event) + ' — vs. ' + (teamSchedules[selectedTeam]?.opponent)"></p>
-          <a :href="(teamSchedules[selectedTeam]?.watchLink)" target="_blank" class="inline-flex items-center gap-2 mt-4 text-gold-600 text-sm font-semibold hover:text-gold-700">Where to watch <i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>
-        </div>
-        <div class="flex gap-4 mt-6">
-          <div class="text-center bg-navy-50 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-navy text-3xl" x-text="teamCountdown.days"></p><p class="text-[10px] text-navy-400 uppercase">Days</p></div>
-          <div class="text-center bg-navy-50 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-navy text-3xl" x-text="teamCountdown.hours"></p><p class="text-[10px] text-navy-400 uppercase">Hours</p></div>
-          <div class="text-center bg-navy-50 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-navy text-3xl" x-text="teamCountdown.mins"></p><p class="text-[10px] text-navy-400 uppercase">Mins</p></div>
-        </div>
-      </div>
-    </div>
-    <p class="text-navy-400 text-[11px] mt-3">Schedule shown is manually updated by our team, not a live sports feed — the Admin Panel lets us keep this current. Team photos are placeholders until real, rights-cleared photos are added.</p>
-  </div>
-</section>
-
-<!-- ============ EXPLAINER VIDEO (admin-editable) ============ -->
+<!-- ============ OFFICIAL MJIC CLIENT JOURNEY SHOWCASE (admin-editable) ============ -->
 <section x-show="siteSettings.explainerVideoUrl" x-cloak class="max-w-5xl mx-auto px-6 sm:px-10 py-16">
   <p class="text-gold-600 font-semibold text-sm mb-2 text-center">Watch</p>
-  <h2 class="font-display font-bold text-navy text-2xl sm:text-3xl tracking-tight mb-6 text-center">See how our website works for you.</h2>
+  <h2 class="font-display font-bold text-navy text-2xl sm:text-3xl tracking-tight mb-2 text-center">The Official MJIC Client Journey.</h2>
+  <p class="text-navy-400 text-sm text-center mb-6">Idea → Fabric Selection → Antipolo Production → Finished Garments</p>
   <div class="aspect-video rounded-lg overflow-hidden border hairline">
     <iframe x-show="siteSettings.explainerVideoType!=='file'" :src="youtubeEmbedUrl(siteSettings.explainerVideoUrl)" class="w-full h-full" frameborder="0" allowfullscreen title="Website explainer video"></iframe>
-    <video x-show="siteSettings.explainerVideoType==='file'" :src="siteSettings.explainerVideoUrl" controls class="w-full h-full bg-navy"></video>
+    <video x-show="siteSettings.explainerVideoType==='file' && !explainerVideoFallback" :src="siteSettings.explainerVideoUrl" :poster="siteSettings.explainerVideoUrl==='/videos/mjic-client-journey.webm' ? '/videos/mjic-client-journey-poster.jpg' : ''" controls loop muted playsinline preload="metadata" class="w-full h-full bg-navy" @error="if(siteSettings.explainerVideoUrl==='/videos/mjic-client-journey.webm') explainerVideoFallback=true"></video>
+    <iframe x-show="siteSettings.explainerVideoType==='file' && explainerVideoFallback" x-cloak src="/mjic-client-journey.html" class="w-full h-full" frameborder="0" title="MJIC client journey showcase"></iframe>
   </div>
 </section>
 
@@ -742,7 +625,7 @@
       <div class="border hairline rounded-lg overflow-hidden hover:shadow-lg hover:border-gold-400/50 transition-all"
            :class="selectedFabric && selectedFabric.name===f.name ? 'ring-2 ring-gold-400' : ''">
         <div class="h-36 bg-navy-50 relative">
-          <img :src="f.img || fabricImage(f.name)" class="w-full h-full object-cover" :alt="f.name">
+          <img :src="f.img || fabricImage(f.name)" class="w-full h-full object-cover" :alt="f.name + ' fabric swatch'" loading="lazy" decoding="async" @error="$el.classList.add('hidden')">
           <video x-show="f.video" :src="f.video" muted loop autoplay playsinline class="w-full h-full object-cover"></video>
           <div x-show="!f.img && !f.video" class="w-full h-full flex items-center justify-center text-navy-400 text-xs">Photo/video to be added</div>
           <span class="absolute top-3 left-3 text-[10px] font-bold px-2.5 py-1 rounded-full" :class="f.class==='Class A' ? 'bg-gold text-navy' : 'bg-white/95 text-navy'" x-text="f.class"></span>
@@ -1125,6 +1008,124 @@
         </button>
       </div>
     </div>
+  </div>
+</section>
+
+<!-- ============ ALEX EALA MATCH COUNTDOWN ============ -->
+<section class="bg-navy py-16" :class="ealaNextMatch.isLive ? 'ring-4 ring-red-500/60' : ''">
+  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
+    <div class="grid lg:grid-cols-5 gap-8 items-center border rounded-lg p-8 sm:p-10" :class="ealaNextMatch.isLive ? 'border-red-500 bg-red-500/5 animate-pulse' : 'border-white/10'">
+      <div class="lg:col-span-2" x-show="siteSettings.ealaPhoto" x-cloak>
+        <img :src="siteSettings.ealaPhoto" class="w-full rounded-lg object-cover max-h-60" alt="Alex Eala">
+      </div>
+      <div :class="siteSettings.ealaPhoto ? 'lg:col-span-3' : 'lg:col-span-5 flex flex-col lg:flex-row lg:items-center justify-between gap-8'">
+        <div>
+          <template x-if="ealaNextMatch.isLive">
+            <p class="text-red-400 font-bold text-sm mb-2 flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-red-500 animate-ping inline-block"></span> ALEX EALA IS PLAYING NOW</p>
+          </template>
+          <template x-if="!ealaNextMatch.isLive">
+            <p class="text-gold-400 font-semibold text-sm mb-2 flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4"></i> Proudly Cheering for the Philippines</p>
+          </template>
+          <h3 class="font-display font-bold text-white text-2xl sm:text-3xl mb-3" x-text="ealaNextMatch.isLive ? 'Alex Eala — LIVE' : &quot;Alex Eala's Next WTA Match&quot;"></h3>
+          <p class="text-white/60 text-sm max-w-md" x-text="ealaNextMatch.event + ' — vs. ' + ealaNextMatch.opponent"></p>
+          <p class="text-gold-400 text-xs mt-1" x-text="phtLabel(ealaNextMatch.targetDate)"></p>
+          <p class="text-white/40 text-[11px] mt-1" x-show="ealaNextMatch.lastVerified" x-cloak x-text="'Last checked: ' + ealaNextMatch.lastVerified"></p>
+          <p x-show="ealaNextMatch.isLive && ealaNextMatch.liveScore" x-cloak class="font-display font-bold text-3xl text-red-400 mt-3" x-text="ealaNextMatch.liveScore"></p>
+          <a :href="ealaNextMatch.watchLink" target="_blank" class="inline-flex items-center gap-2 mt-4 font-semibold" :class="ealaNextMatch.isLive ? 'text-red-400 text-base' : 'text-gold-400 text-sm hover:text-gold-100'" x-text="ealaNextMatch.isLive ? 'Watch LIVE now on BlastTV →' : 'Check official WTA scores →'"></a>
+        </div>
+        <div x-show="!ealaNextMatch.isLive && !!ealaNextMatch.targetDate" class="flex gap-4 mt-6">
+          <div class="text-center bg-white/5 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-white text-3xl" x-text="countdown.days"></p><p class="text-[10px] text-white/50 uppercase">Days</p></div>
+          <div class="text-center bg-white/5 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-white text-3xl" x-text="countdown.hours"></p><p class="text-[10px] text-white/50 uppercase">Hours</p></div>
+          <div class="text-center bg-white/5 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-white text-3xl" x-text="countdown.mins"></p><p class="text-[10px] text-white/50 uppercase">Mins</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="relative mt-6 h-56 sm:h-72 rounded-lg overflow-hidden bg-gradient-to-br from-navy-600 to-navy" aria-label="Alex Eala photo carousel" data-cms-skip>
+      <img :src="ealaSlides[ealaSlide].src" :alt="ealaSlides[ealaSlide].alt" decoding="async" loading="lazy" class="absolute inset-0 w-full h-full object-cover" @error="$el.classList.add('hidden')" @load="$el.classList.remove('hidden')">
+      <span class="absolute bottom-2 right-3 text-[10px] text-white/80 bg-black/40 rounded px-2 py-0.5" x-text="(ealaSlide+1)+' / '+ealaSlides.length"></span>
+    </div>
+    <p class="text-white/30 text-[11px] mt-3">Match schedule shown is informational and updated periodically by our team — always confirm exact timing and where to watch through the official WTA app or the tournament's licensed broadcaster.</p>
+  </div>
+</section>
+
+<!-- ============ NBA & GILAS COUNTDOWN (bonus section) ============ -->
+<section class="bg-navy-50/60 border-y hairline py-16 relative overflow-hidden" style="background-image:linear-gradient(rgba(238,241,246,.94),rgba(238,241,246,.94)),url('/images/sports/nba-3.svg');background-size:cover;background-position:center">
+  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
+    <p class="text-gold-600 font-semibold text-sm mb-2 flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4"></i> Bonus — Basketball Fans</p>
+    <h3 class="font-display font-bold text-navy text-2xl sm:text-3xl mb-6">Pick a team, see their next game.</h3>
+    <div class="flex flex-col sm:flex-row items-start gap-6 mb-6">
+      <div class="relative w-full sm:w-64 h-40 rounded-lg overflow-hidden bg-gradient-to-br from-navy to-navy-600 shrink-0" aria-label="NBA star photo carousel" data-cms-skip>
+        <img :src="nbaSlides[nbaSlide].src" :alt="nbaSlides[nbaSlide].alt" decoding="async" loading="lazy" class="absolute inset-0 w-full h-full object-cover" @error="$el.classList.add('hidden')" @load="$el.classList.remove('hidden')">
+        <span class="absolute bottom-2 right-3 text-[10px] text-white/80 bg-black/40 rounded px-2 py-0.5" x-text="(nbaSlide+1)+' / '+nbaSlides.length"></span>
+      </div>
+      <div class="flex-1 w-full">
+        <div class="bg-white border hairline rounded-lg p-4 mb-4" x-show="teamSchedules[selectedTeam]" x-cloak>
+          <p class="text-[11px] font-semibold text-navy-400 uppercase mb-2" x-text="teamSchedules[selectedTeam]?.event"></p>
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-3">
+              <img :src="teamSchedules[selectedTeam]?.teamLogo" class="w-10 h-10 object-contain" alt="" x-show="teamSchedules[selectedTeam]?.teamLogo">
+              <div><p class="font-bold text-navy text-sm" x-text="selectedTeam"></p><p class="text-[11px] text-navy-400" x-text="teamSchedules[selectedTeam]?.myRecord"></p></div>
+            </div>
+            <div class="text-center">
+              <p class="font-display font-bold text-navy text-lg" x-show="teamSchedules[selectedTeam]?.isLive" x-text="teamSchedules[selectedTeam]?.liveScore"></p>
+              <p class="text-[11px] text-navy-400">VS</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <div class="text-right"><p class="font-bold text-navy text-sm" x-text="teamSchedules[selectedTeam]?.opponent"></p><p class="text-[11px] text-navy-400" x-text="teamSchedules[selectedTeam]?.oppRecord"></p></div>
+              <img :src="teamSchedules[selectedTeam]?.opponentLogo" class="w-10 h-10 object-contain" alt="" x-show="teamSchedules[selectedTeam]?.opponentLogo">
+            </div>
+          </div>
+          <p class="text-xs text-navy-400 mt-3" x-text="phtLabel(teamSchedules[selectedTeam]?.targetDate)"></p>
+          <div class="flex gap-3 mt-3">
+            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.days"></p><p class="text-[10px] text-navy-400 uppercase">Days</p></div>
+            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.hours"></p><p class="text-[10px] text-navy-400 uppercase">Hours</p></div>
+            <div class="text-center bg-navy-50 rounded-lg px-4 py-2 w-16"><p class="font-display font-bold text-navy text-2xl" x-text="teamCountdown.mins"></p><p class="text-[10px] text-navy-400 uppercase">Mins</p></div>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 text-[11px]" aria-label="Today's NBA scores">
+          <template x-for="g in nbaToday.slice(0,8)" :key="g.id">
+            <span class="bg-white border hairline rounded px-2 py-1 text-navy">
+              <span x-text="g.away+' '+g.awayScore"></span> @ <span x-text="g.home+' '+g.homeScore"></span>
+              <span class="text-navy-400" x-text="' · '+(g.state==='pre' ? g.time : g.detail)"></span>
+            </span>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+      <label class="text-xs font-semibold text-navy-400 uppercase tracking-wide">Select team</label>
+      <select x-model="selectedTeam" @change="ensureTeam(); loadLiveSports()" class="border hairline rounded-md px-4 py-2.5 text-sm font-semibold text-navy bg-white min-w-[260px]">
+        <optgroup label="Philippines">
+          <option>Gilas Pilipinas</option>
+        </optgroup>
+        <optgroup label="NBA — Eastern Conference">
+          <template x-for="t in nbaEast" :key="t"><option x-text="t" :value="t"></option></template>
+        </optgroup>
+        <optgroup label="NBA — Western Conference">
+          <template x-for="t in nbaWest" :key="t"><option x-text="t" :value="t"></option></template>
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="grid lg:grid-cols-5 gap-8 items-center bg-white border hairline rounded-lg p-8 sm:p-10">
+      <div class="lg:col-span-2" x-show="(teamSchedules[selectedTeam]?.photo)" x-cloak>
+        <img :src="(teamSchedules[selectedTeam]?.photo)" class="w-full rounded-lg object-cover max-h-60" :alt="selectedTeam">
+      </div>
+      <div :class="(teamSchedules[selectedTeam]?.photo) ? 'lg:col-span-3' : 'lg:col-span-5 flex flex-col lg:flex-row lg:items-center justify-between gap-8'">
+        <div>
+          <h4 class="font-display font-bold text-navy text-xl mb-2" x-text="selectedTeam+' — Next Game'"></h4>
+          <p class="text-navy-400 text-sm" x-text="(teamSchedules[selectedTeam]?.event) + ' — vs. ' + (teamSchedules[selectedTeam]?.opponent)"></p>
+          <a :href="(teamSchedules[selectedTeam]?.watchLink)" target="_blank" class="inline-flex items-center gap-2 mt-4 text-gold-600 text-sm font-semibold hover:text-gold-700">Where to watch <i data-lucide="external-link" class="w-3.5 h-3.5"></i></a>
+        </div>
+        <div class="flex gap-4 mt-6">
+          <div class="text-center bg-navy-50 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-navy text-3xl" x-text="teamCountdown.days"></p><p class="text-[10px] text-navy-400 uppercase">Days</p></div>
+          <div class="text-center bg-navy-50 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-navy text-3xl" x-text="teamCountdown.hours"></p><p class="text-[10px] text-navy-400 uppercase">Hours</p></div>
+          <div class="text-center bg-navy-50 rounded-lg px-5 py-4 w-20"><p class="font-display font-bold text-navy text-3xl" x-text="teamCountdown.mins"></p><p class="text-[10px] text-navy-400 uppercase">Mins</p></div>
+        </div>
+      </div>
+    </div>
+    <p class="text-navy-400 text-[11px] mt-3">Schedule shown is manually updated by our team, not a live sports feed — the Admin Panel lets us keep this current. Team photos are placeholders until real, rights-cleared photos are added.</p>
   </div>
 </section>
 
@@ -1935,9 +1936,10 @@ function mjApp(){
       heroEyebrow: "We build brands through", heroTitle: "CUSTOMIZED JACKETS AND MORE",
       heroDescription: "Since 2004, Michael Jeffrey International Company has manufactured varsity jackets, corporate uniforms, and branded giveaways for enterprises, government offices, and organizations across the Philippines and abroad — from a 20-piece pilot order to full nationwide rollouts.",
       heroImg1: "/images/site/hero1.jpg", heroImg2: "/images/site/hero2.jpg", heroImg3: "/images/site/hero3.jpg",
-      explainerVideoUrl: "/mjic-demo-presentation.html", explainerVideoType: "youtube", ealaPhoto: "",
+      explainerVideoUrl: "/videos/mjic-client-journey.webm", explainerVideoType: "file", ealaPhoto: "",
       facebook: "", instagram: "", tiktok: "", youtube: ""
     }),
+    explainerVideoFallback: false,
     faqs:[
       {q:'What is your minimum order quantity (MOQ)?', a:'Company-wide minimum is 20 pieces for jackets and 20 sets for most uniforms, though enamel pins start at 10 pcs, lanyards at 10 pcs, school uniforms/trophies at 20 pcs, and giveaways (bags, mugs) at 50 pcs. Larger orders unlock significantly lower per-piece pricing.'},
       {q:'What fabrics do you use?', a:'Class B (regular): Microfiber, Michael Angelo, and Diamond Ripstop are included in the base price. Class A (premium) fabrics are available for an additional ₱400/piece.'},
@@ -1969,18 +1971,18 @@ function mjApp(){
     mediaIndex:0, newGalleryLink:{}, expandedGalleryId:null,
     newCrmOrder:{client:'', contact:'', details:'', qty:null, deadline:'', fabric:'', urgency:'Medium'},
     fabrics: safeLS.get('mji_fabrics', [
-      {name:'Microfiber', class:'Class B', description:'Lightweight, smooth, quick-drying polyester. Our most popular jacket shell.', bestFor:'Varsity jackets, windbreakers, corporate jackets', img:'/images/site/microfiber.jpg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Maroon',hex:'#6B1F2C'},{name:'Green',hex:'#1E6B3C'},{name:'Gray',hex:'#77797C'},{name:'White',hex:'#F2F2F0'}]},
-      {name:'Michael Angelo', class:'Class B', description:'Soft-hand woven polyester with a subtle sheen and good body.', bestFor:'Corporate jackets, executive uniforms', img:'/images/site/corporate.jpg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Charcoal',hex:'#3A3D42'},{name:'Maroon',hex:'#6B1F2C'},{name:'Royal Blue',hex:'#1E4FBF'}]},
-      {name:'Diamond Ripstop', class:'Class B', description:'Diamond-grid weave that resists tearing and spreading damage.', bestFor:'Coveralls, security and military uniforms, workwear', img:'/images/site/softshell.jpg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Khaki',hex:'#9A8B66'},{name:'Olive Green',hex:'#4B5320'},{name:'Gray',hex:'#77797C'}]},
-      {name:'Honeycomb / Pique', class:'Class B', description:'Textured knit with visible mesh structure — breathable and stretchy.', bestFor:'Corporate polo shirts, school PE uniforms', img:'', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'White',hex:'#F2F2F0'},{name:'Red',hex:'#B61B25'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Green',hex:'#1E6B3C'}]},
-      {name:'Dri-Fit / Performance Knit', class:'Class A', description:'Moisture-wicking knit that pulls sweat away from the skin.', bestFor:'Field teams, sports uniforms, outdoor staff polos', img:'', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Gray',hex:'#77797C'}]},
-      {name:'Oxford / Broadcloth', class:'Class A', description:'Crisp woven cotton-blend with a clean, formal finish.', bestFor:'Corporate long-sleeve uniforms, executive shirts', img:'', video:'', colors:[{name:'White',hex:'#F2F2F0'},{name:'Light Blue',hex:'#A7C4DC'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Gray',hex:'#77797C'}]},
-      {name:'Softshell', class:'Class A', description:'Bonded, water-repellent outer with fleece-backed warmth.', bestFor:'Executive jackets, cold-storage and outdoor teams', img:'', video:'', colors:[{name:'Black',hex:'#1A1A1A'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Charcoal',hex:'#3A3D42'}]},
-      {name:'Scrub Suit Poly-Cotton', class:'Class B', description:'Easy-care poly-cotton blend built for daily washing.', bestFor:'Hospital scrub suits, lab gowns, clinic staff', img:'', video:'', colors:[{name:'Ceil Blue',hex:'#7FA5C4'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Wine',hex:'#6B1F2C'},{name:'Teal',hex:'#2E7D80'},{name:'Gray',hex:'#77797C'}]},
-      {name:'Canvas / Twill', class:'Class A', description:'Heavy, durable weave that holds structure and takes abuse.', bestFor:'Heavy-duty coveralls, industrial uniforms', img:'', video:'', colors:[{name:'Khaki',hex:'#9A8B66'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Olive Green',hex:'#4B5320'}]},
-      {name:'Cotton Fleece', class:'Class B', description:'Brushed-back cotton-poly blend, soft and warm with a matte finish.', bestFor:'Varsity jacket lining and hoodie-style uniforms', img:'', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Gray',hex:'#77797C'},{name:'Maroon',hex:'#6B1F2C'},{name:'Red',hex:'#B61B25'}]},
-      {name:'Taslan', class:'Class A', description:'Tightly-woven nylon with a slight sheen — water-resistant and windproof.', bestFor:'Windbreakers, varsity jacket shells, outdoor uniforms', img:'', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'White',hex:'#F2F2F0'},{name:'Gray',hex:'#77797C'}]},
-      {name:'Varsity Satin', class:'Class A', description:'Classic glossy satin shell — the traditional letterman-jacket look.', bestFor:'Custom varsity jackets, batch jackets, org jackets', img:'', video:'', colors:[{name:'Black',hex:'#1A1A1A'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Maroon',hex:'#6B1F2C'},{name:'Red',hex:'#B61B25'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Gold',hex:'#B8912F'},{name:'White',hex:'#F2F2F0'}]}
+      {name:'Microfiber', class:'Class B', description:'Lightweight, smooth, quick-drying polyester. Our most popular jacket shell.', bestFor:'Varsity jackets, windbreakers, corporate jackets', img:'/images/fabrics/microfiber.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Maroon',hex:'#6B1F2C'},{name:'Green',hex:'#1E6B3C'},{name:'Gray',hex:'#77797C'},{name:'White',hex:'#F2F2F0'}]},
+      {name:'Michael Angelo', class:'Class B', description:'Soft-hand woven polyester with a subtle sheen and good body.', bestFor:'Corporate jackets, executive uniforms', img:'/images/fabrics/michael-angelo.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Charcoal',hex:'#3A3D42'},{name:'Maroon',hex:'#6B1F2C'},{name:'Royal Blue',hex:'#1E4FBF'}]},
+      {name:'Diamond Ripstop', class:'Class B', description:'Diamond-grid weave that resists tearing and spreading damage.', bestFor:'Coveralls, security and military uniforms, workwear', img:'/images/fabrics/diamond-ripstop.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Khaki',hex:'#9A8B66'},{name:'Olive Green',hex:'#4B5320'},{name:'Gray',hex:'#77797C'}]},
+      {name:'Honeycomb / Pique', class:'Class B', description:'Textured knit with visible mesh structure — breathable and stretchy.', bestFor:'Corporate polo shirts, school PE uniforms', img:'/images/fabrics/honeycomb-pique.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'White',hex:'#F2F2F0'},{name:'Red',hex:'#B61B25'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Green',hex:'#1E6B3C'}]},
+      {name:'Dri-Fit / Performance Knit', class:'Class A', description:'Moisture-wicking knit that pulls sweat away from the skin.', bestFor:'Field teams, sports uniforms, outdoor staff polos', img:'/images/fabrics/dri-fit.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Gray',hex:'#77797C'}]},
+      {name:'Oxford / Broadcloth', class:'Class A', description:'Crisp woven cotton-blend with a clean, formal finish.', bestFor:'Corporate long-sleeve uniforms, executive shirts', img:'/images/fabrics/oxford.svg', video:'', colors:[{name:'White',hex:'#F2F2F0'},{name:'Light Blue',hex:'#A7C4DC'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Gray',hex:'#77797C'}]},
+      {name:'Softshell', class:'Class A', description:'Bonded, water-repellent outer with fleece-backed warmth.', bestFor:'Executive jackets, cold-storage and outdoor teams', img:'/images/fabrics/softshell.svg', video:'', colors:[{name:'Black',hex:'#1A1A1A'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Charcoal',hex:'#3A3D42'}]},
+      {name:'Scrub Suit Poly-Cotton', class:'Class B', description:'Easy-care poly-cotton blend built for daily washing.', bestFor:'Hospital scrub suits, lab gowns, clinic staff', img:'/images/fabrics/scrub-polycotton.svg', video:'', colors:[{name:'Ceil Blue',hex:'#7FA5C4'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Wine',hex:'#6B1F2C'},{name:'Teal',hex:'#2E7D80'},{name:'Gray',hex:'#77797C'}]},
+      {name:'Canvas / Twill', class:'Class A', description:'Heavy, durable weave that holds structure and takes abuse.', bestFor:'Heavy-duty coveralls, industrial uniforms', img:'/images/fabrics/canvas-twill.svg', video:'', colors:[{name:'Khaki',hex:'#9A8B66'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Olive Green',hex:'#4B5320'}]},
+      {name:'Cotton Fleece', class:'Class B', description:'Brushed-back cotton-poly blend, soft and warm with a matte finish.', bestFor:'Varsity jacket lining and hoodie-style uniforms', img:'/images/fabrics/cotton-fleece.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Gray',hex:'#77797C'},{name:'Maroon',hex:'#6B1F2C'},{name:'Red',hex:'#B61B25'}]},
+      {name:'Taslan', class:'Class A', description:'Tightly-woven nylon with a slight sheen — water-resistant and windproof.', bestFor:'Windbreakers, varsity jacket shells, outdoor uniforms', img:'/images/fabrics/taslan.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'White',hex:'#F2F2F0'},{name:'Gray',hex:'#77797C'}]},
+      {name:'Varsity Satin', class:'Class A', description:'Classic glossy satin shell — the traditional letterman-jacket look.', bestFor:'Custom varsity jackets, batch jackets, org jackets', img:'/images/fabrics/varsity-satin.svg', video:'', colors:[{name:'Black',hex:'#1A1A1A'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Maroon',hex:'#6B1F2C'},{name:'Red',hex:'#B61B25'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Gold',hex:'#B8912F'},{name:'White',hex:'#F2F2F0'}]}
     ]),
     nbaEast:['Atlanta Hawks','Boston Celtics','Brooklyn Nets','Charlotte Hornets','Chicago Bulls','Cleveland Cavaliers','Detroit Pistons','Indiana Pacers','Miami Heat','Milwaukee Bucks','New York Knicks','Orlando Magic','Philadelphia 76ers','Toronto Raptors','Washington Wizards'],
     nbaWest:['Dallas Mavericks','Denver Nuggets','Golden State Warriors','Houston Rockets','LA Clippers','Los Angeles Lakers','Memphis Grizzlies','Minnesota Timberwolves','New Orleans Pelicans','Oklahoma City Thunder','Phoenix Suns','Portland Trail Blazers','Sacramento Kings','San Antonio Spurs','Utah Jazz'],
@@ -1993,9 +1995,9 @@ function mjApp(){
     }),
     countdown:{days:0,hours:0,mins:0},
     nbaToday: [],
-    // 50-slot carousels; drop real photos at these paths to replace the placeholders
-    ealaSlides: Array.from({length:50}, (_,i)=>({src:'/images/sports/eala-'+(i+1)+'.jpg', alt:'Alex Eala match moment '+(i+1)})),
-    nbaSlides: Array.from({length:50}, (_,i)=>({src:'/images/sports/nba-'+(i+1)+'.jpg', alt:'NBA star photo '+(i+1)})),
+    // 5 high-impact slides per carousel — local vector art, never 404, zero lag
+    ealaSlides: Array.from({length:5}, (_,i)=>({src:'/images/sports/eala-'+(i+1)+'.svg', alt:'Alex Eala tennis artwork '+(i+1)})),
+    nbaSlides: Array.from({length:5}, (_,i)=>({src:'/images/sports/nba-'+(i+1)+'.svg', alt:'Basketball artwork '+(i+1)})),
     ealaSlide: 0,
     nbaSlide: 0,
     newsItems: [
@@ -2171,9 +2173,9 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
         heroTitle: this.siteSettings.heroTitle || 'CUSTOMIZED JACKETS AND MORE',
         heroDescription: this.siteSettings.heroDescription || 'Since 2004, Michael Jeffrey International Company has manufactured varsity jackets, corporate uniforms, and branded giveaways for enterprises, government offices, and organizations across the Philippines and abroad — from a 20-piece pilot order to full nationwide rollouts.'
       });
-      if(!this.siteSettings.explainerVideoUrl){
-        this.siteSettings.explainerVideoUrl = '/mjic-demo-presentation.html';
-        this.siteSettings.explainerVideoType = 'youtube';
+      if(!this.siteSettings.explainerVideoUrl || this.siteSettings.explainerVideoUrl === '/mjic-demo-presentation.html'){
+        this.siteSettings.explainerVideoUrl = '/videos/mjic-client-journey.webm';
+        this.siteSettings.explainerVideoType = 'file';
         safeLS.set('mji_site_settings', this.siteSettings);
       }
       if(!this.ealaNextMatch.targetDate || this.ealaNextMatch.opponent.includes('not published') || this.ealaNextMatch.opponent.includes('To be confirmed')){
@@ -2196,8 +2198,8 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
         this.siteSettings.heroImg3 = '/images/site/hero3.jpg';
         safeLS.set('mji_site_settings', this.siteSettings);
       }
-      const fabricPhotos = {'Microfiber':'microfiber','Michael Angelo':'corporate','Diamond Ripstop':'softshell'};
-      this.fabrics.forEach(f=>{ if(fabricPhotos[f.name] && /images\.unsplash\.com/.test(f.img||'')) f.img = '/images/site/'+fabricPhotos[f.name]+'.jpg'; });
+      const fabricSwatches = {"Microfiber":"microfiber","Michael Angelo":"michael-angelo","Diamond Ripstop":"diamond-ripstop","Honeycomb / Pique":"honeycomb-pique","Dri-Fit / Performance Knit":"dri-fit","Oxford / Broadcloth":"oxford","Softshell":"softshell","Scrub Suit Poly-Cotton":"scrub-polycotton","Canvas / Twill":"canvas-twill","Cotton Fleece":"cotton-fleece","Taslan":"taslan","Varsity Satin":"varsity-satin"};
+      this.fabrics.forEach(f=>{ const swatch = fabricSwatches[f.name]; if(swatch && (!f.img || /images\.unsplash\.com|images\/site\//.test(f.img))) f.img = '/images/fabrics/'+swatch+'.svg'; });
       this.saveFabrics();
       this.chatLog = [{from:'bot', text:"Hi! I'm the MJ auto-assistant. Ask me about MOQ, pricing tiers, fabrics, lead time, delivery, or payment options."}];
 
@@ -2274,10 +2276,10 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
       this.quoteItems = (this.quoteItems || []).filter(item=>item && item.id && Number(item.tierQty)>0).map(item=>({...item, tierQty:Number(item.tierQty)}));
       safeSS.set('mji_quote', this.quoteItems);
       repairs.push('cart checked');
-      if(typeof this.siteSettings.explainerVideoUrl !== 'string' || !this.siteSettings.explainerVideoUrl){
-        this.siteSettings.explainerVideoUrl = '/mjic-demo-presentation.html';
-        this.siteSettings.explainerVideoType = 'youtube';
-        repairs.push('demo presentation restored');
+      if(typeof this.siteSettings.explainerVideoUrl !== 'string' || !this.siteSettings.explainerVideoUrl || this.siteSettings.explainerVideoUrl === '/mjic-demo-presentation.html'){
+        this.siteSettings.explainerVideoUrl = '/videos/mjic-client-journey.webm';
+        this.siteSettings.explainerVideoType = 'file';
+        repairs.push('client journey video restored');
       }
       if(!this.ealaNextMatch?.opponent || !this.ealaNextMatch?.targetDate){
         this.ealaNextMatch = {event:'Singapore Tennis Open 2026 (WTA 500) — Round of 16', opponent:'Tatiana Prozorova', watchLink:'https://www.wtatennis.com/tournaments/1152/singapore/2026/scores', targetDate:'2026-09-24T11:00:00+08:00', isLive:false, liveScore:'', lastVerified:'September 22, 2026 (Philippine time)'};
@@ -2534,13 +2536,20 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
 
     fabricImage(name){
       const images = {
-        'Microfiber':'/images/site/microfiber.jpg',
-        'Michael Angelo':'/images/site/corporate.jpg',
-        'Diamond Ripstop':'/images/site/softshell.jpg',
-        'Cotton Fleece':'/images/site/fleece.jpg',
-        'Varsity Satin':'/images/site/varsity-satin.jpg'
+        'Microfiber':'/images/fabrics/microfiber.svg',
+        'Michael Angelo':'/images/fabrics/michael-angelo.svg',
+        'Diamond Ripstop':'/images/fabrics/diamond-ripstop.svg',
+        'Honeycomb / Pique':'/images/fabrics/honeycomb-pique.svg',
+        'Dri-Fit / Performance Knit':'/images/fabrics/dri-fit.svg',
+        'Oxford / Broadcloth':'/images/fabrics/oxford.svg',
+        'Softshell':'/images/fabrics/softshell.svg',
+        'Scrub Suit Poly-Cotton':'/images/fabrics/scrub-polycotton.svg',
+        'Canvas / Twill':'/images/fabrics/canvas-twill.svg',
+        'Cotton Fleece':'/images/fabrics/cotton-fleece.svg',
+        'Taslan':'/images/fabrics/taslan.svg',
+        'Varsity Satin':'/images/fabrics/varsity-satin.svg'
       };
-      return images[name] || '/images/site/varsity-letterman.jpg';
+      return images[name] || '/images/fabrics/microfiber.svg';
     },
 
     pickFabric(fabric, color){
