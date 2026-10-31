@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 const NAV_LINKS = [
   { href: "/production-workflow", label: "Production Workflow" },
   { href: "/capabilities", label: "Capabilities & Advantages" },
+  { href: "/advantages", label: "Competitive Advantages" },
 ];
 
 export default function MjicPageShell({
