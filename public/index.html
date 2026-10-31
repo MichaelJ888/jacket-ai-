@@ -159,6 +159,7 @@
     document.head.appendChild(link);
   })();
 </script>
+<script src="/site-look.js"></script>
 </head>
 
 <body class="bg-white text-navy-700 antialiased" x-data="mjApp()" x-init="init()">
@@ -475,14 +476,15 @@
 
 <!-- ============ CATALOG ============ -->
 <!-- ============ DESIGN STUDIO — LOGO MOCKUP + INSTANT PRICE QUOTE ============ -->
-<section id="mockup" class="bg-navy-50/60 border-y hairline py-20">
-  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
-    <div class="flex items-center gap-2 mb-2">
-      <span class="bg-gold text-navy text-[10px] font-bold px-2.5 py-1 rounded-full uppercase">Free Tool</span>
+<section id="mockup" class="relative overflow-hidden bg-gradient-to-br from-navy-50 via-white to-navy-50/60 border-y hairline py-24">
+  <div class="pointer-events-none absolute -top-24 -right-24 w-96 h-96 rounded-full bg-gold/15 blur-3xl"></div>
+  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 relative">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="bg-navy text-gold-400 text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Free Tool</span>
       <p class="text-gold-600 font-semibold text-sm">Mock Design Creator + Price Quotation Creator</p>
     </div>
-    <h2 data-aos="fade-up" class="font-display font-bold text-navy text-3xl sm:text-4xl tracking-tight mb-3">See your logo on the jacket — and know the exact price — before you order.</h2>
-    <p class="text-navy-400 max-w-2xl mb-10">Pick a product, attach your logo(s), tell us your fabric, printing method, and quantity — get a real, itemized price using our actual 2026 rate card. No waiting for a reply.</p>
+    <h2 data-aos="fade-up" class="font-display font-bold text-navy text-3xl sm:text-5xl tracking-tight mb-4 max-w-4xl">See your logo on the jacket — and know the exact price — before you order.</h2>
+    <p class="text-navy-400 max-w-2xl mb-12 text-base">Pick a product, attach your logo(s), tell us your fabric, printing method, and quantity — get a real, itemized price using our actual 2026 rate card. No waiting for a reply.</p>
 
     <div class="grid lg:grid-cols-5 gap-8">
       <div class="lg:col-span-2 bg-white border hairline rounded-lg p-6 space-y-5">
@@ -717,10 +719,11 @@
 </section>
 
 <!-- ============ QUOTATION BUILDER + PAYMENT ============ -->
-<section id="quote" class="bg-navy-50/60 border-y hairline py-20">
-  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
-    <p class="text-gold-600 font-semibold text-sm mb-2">Bulk Quotation Builder</p>
-    <h2 class="font-display font-bold text-navy text-3xl sm:text-4xl tracking-tight mb-10">Estimate your order, then send it straight to our sales team.</h2>
+<section id="quote" class="relative overflow-hidden bg-gradient-to-br from-navy-50/60 via-white to-navy-50/60 border-y hairline py-24">
+  <div class="pointer-events-none absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-gold/10 blur-3xl"></div>
+  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 relative">
+    <p class="text-gold-600 font-semibold text-sm mb-2 uppercase tracking-widest">Bulk Quotation Builder</p>
+    <h2 class="font-display font-bold text-navy text-3xl sm:text-5xl tracking-tight mb-12">Estimate your order, then send it straight to our sales team.</h2>
 
     <div class="grid lg:grid-cols-5 gap-8">
       <!-- Quote list + tier selector -->
@@ -776,16 +779,21 @@
     </div>
 
     <!-- Payment / Checkout -->
-    <div class="mt-8 bg-white border hairline rounded-lg p-6 sm:p-8">
-      <h3 class="font-display font-bold text-navy mb-1">Checkout &amp; Payment</h3>
-      <p class="text-sm text-navy-400 mb-6">A 50% deposit confirms production slot. Balance is due before delivery/pickup.</p>
+    <div class="mt-8 bg-white border hairline rounded-2xl p-6 sm:p-10 shadow-sm">
+      <div class="flex flex-wrap items-start justify-between gap-4 mb-2">
+        <div>
+          <h3 class="font-display font-bold text-navy text-2xl">Checkout &amp; Payment</h3>
+          <p class="text-sm text-navy-400 mt-1">Secure your production slot with a deposit. Balance is due before delivery or pickup.</p>
+        </div>
+        <span class="inline-flex items-center gap-2 bg-gold/15 text-navy text-xs font-bold px-4 py-2 rounded-full"><i data-lucide="shield-check" class="w-4 h-4"></i> 50% deposit confirms your slot</span>
+      </div>
 
-      <div class="flex flex-wrap gap-2 mb-6">
-        <button @click="activePayment = 'wise'" :class="activePayment === 'wise' ? 'bg-navy text-white' : 'bg-slate-100 text-slate-700'" class="px-3 py-1.5 rounded text-xs font-medium border border-slate-200">Wise (USD/PHP)</button>
-        <button @click="activePayment = 'card'" :class="activePayment === 'card' ? 'bg-navy text-white' : 'bg-slate-100 text-slate-700'" class="px-3 py-1.5 rounded text-xs font-medium border border-slate-200">Debit / Credit Card</button>
-        <button @click="activePayment = 'gcash'" :class="activePayment === 'gcash' ? 'bg-navy text-white' : 'bg-slate-100 text-slate-700'" class="px-3 py-1.5 rounded text-xs font-medium border border-slate-200">GCash</button>
-        <button @click="activePayment = 'maya'" :class="activePayment === 'maya' ? 'bg-navy text-white' : 'bg-slate-100 text-slate-700'" class="px-3 py-1.5 rounded text-xs font-medium border border-slate-200">Maya</button>
-        <button @click="activePayment = 'bank'" :class="activePayment === 'bank' ? 'bg-navy text-white' : 'bg-slate-100 text-slate-700'" class="px-3 py-1.5 rounded text-xs font-medium border border-slate-200">Bank Transfer (Any PH Bank)</button>
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-3 my-6">
+        <button @click="activePayment = 'wise'" :aria-pressed="activePayment === 'wise'" :class="activePayment === 'wise' ? 'bg-navy text-white border-navy shadow-md' : 'bg-white text-navy border-slate-200 hover:border-navy'" class="flex flex-col items-center gap-1.5 px-3 py-4 rounded-xl border text-xs font-semibold transition-all hover:-translate-y-0.5"><i data-lucide="globe" class="w-5 h-5"></i>Wise (USD/PHP)</button>
+        <button @click="activePayment = 'card'" :aria-pressed="activePayment === 'card'" :class="activePayment === 'card' ? 'bg-navy text-white border-navy shadow-md' : 'bg-white text-navy border-slate-200 hover:border-navy'" class="flex flex-col items-center gap-1.5 px-3 py-4 rounded-xl border text-xs font-semibold transition-all hover:-translate-y-0.5"><i data-lucide="credit-card" class="w-5 h-5"></i>Debit / Credit Card</button>
+        <button @click="activePayment = 'gcash'" :aria-pressed="activePayment === 'gcash'" :class="activePayment === 'gcash' ? 'bg-navy text-white border-navy shadow-md' : 'bg-white text-navy border-slate-200 hover:border-navy'" class="flex flex-col items-center gap-1.5 px-3 py-4 rounded-xl border text-xs font-semibold transition-all hover:-translate-y-0.5"><i data-lucide="smartphone" class="w-5 h-5"></i>GCash</button>
+        <button @click="activePayment = 'maya'" :aria-pressed="activePayment === 'maya'" :class="activePayment === 'maya' ? 'bg-navy text-white border-navy shadow-md' : 'bg-white text-navy border-slate-200 hover:border-navy'" class="flex flex-col items-center gap-1.5 px-3 py-4 rounded-xl border text-xs font-semibold transition-all hover:-translate-y-0.5"><i data-lucide="wallet" class="w-5 h-5"></i>Maya</button>
+        <button @click="activePayment = 'bank'" :aria-pressed="activePayment === 'bank'" :class="activePayment === 'bank' ? 'bg-navy text-white border-navy shadow-md' : 'bg-white text-navy border-slate-200 hover:border-navy'" class="flex flex-col items-center gap-1.5 px-3 py-4 rounded-xl border text-xs font-semibold transition-all hover:-translate-y-0.5"><i data-lucide="landmark" class="w-5 h-5"></i>Bank Transfer (Any PH Bank)</button>
       </div>
 
       <template x-for="method in paymentMethods" :key="method.id + '-panel'">
@@ -824,12 +832,12 @@
         <i data-lucide="send" class="w-4 h-4"></i> Send Payment Confirmation
       </button>
       <div class="flex flex-wrap gap-3 mt-3">
-        <button @click="sendViaWhatsApp()" :class="quoteItems.length===0 ? 'opacity-40 cursor-not-allowed' : ''" class="text-xs font-semibold border border-navy text-navy rounded-md px-4 py-2.5 flex items-center gap-1.5 hover:bg-navy hover:text-white transition-colors" :title="quoteItems.length===0 ? 'Add an item to your cart first' : ''"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> Via WhatsApp</button>
+        <button @click="sendViaTelegram()" :class="quoteItems.length===0 ? 'opacity-40 cursor-not-allowed' : ''" class="text-xs font-semibold border border-navy text-navy rounded-md px-4 py-2.5 flex items-center gap-1.5 hover:bg-navy hover:text-white transition-colors" :title="quoteItems.length===0 ? 'Add an item to your cart first' : 'Opens our Telegram bot — quotation is copied for pasting'"><i data-lucide="send" class="w-3.5 h-3.5"></i> Via Telegram</button>
         <button @click="sendViaViber()" :class="quoteItems.length===0 ? 'opacity-40 cursor-not-allowed' : ''" class="text-xs font-semibold border border-navy text-navy rounded-md px-4 py-2.5 flex items-center gap-1.5 hover:bg-navy hover:text-white transition-colors" :title="quoteItems.length===0 ? 'Add an item to your cart first' : 'Opens Viber — needs the Viber app installed on this device'"><i data-lucide="phone" class="w-3.5 h-3.5"></i> Via Viber</button>
         <button @click="openFormalQuote()" :class="quoteItems.length===0 ? 'opacity-40 cursor-not-allowed' : ''" class="text-xs font-semibold border border-gold-600 text-gold-600 rounded-md px-4 py-2.5 flex items-center gap-1.5 hover:bg-gold hover:text-white transition-colors" :title="quoteItems.length===0 ? 'Add an item to your cart first' : ''"><i data-lucide="file-text" class="w-3.5 h-3.5"></i> Generate Formal Quotation (PDF)</button>
       </div>
-      <p class="text-[10px] text-navy-400 mt-2">Note: the Viber button opens the Viber desktop/mobile app — if nothing happens when you click it, Viber isn't installed on that device. WhatsApp and the PDF quotation work in any browser with no app required.</p>
-      <p class="text-[11px] text-navy-400 mt-2">This site has no backend — orders are confirmed directly with our sales team via WhatsApp/Viber, not auto-processed. Nothing is charged automatically.</p>
+      <p class="text-[10px] text-navy-400 mt-2">Note: the Viber button opens the Viber app — if nothing happens, Viber isn't installed on that device. Telegram and the PDF quotation work in any browser.</p>
+      <p class="text-[11px] text-navy-400 mt-2">This site has no backend — orders are confirmed directly with our sales team via Telegram/Viber, not auto-processed. Nothing is charged automatically.</p>
     </div>
   </div>
 </section>
@@ -958,7 +966,6 @@
       </span>
     </template>
   </div>
-  <p class="text-[11px] text-navy-400 mt-4">Placeholder list for demonstration — replace with your real, permission-cleared client names via the Admin Panel before publishing.</p>
 </section>
 <section id="contact" class="bg-navy py-20">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 grid lg:grid-cols-5 gap-12">
@@ -1009,8 +1016,8 @@
         </div>
       </div>
       <div class="flex flex-wrap gap-3 mt-5">
-        <button @click="sendInquiry()" class="bg-navy hover:bg-navy-600 text-white font-semibold px-6 py-3 rounded-md flex items-center gap-2 transition-colors">
-          <i data-lucide="message-circle" class="w-4 h-4"></i> Send via WhatsApp
+        <button @click="sendInquiryTelegram()" class="bg-navy hover:bg-navy-600 text-white font-semibold px-6 py-3 rounded-md flex items-center gap-2 transition-colors">
+          <i data-lucide="send" class="w-4 h-4"></i> Send via Telegram
         </button>
         <button @click="sendInquiryViber()" class="border border-navy text-navy font-semibold px-6 py-3 rounded-md flex items-center gap-2 hover:bg-navy hover:text-white transition-colors">
           <i data-lucide="phone" class="w-4 h-4"></i> Send via Viber
@@ -1952,7 +1959,7 @@ function mjApp(){
       salesOfficeShort: "BGC, Taguig",
       productionFacility: "#22 Bayabas St., Elmar's Subdivision, Cupang, Antipolo City",
       phoneGlobe: "09158991338", phoneDito: "09943880349", phoneSmartViber: "0929 227 1761", landline: "(02) 7971 9822",
-      whatsappNumber: "639292271761", viberNumber: "639292271761",
+      whatsappNumber: "639292271761", viberNumber: "639292271761", telegramBot: "VERCELAI_MJIC_BOT",
       brandName: "CUSTOMIZED JACKETS", brandTagline: "AND MORE", logoImage: "",
       heroEyebrow: "We build brands through", heroTitle: "CUSTOMIZED JACKETS AND MORE",
       heroDescription: "Since 2004, Michael Jeffrey International Company has manufactured varsity jackets, corporate uniforms, and branded giveaways for enterprises, government offices, and organizations across the Philippines and abroad — from a 20-piece pilot order to full nationwide rollouts.",
@@ -1981,7 +1988,7 @@ function mjApp(){
       {q:'Do trophies and enamel pins follow the same pricing as jackets?', a:'No — trophies are priced per size (not quantity), and enamel pins have their own quantity-tier pricing plus a one-time mold fee (₱5,500–7,500, often waived at 500+ pcs).'},
       {q:'How do I cancel or modify an order after paying the down payment?', a:'Please contact our sales team as soon as possible — cancellations may not be refundable once fabrics are bought, cutting or embroidery has already begun. See our Terms of Service for full details.'},
       {q:'Is my payment information safe?', a:'We never see or store your card details — card payments are processed entirely through PayMongo\'s secure system. E-wallet and bank transfers are confirmed manually from the receipt you send us.'},
-      {q:'How do I place a bulk order today?', a:'Browse the catalog or use the Design Studio to configure your item, add it to your Quotation Builder, then send it to our sales team via WhatsApp or Viber — or request a formal, signed quotation with down payment computation.'}
+      {q:'How do I place a bulk order today?', a:'Browse the catalog or use the Design Studio to configure your item, add it to your Quotation Builder, then send it to our sales team via Telegram or Viber — or request a formal, signed quotation with down payment computation.'}
     ],
     paymentQR: safeLS.get('mji_payment_qr', {gcash:'', maya:'', bpi:''}),
     mockup: {productId:'', color:'Navy', logos:[], fabricClass:'B', logoMethod:'embroidery', qty:20, addons:{reversible:false, reflector:false, hood:false, netLining:false}, addNames:false, sampleName:'JUAN DELA CRUZ', rushOrder:false},
@@ -2104,7 +2111,7 @@ function mjApp(){
 
     paymentMethods:[
       {id:'wise', label:'Wise (USD/PHP)', steps:['We send you our Wise account email/recipient details after your quotation is confirmed.','Log in to wise.com (or the Wise app) and start a new transfer.','Enter the amount and select PHP or USD as the currency you\'re sending.','Paste in our Wise account details as the recipient.','Add your Company Name + Quotation No. as the payment reference.','Complete the transfer, then screenshot the confirmation and upload it below.'], details:'Best for international clients — Wise usually gives a better exchange rate than a regular bank wire, and the transfer typically arrives within 1 business day.'},
-      {id:'card', label:'Debit / Credit Card', steps:['Request your formal quotation first (use the "Generate Formal Quotation" button below the Quotation Builder).','Our sales team sends you a secure PayMongo payment link by WhatsApp/Viber or email — usually within a few hours.','Click the link — it opens PayMongo\'s own secure checkout page (we never see or store your card number).','Enter your Visa, Mastercard, or JCB details on that page and confirm.','You and our sales team both get an instant email confirmation — no need to upload anything for card payments.'], details:'Cheapest and safest way to accept cards: we use PayMongo Payment Links, which need no monthly fee and no PCI compliance burden on our side — only a small per-transaction processing fee applies, shown on the payment page before you confirm.'},
+      {id:'card', label:'Debit / Credit Card', steps:['Request your formal quotation first (use the "Generate Formal Quotation" button below the Quotation Builder).','Our sales team sends you a secure PayMongo payment link by Telegram/Viber or email — usually within a few hours.','Click the link — it opens PayMongo\'s own secure checkout page (we never see or store your card number).','Enter your Visa, Mastercard, or JCB details on that page and confirm.','You and our sales team both get an instant email confirmation — no need to upload anything for card payments.'], details:'Cheapest and safest way to accept cards: we use PayMongo Payment Links, which need no monthly fee and no PCI compliance burden on our side — only a small per-transaction processing fee applies, shown on the payment page before you confirm.'},
       {id:'gcash', label:'GCash', steps:['Open your GCash app and tap Send Money, or scan our QR code below.','Send to the GCash number provided after quotation confirmation.','Add your Company Name as the note.','Upload your transaction screenshot below.'], details:'Fastest option for Philippine clients — usually confirmed within the hour.'},
       {id:'maya', label:'Maya', steps:['Open your Maya app and tap Send Money, or scan our QR code below.','Send to the Maya number provided after quotation confirmation.','Upload your transaction screenshot below.'], details:'Available for both individual and business Maya accounts.'},
       {id:'bank', label:'Bank Transfer (Any PH Bank)', steps:['Transfer via InstaPay or PESONet from any Philippine bank — BDO, BPI, Metrobank, UnionBank, Landbank, Security Bank, RCBC, PNB, and more.','Account details sent after quotation confirmation.','Keep your deposit slip or online transfer confirmation.','Upload the deposit slip below.'], details:'InstaPay is instant for transfers up to the standard per-transaction limit; PESONet is used for larger transfers and settles within one banking day.'}
@@ -2234,11 +2241,15 @@ coverall1:'/images/site/coverall.jpg'
       this.updates = safeLS.get('mji_updates', []);
       this.testimonials = safeLS.get('mji_testimonials', null) || this.defaultTestimonials;
 
-      this.clientNames = safeLS.get('mji_client_names', [
-        {name:'ABC Manufacturing Corp.', logo:''},{name:'XYZ Business Solutions Inc.', logo:''},
-        {name:'Metro Logistics Group', logo:''},{name:'Prime Retail Holdings', logo:''},
-        {name:'Summit Construction Co.', logo:''},{name:'National Health Services Inc.', logo:''}
-      ]);
+      const verifiedClients = [
+        'Panasonic Manufacturing Philippines','Department of Health (DOH)','Office of the President (OP)',
+        'Nokia Philippines','Smart Communications','Globe Telecom','Robinsons Land Corporation (RLC)',
+        'University of the East (UE)','Philippine Power Industries Corporation','Metro Logistics Group'
+      ].map(name=>({name, logo:''}));
+      const storedClients = safeLS.get('mji_client_names', null);
+      // Replace the old demo placeholder list with the verified list; keep any custom edits otherwise.
+      this.clientNames = (!Array.isArray(storedClients) || storedClients.some(c=>/ABC Manufacturing|XYZ Business|Prime Retail|Summit Construction|National Health/.test(c.name)))
+        ? verifiedClients : storedClients;
 
       this.$nextTick(()=> { lucide.createIcons(); this.renderMockup(); });
       this.updateCountdown();
@@ -2648,7 +2659,7 @@ coverall1:'/images/site/coverall.jpg'
       this.crmOrders.unshift({
         id: Date.now(),
         client: this.clientInfo.name || this.inquiry.company || 'Website visitor (name not given)',
-        contact: [this.clientInfo.fullName, this.clientInfo.contactNumber, this.clientInfo.address].filter(Boolean).join(' — ') || this.inquiry.contact || 'Sent via WhatsApp/Viber',
+        contact: [this.clientInfo.fullName, this.clientInfo.contactNumber, this.clientInfo.address].filter(Boolean).join(' — ') || this.inquiry.contact || 'Sent via Telegram/Viber',
         details: items || 'Quotation sent from website',
         qty: this.quoteItems.reduce((s,i)=> s + Number(i.tierQty||0), 0),
         deadline: '', urgency: this.mockup.rushOrder ? 'Urgent' : 'Medium',
@@ -2926,7 +2937,7 @@ coverall1:'/images/site/coverall.jpg'
       return msg;
     },
 
-    submitOrder(){ this.sendViaWhatsApp(); },
+    submitOrder(){ this.sendViaTelegram(); },
 
     // Backup record in Netlify's own form dashboard — works once deployed on Netlify,
     // even if the visitor doesn't have WhatsApp/Viber installed. Silently no-ops locally.
@@ -2942,7 +2953,7 @@ coverall1:'/images/site/coverall.jpg'
       }).catch(()=>{});
     },
 
-    sendViaWhatsApp(){
+    sendViaTelegram(){
       if(this.quoteItems.length===0){ this.guideToEmptyCart(); return; }
       this.pushQuoteToCrm(); this.submitToNetlify('quotation', {client: this.clientInfo.name || 'Not provided', items: this.quoteItems.map(i=>i.title+' x'+i.tierQty).join(', '), total: this.grandTotal(), payment: this.activePayment});
       this.persistLead({
@@ -2950,7 +2961,11 @@ coverall1:'/images/site/coverall.jpg'
         message:this.quoteItems.map(i=>i.title+' x'+i.tierQty+' pcs').join('; '), source:'quotation',
         details:{total:this.grandTotal(), payment:this.activePayment, address:this.clientInfo.address}
       });
-      window.open('https://wa.me/'+this.siteSettings.whatsappNumber+'?text='+this.waMessage(), '_blank');
+      // Telegram deep links cannot pre-fill text, so the quotation is copied and the bot chat opens.
+      const plain = decodeURIComponent(this.waMessage()).replace(/%0A/g,'\n');
+      navigator.clipboard?.writeText(plain).catch(()=>{});
+      this.showToast('Quotation copied — paste it into the Telegram chat once it opens.');
+      window.open('https://t.me/'+this.siteSettings.telegramBot, '_blank', 'noopener');
     },
 
     sendViaViber(){
@@ -2969,12 +2984,14 @@ coverall1:'/images/site/coverall.jpg'
       window.open('viber://chat?number=%2B'+this.siteSettings.viberNumber, '_blank');
     },
 
-    sendInquiry(){
+    sendInquiryTelegram(){
       const i = this.inquiry;
       this.submitToNetlify('inquiry', {name:i.name, company:i.company, contact:i.contact, message:i.message});
       this.persistLead({...i, source:'inquiry'});
-      let msg = 'Hi Michael Jeffrey International, I have an inquiry:%0A%0AName: '+i.name+'%0ACompany: '+i.company+'%0AContact: '+i.contact+'%0AMessage: '+i.message;
-      window.open('https://wa.me/'+this.siteSettings.whatsappNumber+'?text='+msg, '_blank');
+      const plain = 'Hi Michael Jeffrey International, I have an inquiry:\n\nName: '+i.name+'\nCompany: '+i.company+'\nContact: '+i.contact+'\nMessage: '+i.message;
+      navigator.clipboard?.writeText(plain).catch(()=>{});
+      this.showToast('Inquiry copied — paste it into the Telegram chat once it opens.');
+      window.open('https://t.me/'+this.siteSettings.telegramBot, '_blank', 'noopener');
     },
     sendInquiryViber(){
       const i = this.inquiry;

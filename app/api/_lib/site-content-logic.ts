@@ -2,6 +2,7 @@ import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto'
 
 export type SiteTheme = { primary: string; secondary: string; background: string };
 export type SitePosition = { x: number; y: number };
+export type SiteStyle = { w?: number; h?: number; rot?: number; hidden?: boolean };
 export type SiteDoc = {
   theme: SiteTheme;
   texts: Record<string, string>;
@@ -9,6 +10,7 @@ export type SiteDoc = {
   catalogOrder: string[];
   sectionOrder: string[];
   positions: Record<string, SitePosition>;
+  styles: Record<string, SiteStyle>;
   updatedAt: string | null;
 };
 
@@ -27,11 +29,13 @@ const MAX_KEY = 300;
 const MAX_TEXT = 2000;
 const MAX_URL = 2000;
 const MAX_OFFSET = 2000;
+const MAX_SIZE = 2000;
+const MAX_ROTATION = 360;
 
 export const DEFAULT_THEME: SiteTheme = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF' };
 
 export function emptySiteDoc(): SiteDoc {
-  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], sectionOrder: [], positions: {}, updatedAt: null };
+  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], sectionOrder: [], positions: {}, styles: {}, updatedAt: null };
 }
 
 type SanitizeResult = { ok: true; doc: SiteDoc } | { ok: false; error: string };
@@ -63,6 +67,8 @@ export function sanitizeSiteDoc(input: unknown): SanitizeResult {
   if (!sections.ok) return sections;
   const positions = pickPositions(raw.positions);
   if (!positions.ok) return positions;
+  const styles = pickStyles(raw.styles);
+  if (!styles.ok) return styles;
 
   return {
     ok: true,
@@ -73,9 +79,40 @@ export function sanitizeSiteDoc(input: unknown): SanitizeResult {
       catalogOrder: catalog.value,
       sectionOrder: sections.value,
       positions: positions.value,
+      styles: styles.value,
       updatedAt: null,
     },
   };
+}
+
+function pickStyles(value: unknown): { ok: true; value: Record<string, SiteStyle> } | { ok: false; error: string } {
+  const out: Record<string, SiteStyle> = {};
+  if (value === undefined || value === null) return { ok: true, value: out };
+  if (typeof value !== 'object' || Array.isArray(value)) return { ok: false, error: 'Invalid style map.' };
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > MAX_TEXTS + MAX_IMAGES) return { ok: false, error: 'Too many style edits.' };
+  for (const [key, item] of entries) {
+    if (key.length > MAX_KEY || key === '__proto__') return { ok: false, error: 'Invalid style key.' };
+    const s = item as Record<string, unknown> | null;
+    if (!s || typeof s !== 'object') return { ok: false, error: 'Invalid style value.' };
+    const style: SiteStyle = {};
+    for (const field of ['w', 'h'] as const) {
+      const n = s[field];
+      if (n === undefined) continue;
+      if (typeof n !== 'number' || !Number.isFinite(n) || n < 10 || n > MAX_SIZE) return { ok: false, error: 'Size out of range.' };
+      style[field] = Math.round(n);
+    }
+    if (s.rot !== undefined) {
+      if (typeof s.rot !== 'number' || !Number.isFinite(s.rot) || Math.abs(s.rot) > MAX_ROTATION) return { ok: false, error: 'Rotation out of range.' };
+      style.rot = Math.round(s.rot);
+    }
+    if (s.hidden !== undefined) {
+      if (typeof s.hidden !== 'boolean') return { ok: false, error: 'Invalid hidden flag.' };
+      style.hidden = s.hidden;
+    }
+    if (Object.keys(style).length) out[key] = style;
+  }
+  return { ok: true, value: out };
 }
 
 function pickPositions(value: unknown): { ok: true; value: Record<string, SitePosition> } | { ok: false; error: string } {

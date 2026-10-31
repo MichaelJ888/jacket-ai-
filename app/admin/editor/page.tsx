@@ -13,6 +13,7 @@ type FrameMessage = {
   url?: string;
   x?: number;
   y?: number;
+  style?: { w?: number; h?: number; rot?: number; hidden?: boolean };
   catalogOrder?: string[];
   sectionOrder?: string[];
 };
@@ -129,6 +130,12 @@ export default function EditorPage() {
           if (message.x === 0 && message.y === 0) delete positions[message.key];
           else positions[message.key] = { x: message.x, y: message.y };
           return { ...prev, positions };
+        }
+        if (message.type === 'style' && message.key !== undefined && message.style) {
+          const styles = { ...prev.styles };
+          if (Object.keys(message.style).length) styles[message.key] = message.style;
+          else delete styles[message.key];
+          return { ...prev, styles };
         }
         return prev;
       });

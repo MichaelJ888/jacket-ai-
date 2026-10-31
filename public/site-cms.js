@@ -198,6 +198,94 @@
     }
   }
 
+  var STYLE_MIN = 10, STYLE_MAX = 2000, bar = null;
+
+  function clampSize(n) { return Math.min(STYLE_MAX, Math.max(STYLE_MIN, Math.round(n))); }
+
+  function resetStyle(el) {
+    el.style.width = '';
+    el.style.height = '';
+    el.style.rotate = '';
+    el.style.display = '';
+    el.style.opacity = '';
+    el.style.outline = '';
+    el.removeAttribute('data-cms-styled');
+  }
+
+  // Sizes, rotation and hiding are applied per element key; the editor dims hidden items so they can be restored.
+  function applyStyles(elementsByKey) {
+    var styles = doc.styles || {};
+    var marked = document.querySelectorAll('[data-cms-styled]');
+    for (var i = 0; i < marked.length; i++) {
+      if (!styles[pathKey(marked[i])]) resetStyle(marked[i]);
+    }
+    Object.keys(styles).forEach(function (key) {
+      var el = elementsByKey[key];
+      if (!el) return;
+      var st = styles[key];
+      resetStyle(el);
+      if (st.w) el.style.width = st.w + 'px';
+      if (st.h) el.style.height = st.h + 'px';
+      if (st.rot) el.style.rotate = st.rot + 'deg';
+      if (st.hidden) {
+        if (EDITOR) { el.style.opacity = '0.3'; el.style.outline = '2px dashed #B8912F'; }
+        else el.style.display = 'none';
+      }
+      el.setAttribute('data-cms-styled', '');
+    });
+  }
+
+  function ensureBar() {
+    if (bar) return bar;
+    bar = document.createElement('div');
+    bar.setAttribute('data-cms-ignore', '');
+    bar.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483000;display:none;gap:4px;padding:4px;border-radius:8px;background:#0B1E3D;box-shadow:0 2px 8px rgba(0,0,0,.35);font:700 13px/1 sans-serif;color:#fff;user-select:none';
+    var actions = [['rotate-l', '\u21BA', 'Rotate left 15\u00B0'], ['rotate-r', '\u21BB', 'Rotate right 15\u00B0'], ['grow', '+', 'Larger'], ['shrink', '\u2212', 'Smaller'], ['hide', '\u2298', 'Hide / show'], ['reset', '\u2715', 'Reset']];
+    actions.forEach(function (a) {
+      var b = document.createElement('div');
+      b.setAttribute('data-act', a[0]);
+      b.title = a[2];
+      b.textContent = a[1];
+      b.style.cssText = 'width:26px;height:26px;line-height:26px;text-align:center;border-radius:6px;cursor:pointer;background:rgba(255,255,255,.12)';
+      bar.appendChild(b);
+    });
+    bar.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-act]');
+      if (!b || !hovered) return;
+      e.stopPropagation();
+      changeStyle(b.getAttribute('data-act'));
+    });
+    document.body.appendChild(bar);
+    return bar;
+  }
+
+  function placeBar() {
+    if (!bar) return;
+    if (!hovered || !hovered.isConnected) { bar.style.display = 'none'; return; }
+    var r = hovered.getBoundingClientRect();
+    bar.style.display = 'flex';
+    bar.style.transform = 'translate3d(' + Math.max(0, r.right - 190) + 'px,' + Math.max(0, r.top - 38) + 'px,0)';
+  }
+
+  function changeStyle(action) {
+    var key = pathKey(hovered);
+    var cur = (doc.styles && doc.styles[key]) || {};
+    var st = { w: cur.w, h: cur.h, rot: cur.rot, hidden: cur.hidden };
+    var rect = hovered.getBoundingClientRect();
+    if (action === 'rotate-l') st.rot = ((st.rot || 0) - 15 + 360) % 360 || undefined;
+    if (action === 'rotate-r') st.rot = ((st.rot || 0) + 15) % 360 || undefined;
+    if (action === 'grow') st.w = clampSize(rect.width * 1.1);
+    if (action === 'shrink') st.w = clampSize(rect.width * 0.9);
+    if (action === 'hide') st.hidden = st.hidden ? undefined : true;
+    if (action === 'reset') st = {};
+    Object.keys(st).forEach(function (k) { if (st[k] === undefined) delete st[k]; });
+    if (!doc.styles) doc.styles = {};
+    if (Object.keys(st).length) doc.styles[key] = st;
+    else delete doc.styles[key];
+    emit({ type: 'style', key: key, style: st });
+    apply();
+  }
+
   function apply() {
     stampCards();
     stampSections();
@@ -223,6 +311,7 @@
         if (url && imgs[k].getAttribute('src') !== url) imgs[k].setAttribute('src', url);
       }
       applyPositions(byKey);
+      applyStyles(byKey);
       applyOrder(doc.catalogOrder || []);
     }
     if (EDITOR) decorateEditor();
@@ -506,10 +595,11 @@
   }
 
   function placeGrip() {
-    if (!hovered || !hovered.isConnected) { grip.style.display = 'none'; hovered = null; return; }
+    if (!hovered || !hovered.isConnected) { grip.style.display = 'none'; hovered = null; placeBar(); return; }
     var r = hovered.getBoundingClientRect();
     grip.style.display = 'block';
     grip.style.transform = 'translate3d(' + Math.max(0, r.left - 10) + 'px,' + Math.max(0, r.top - 10) + 'px,0)';
+    placeBar();
   }
 
   function queueGrip() {
@@ -568,6 +658,7 @@
     grip.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483000;display:none;width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;background:#B8912F;color:#fff;font:700 13px/22px sans-serif;cursor:move;user-select:none;touch-action:none;box-shadow:0 2px 6px rgba(0,0,0,.3)';
     grip.addEventListener('pointerdown', onGripDown);
     document.body.appendChild(grip);
+    ensureBar();
 
     document.addEventListener('pointerover', function (e) {
       if (drag) return;

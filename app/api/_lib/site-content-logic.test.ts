@@ -64,6 +64,12 @@ test('sanitizeSiteDoc keeps drag positions and rejects invalid ones', () => {
   assert.equal(sanitizeSiteDoc({ positions: { k: { x: 'a', y: 0 } } }).ok, false);
   assert.equal(sanitizeSiteDoc({ positions: { k: { x: 2001, y: 0 } } }).ok, false);
   assert.equal(sanitizeSiteDoc({ positions: { k: { x: Number.NaN, y: 0 } } }).ok, false);
+  const styled = sanitizeSiteDoc({ styles: { 'p:0': { w: 240.4, rot: -15, hidden: true } } });
+  assert.equal(styled.ok, true);
+  if (styled.ok) assert.deepEqual(styled.doc.styles, { 'p:0': { w: 240, rot: -15, hidden: true } });
+  assert.equal(sanitizeSiteDoc({ styles: { k: { w: 5 } } }).ok, false);
+  assert.equal(sanitizeSiteDoc({ styles: { k: { rot: 720 } } }).ok, false);
+  assert.equal(sanitizeSiteDoc({ styles: { k: { hidden: 'yes' } } }).ok, false);
   assert.equal(sanitizeSiteDoc({ positions: JSON.parse('{"__proto__":{"x":1,"y":1}}') }).ok, false);
   assert.equal(sanitizeSiteDoc({ positions: ['x'] }).ok, false);
 });
