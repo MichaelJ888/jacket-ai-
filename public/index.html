@@ -212,9 +212,6 @@
       <a href="#catalog" class="hover:text-navy transition-colors">Catalog</a>
       <a href="#quote" class="hover:text-navy transition-colors">Bulk Quotation</a>
       <a href="#trust" class="hover:text-navy transition-colors">Production</a>
-      <a href="/production-workflow" target="_top" class="hover:text-navy transition-colors">Workflow</a>
-      <a href="/capabilities" target="_top" class="hover:text-navy transition-colors">Capabilities</a>
-      <a href="/advantages" target="_top" class="hover:text-navy transition-colors">Advantages</a>
       <a href="#fabrics" class="hover:text-navy transition-colors">Fabrics</a>
       <a href="#faq" class="hover:text-navy transition-colors">FAQ</a>
       <a href="#testimonials" class="hover:text-navy transition-colors">Clients</a>
@@ -265,9 +262,6 @@
     <a @click="mobileMenu=false" href="#catalog">Catalog</a>
     <a @click="mobileMenu=false" href="#quote">Bulk Quotation</a>
     <a @click="mobileMenu=false" href="#trust">Production</a>
-    <a @click="mobileMenu=false" href="/production-workflow" target="_top">Production Workflow</a>
-    <a @click="mobileMenu=false" href="/capabilities" target="_top">Capabilities &amp; Advantages</a>
-    <a @click="mobileMenu=false" href="/advantages" target="_top">Competitive Advantages</a>
     <a @click="mobileMenu=false" href="#fabrics">Fabrics</a>
     <a @click="mobileMenu=false" href="#faq">FAQ</a>
     <a @click="mobileMenu=false" href="#testimonials">Clients</a>
@@ -375,15 +369,6 @@
       <img :src="siteSettings.heroImg1" class="absolute top-0 right-0 w-64 rounded-lg shadow-2xl rotate-2 border-4 border-white/10" alt="Custom jacket sample">
       <img :src="siteSettings.heroImg2" class="absolute bottom-16 right-24 w-56 rounded-lg shadow-2xl -rotate-3 border-4 border-white/10" alt="Custom jacket sample">
       <img :src="siteSettings.heroImg3" class="absolute bottom-0 left-0 w-52 rounded-lg shadow-2xl rotate-1 border-4 border-white/10" alt="Custom jacket sample">
-      <div class="absolute top-20 left-4 p-4 w-36 text-center bg-transparent border-0 shadow-none">
-        <svg viewBox="0 0 64 64" class="w-10 h-10 mx-auto mb-1">
-          <circle cx="32" cy="32" r="30" fill="#0B1E3D"/>
-          <circle cx="32" cy="32" r="30" fill="none" stroke="#B8912F" stroke-width="1.5"/>
-          <path d="M32 4 L34.5 10 L41 10.5 L36 14.8 L37.6 21 L32 17.5 L26.4 21 L28 14.8 L23 10.5 L29.5 10 Z" fill="#E0A458"/>
-          <text x="32" y="41" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="19" fill="#F3E7C6">CJ</text>
-        </svg>
-        <p class="text-[10px] font-bold text-gold-100 leading-tight">FREE LOGO<br>ON FIRST ORDER</p>
-      </div>
     </div>
   </div>
 
@@ -394,6 +379,24 @@
         <button @click="activeCat=cat; document.getElementById('catalog').scrollIntoView({behavior:'smooth'})" class="shrink-0 text-xs font-medium text-white/60 hover:text-gold-400 border border-white/10 hover:border-gold-400/40 rounded-full px-4 py-2 transition-colors" x-text="cat"></button>
       </template>
     </div>
+  </div>
+</section>
+
+<!-- ============ KEY PAGES (prominent, directly under hero) ============ -->
+<section class="bg-white border-b hairline py-8">
+  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 grid gap-4 sm:grid-cols-3">
+    <a href="/production-workflow" target="_top" class="group flex items-center justify-between gap-3 bg-navy text-gold-400 hover:bg-gold hover:text-navy font-display font-bold text-xl sm:text-2xl px-7 py-7 rounded-xl shadow-lg transition-all duration-300 hover:-translate-y-1">
+      <span class="flex items-center gap-3"><i data-lucide="workflow" class="w-7 h-7"></i> Production Workflow</span>
+      <i data-lucide="arrow-right" class="w-6 h-6 transition-transform group-hover:translate-x-1"></i>
+    </a>
+    <a href="/capabilities" target="_top" class="group flex items-center justify-between gap-3 bg-navy text-gold-400 hover:bg-gold hover:text-navy font-display font-bold text-xl sm:text-2xl px-7 py-7 rounded-xl shadow-lg transition-all duration-300 hover:-translate-y-1">
+      <span class="flex items-center gap-3"><i data-lucide="layers" class="w-7 h-7"></i> Capabilities</span>
+      <i data-lucide="arrow-right" class="w-6 h-6 transition-transform group-hover:translate-x-1"></i>
+    </a>
+    <a href="/advantages" target="_top" class="group flex items-center justify-between gap-3 bg-navy text-gold-400 hover:bg-gold hover:text-navy font-display font-bold text-xl sm:text-2xl px-7 py-7 rounded-xl shadow-lg transition-all duration-300 hover:-translate-y-1">
+      <span class="flex items-center gap-3"><i data-lucide="award" class="w-7 h-7"></i> Competitive Advantages</span>
+      <i data-lucide="arrow-right" class="w-6 h-6 transition-transform group-hover:translate-x-1"></i>
+    </a>
   </div>
 </section>
 
@@ -884,7 +887,7 @@
 <section class="bg-navy-900 border-t border-white/10 py-5 overflow-hidden">
   <div class="flex items-center">
     <span class="shrink-0 bg-gold text-navy text-[10px] font-bold px-3 py-1.5 uppercase tracking-wide ml-2 rounded-sm z-10">Live Headlines</span>
-    <div class="flex whitespace-nowrap news-track ml-4">
+    <div class="flex whitespace-nowrap news-track ml-4" style="animation-duration:240s;">
       <template x-for="n in 2" :key="'newsloop-'+n">
         <div class="flex items-center gap-8 pr-8 text-white/70 text-xs">
           <template x-for="(item,i) in newsItems" :key="n+'-'+i">
@@ -1016,6 +1019,11 @@
     </div>
   </div>
 </section>
+
+<!-- ============ BONUS FEATURES ============ -->
+<div class="bg-navy pt-16 pb-2 text-center">
+  <p class="font-display font-bold text-gold-400 text-3xl sm:text-4xl tracking-[0.2em] uppercase">Bonus Features</p>
+</div>
 
 <!-- ============ ALEX EALA MATCH COUNTDOWN ============ -->
 <section class="bg-navy py-16" :class="ealaNextMatch.isLive ? 'ring-4 ring-red-500/60' : ''">
