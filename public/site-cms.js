@@ -15,6 +15,10 @@
   var dragSection = null;
   var sectionDragging = false;
   var sectionSlots = null;
+  var grip = null;
+  var hovered = null;
+  var drag = null;
+  var gripFrame = 0;
 
   function sectionNodes() {
     return [].slice.call(document.body.children).filter(function (el) { return el.tagName === 'SECTION'; });
@@ -151,6 +155,49 @@
     decorateSections();
   }
 
+  // Offsets use translate (keeps Tailwind transforms intact); plain inline text uses relative offsets since translate ignores it.
+  function placeEl(el, pos) {
+    var x = pos ? pos.x : 0, y = pos ? pos.y : 0;
+    if (!x && !y) { resetEl(el); return; }
+    var tag = x + ',' + y;
+    if (el.getAttribute('data-cms-moved') === tag) return;
+    var cs = getComputedStyle(el);
+    if (cs.display === 'inline' && cs.position === 'static') {
+      el.style.position = 'relative';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.setAttribute('data-cms-rel', '');
+    } else {
+      el.style.translate = x + 'px ' + y + 'px';
+    }
+    el.setAttribute('data-cms-moved', tag);
+  }
+
+  function resetEl(el) {
+    if (el.hasAttribute('data-cms-rel')) {
+      el.style.position = '';
+      el.style.left = '';
+      el.style.top = '';
+      el.removeAttribute('data-cms-rel');
+    }
+    el.style.translate = '';
+    el.removeAttribute('data-cms-moved');
+  }
+
+  function applyPositions(elementsByKey) {
+    var positions = doc.positions || {};
+    var active = drag ? drag.el : null;
+    Object.keys(positions).forEach(function (key) {
+      var el = elementsByKey[key];
+      if (el && el !== active) placeEl(el, positions[key]);
+    });
+    var moved = document.querySelectorAll('[data-cms-moved]');
+    for (var i = 0; i < moved.length; i++) {
+      if (moved[i] === active) continue;
+      if (!positions[pathKey(moved[i])]) resetEl(moved[i]);
+    }
+  }
+
   function apply() {
     stampCards();
     stampSections();
@@ -169,13 +216,18 @@
       var imageMap = doc.images || {};
       var imgs = document.querySelectorAll('img');
       for (var k = 0; k < imgs.length; k++) {
-        var url = imageMap[pathKey(imgs[k])];
+        if (imgs[k].closest('[data-cms-skip]')) continue;
+        var key = pathKey(imgs[k]);
+        byKey[key] = imgs[k];
+        var url = imageMap[key];
         if (url && imgs[k].getAttribute('src') !== url) imgs[k].setAttribute('src', url);
       }
+      applyPositions(byKey);
       applyOrder(doc.catalogOrder || []);
     }
     if (EDITOR) decorateEditor();
   }
+
 
   function schedule() {
     if (scheduled) return;
@@ -195,6 +247,7 @@
     doc.images = doc.images || {};
     doc.catalogOrder = doc.catalogOrder || [];
     doc.sectionOrder = doc.sectionOrder || [];
+    doc.positions = doc.positions || {};
     apply();
   }
 
@@ -336,7 +389,94 @@
       if (e.origin !== location.origin || !e.data || e.data.source !== 'mjic-cms-editor') return;
       if (e.data.type === 'render' && e.data.doc) setDoc(e.data.doc);
     });
+
+    setupFreeDrag();
   }
+
+  // One shared grip follows the hovered text/image, so no per-element DOM is added.
+  function candidateAt(target) {
+    if (!target || !target.closest) return null;
+    if (target.closest('[data-cms-ignore],[data-cms-skip],[data-cms-handle]')) return null;
+    if (target.tagName === 'IMG') return target;
+    var el = target.closest(TEXT_SELECTOR);
+    return el && isTextCandidate(el) ? el : null;
+  }
+
+  function placeGrip() {
+    if (!hovered || !hovered.isConnected) { grip.style.display = 'none'; hovered = null; return; }
+    var r = hovered.getBoundingClientRect();
+    grip.style.display = 'block';
+    grip.style.transform = 'translate3d(' + Math.max(0, r.left - 10) + 'px,' + Math.max(0, r.top - 10) + 'px,0)';
+  }
+
+  function queueGrip() {
+    if (gripFrame) return;
+    gripFrame = requestAnimationFrame(function () { gripFrame = 0; placeGrip(); });
+  }
+
+  function onGripMove(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag.x = Math.round(drag.bx + e.clientX - drag.sx);
+    drag.y = Math.round(drag.by + e.clientY - drag.sy);
+    if (!drag.frame) drag.frame = requestAnimationFrame(flushDrag);
+  }
+
+  function flushDrag() {
+    if (!drag) return;
+    drag.frame = 0;
+    placeEl(drag.el, { x: drag.x, y: drag.y });
+    queueGrip();
+  }
+
+  function onGripUp(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var d = drag;
+    drag = null;
+    if (d.frame) cancelAnimationFrame(d.frame);
+    grip.removeEventListener('pointermove', onGripMove);
+    grip.removeEventListener('pointerup', onGripUp);
+    grip.removeEventListener('pointercancel', onGripUp);
+    document.body.style.userSelect = '';
+    if (d.x === d.bx && d.y === d.by) return;
+    if (!doc) return;
+    if (!doc.positions) doc.positions = {};
+    if (d.x === 0 && d.y === 0) delete doc.positions[d.key];
+    else doc.positions[d.key] = { x: d.x, y: d.y };
+    emit({ type: 'position', key: d.key, x: d.x, y: d.y });
+  }
+
+  function onGripDown(e) {
+    if (e.button !== 0 || !hovered || drag) return;
+    e.preventDefault();
+    var current = (doc && doc.positions && doc.positions[pathKey(hovered)]) || { x: 0, y: 0 };
+    drag = { el: hovered, key: pathKey(hovered), id: e.pointerId, sx: e.clientX, sy: e.clientY, bx: current.x, by: current.y, x: current.x, y: current.y, frame: 0 };
+    grip.setPointerCapture(e.pointerId);
+    grip.addEventListener('pointermove', onGripMove, { passive: true });
+    grip.addEventListener('pointerup', onGripUp);
+    grip.addEventListener('pointercancel', onGripUp);
+    document.body.style.userSelect = 'none';
+  }
+
+  function setupFreeDrag() {
+    grip = document.createElement('div');
+    grip.setAttribute('data-cms-ignore', '');
+    grip.title = 'Drag to move';
+    grip.textContent = '\u2725';
+    grip.style.cssText = 'position:fixed;left:0;top:0;z-index:2147483000;display:none;width:22px;height:22px;line-height:22px;text-align:center;border-radius:6px;background:#B8912F;color:#fff;font:700 13px/22px sans-serif;cursor:move;user-select:none;touch-action:none;box-shadow:0 2px 6px rgba(0,0,0,.3)';
+    grip.addEventListener('pointerdown', onGripDown);
+    document.body.appendChild(grip);
+
+    document.addEventListener('pointerover', function (e) {
+      if (drag) return;
+      var el = candidateAt(e.target);
+      if (!el || el === hovered) return;
+      hovered = el;
+      queueGrip();
+    }, { capture: true, passive: true });
+
+    window.addEventListener('scroll', function () { if (hovered) queueGrip(); }, { passive: true });
+  }
+
 
   var observer = new MutationObserver(schedule);
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });

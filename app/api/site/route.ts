@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const supabase = getSupabaseAdmin();
   const doc = supabase ? await loadSiteDoc(supabase).catch(() => null) : null;
-  return NextResponse.json(doc ?? { theme: {}, texts: {}, images: {}, catalogOrder: [], updatedAt: null }, {
+  return NextResponse.json(doc ?? { theme: {}, texts: {}, images: {}, catalogOrder: [], positions: {}, updatedAt: null }, {
     headers: { 'Cache-Control': 'no-store' },
   });
 }

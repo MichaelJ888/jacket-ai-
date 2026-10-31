@@ -1,12 +1,14 @@
 import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 
 export type SiteTheme = { primary: string; secondary: string; background: string };
+export type SitePosition = { x: number; y: number };
 export type SiteDoc = {
   theme: SiteTheme;
   texts: Record<string, string>;
   images: Record<string, string>;
   catalogOrder: string[];
   sectionOrder: string[];
+  positions: Record<string, SitePosition>;
   updatedAt: string | null;
 };
 
@@ -24,11 +26,12 @@ const MAX_IMAGES = 200;
 const MAX_KEY = 300;
 const MAX_TEXT = 2000;
 const MAX_URL = 2000;
+const MAX_OFFSET = 2000;
 
 export const DEFAULT_THEME: SiteTheme = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF' };
 
 export function emptySiteDoc(): SiteDoc {
-  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], sectionOrder: [], updatedAt: null };
+  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], sectionOrder: [], positions: {}, updatedAt: null };
 }
 
 type SanitizeResult = { ok: true; doc: SiteDoc } | { ok: false; error: string };
@@ -58,11 +61,41 @@ export function sanitizeSiteDoc(input: unknown): SanitizeResult {
   if (!catalog.ok) return catalog;
   const sections = pickKeyList(raw.sectionOrder, 'section order');
   if (!sections.ok) return sections;
+  const positions = pickPositions(raw.positions);
+  if (!positions.ok) return positions;
 
   return {
     ok: true,
-    doc: { theme, texts: texts.value, images: images.value, catalogOrder: catalog.value, sectionOrder: sections.value, updatedAt: null },
+    doc: {
+      theme,
+      texts: texts.value,
+      images: images.value,
+      catalogOrder: catalog.value,
+      sectionOrder: sections.value,
+      positions: positions.value,
+      updatedAt: null,
+    },
   };
+}
+
+function pickPositions(value: unknown): { ok: true; value: Record<string, SitePosition> } | { ok: false; error: string } {
+  const out: Record<string, SitePosition> = {};
+  if (value === undefined || value === null) return { ok: true, value: out };
+  if (typeof value !== 'object' || Array.isArray(value)) return { ok: false, error: 'Invalid position map.' };
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (entries.length > MAX_TEXTS + MAX_IMAGES) return { ok: false, error: 'Too many position edits.' };
+  for (const [key, item] of entries) {
+    if (key.length > MAX_KEY || key === '__proto__') return { ok: false, error: 'Invalid position key.' };
+    const pos = item as Record<string, unknown> | null;
+    if (!pos || typeof pos !== 'object') return { ok: false, error: 'Invalid position value.' };
+    const { x, y } = pos;
+    if (typeof x !== 'number' || typeof y !== 'number' || !Number.isFinite(x) || !Number.isFinite(y)) {
+      return { ok: false, error: 'Invalid position value.' };
+    }
+    if (Math.abs(x) > MAX_OFFSET || Math.abs(y) > MAX_OFFSET) return { ok: false, error: 'Position offset out of range.' };
+    out[key] = { x: Math.round(x), y: Math.round(y) };
+  }
+  return { ok: true, value: out };
 }
 
 function pickKeyList(value: unknown, label: string): { ok: true; value: string[] } | { ok: false; error: string } {

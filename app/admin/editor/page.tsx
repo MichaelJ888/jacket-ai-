@@ -11,6 +11,8 @@ type FrameMessage = {
   key?: string;
   value?: string;
   url?: string;
+  x?: number;
+  y?: number;
   catalogOrder?: string[];
   sectionOrder?: string[];
 };
@@ -121,6 +123,12 @@ export default function EditorPage() {
         }
         if (message.type === 'sections' && Array.isArray(message.sectionOrder)) {
           return { ...prev, sectionOrder: message.sectionOrder };
+        }
+        if (message.type === 'position' && message.key !== undefined && typeof message.x === 'number' && typeof message.y === 'number') {
+          const positions = { ...prev.positions };
+          if (message.x === 0 && message.y === 0) delete positions[message.key];
+          else positions[message.key] = { x: message.x, y: message.y };
+          return { ...prev, positions };
         }
         return prev;
       });

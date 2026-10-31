@@ -54,6 +54,20 @@ test('sanitizeSiteDoc keeps section order and defaults it when absent', () => {
   if (missing.ok) assert.deepEqual(missing.doc.sectionOrder, []);
 });
 
+test('sanitizeSiteDoc keeps drag positions and rejects invalid ones', () => {
+  const ok = sanitizeSiteDoc({ positions: { 'card:Varsity/p:0': { x: 12.6, y: -40 } } });
+  assert.equal(ok.ok, true);
+  if (ok.ok) assert.deepEqual(ok.doc.positions, { 'card:Varsity/p:0': { x: 13, y: -40 } });
+  const empty = sanitizeSiteDoc({});
+  assert.equal(empty.ok, true);
+  if (empty.ok) assert.deepEqual(empty.doc.positions, {});
+  assert.equal(sanitizeSiteDoc({ positions: { k: { x: 'a', y: 0 } } }).ok, false);
+  assert.equal(sanitizeSiteDoc({ positions: { k: { x: 2001, y: 0 } } }).ok, false);
+  assert.equal(sanitizeSiteDoc({ positions: { k: { x: Number.NaN, y: 0 } } }).ok, false);
+  assert.equal(sanitizeSiteDoc({ positions: JSON.parse('{"__proto__":{"x":1,"y":1}}') }).ok, false);
+  assert.equal(sanitizeSiteDoc({ positions: ['x'] }).ok, false);
+});
+
 test('sanitizeSiteDoc rejects malformed section order', () => {
   assert.equal(sanitizeSiteDoc({ sectionOrder: '#top' }).ok, false);
   assert.equal(sanitizeSiteDoc({ sectionOrder: [1] }).ok, false);
