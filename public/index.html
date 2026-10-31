@@ -216,6 +216,8 @@
       <a href="#catalog" class="hover:text-navy transition-colors">Catalog</a>
       <a href="#quote" class="hover:text-navy transition-colors">Bulk Quotation</a>
       <a href="#trust" class="hover:text-navy transition-colors">Production</a>
+      <a href="/production-workflow" target="_top" class="hover:text-navy transition-colors">Workflow</a>
+      <a href="/capabilities" target="_top" class="hover:text-navy transition-colors">Capabilities</a>
       <a href="#fabrics" class="hover:text-navy transition-colors">Fabrics</a>
       <a href="#faq" class="hover:text-navy transition-colors">FAQ</a>
       <a href="#testimonials" class="hover:text-navy transition-colors">Clients</a>
@@ -242,7 +244,7 @@
       <div class="space-y-2 max-h-64 overflow-y-auto">
         <template x-for="item in quoteItems" :key="item.id">
           <div class="flex items-center gap-2 border-b hairline pb-2">
-            <img :src="item.img" class="w-10 h-10 rounded object-cover shrink-0">
+            <img x-show="item.img" :src="item.img" class="w-10 h-10 rounded object-cover shrink-0">
             <div class="flex-1 min-w-0">
               <p class="text-xs font-semibold text-navy truncate" x-text="item.title"></p>
               <p class="text-[11px] text-navy-400" x-text="item.tierQty + ' pcs — ₱' + lineTotal(item).toLocaleString()"></p>
@@ -266,6 +268,8 @@
     <a @click="mobileMenu=false" href="#catalog">Catalog</a>
     <a @click="mobileMenu=false" href="#quote">Bulk Quotation</a>
     <a @click="mobileMenu=false" href="#trust">Production</a>
+    <a @click="mobileMenu=false" href="/production-workflow" target="_top">Production Workflow</a>
+    <a @click="mobileMenu=false" href="/capabilities" target="_top">Capabilities &amp; Advantages</a>
     <a @click="mobileMenu=false" href="#fabrics">Fabrics</a>
     <a @click="mobileMenu=false" href="#faq">FAQ</a>
     <a @click="mobileMenu=false" href="#testimonials">Clients</a>
@@ -683,7 +687,11 @@
     <template x-for="p in filteredProducts" :key="p.id">
       <div class="group border hairline rounded-lg overflow-hidden hover:shadow-xl hover:shadow-gold/10 hover:border-gold-400/50 transition-all duration-300 bg-white flex flex-col">
         <div class="aspect-[4/3] overflow-hidden bg-navy-50 relative">
-          <img :src="p.img" :alt="p.title" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+          <img x-show="p.img" :src="p.img" :alt="p.title" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+          <div x-show="!p.img" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-navy to-navy-600 text-center px-4">
+            <span class="font-display font-bold text-gold-100 tracking-widest text-sm">MJIC</span>
+            <span class="text-[10px] uppercase tracking-wide text-white/70" x-text="p.category"></span>
+          </div>
           <span class="absolute top-3 left-3 bg-white/95 text-navy text-[10px] font-bold px-2.5 py-1 rounded-full">MOQ <span x-text="p.moq"></span> pcs</span>
           <span x-show="mediaCount(p) > 1" x-cloak class="absolute bottom-3 right-3 bg-navy/85 text-white text-[10px] font-bold px-2 py-1 rounded-full flex items-center gap-1">
             <i data-lucide="images" class="w-3 h-3"></i><span x-text="mediaCount(p)"></span>
@@ -728,7 +736,7 @@
         <div class="space-y-4">
           <template x-for="(item, idx) in quoteItems" :key="item.id">
             <div class="flex items-center gap-4 border-b hairline pb-4">
-              <img :src="item.img" class="w-14 h-14 rounded-md object-cover shrink-0">
+              <img x-show="item.img" :src="item.img" class="w-14 h-14 rounded-md object-cover shrink-0">
               <div class="flex-1 min-w-0">
                 <p class="font-semibold text-navy text-sm truncate" x-text="item.title"></p>
                 <p class="text-xs text-navy-400" x-text="'₱'+(item.configuredPricePerPiece || getPricePerPiece(item.category, item.tierQty)).toLocaleString()+' / pc at this qty'"></p>
@@ -1195,7 +1203,11 @@
       <div>
         <div class="bg-navy-50">
           <div class="h-72 sm:h-80 relative bg-navy-900/5">
-            <img x-show="activeMedia(selectedProduct).type==='image'" :src="activeMedia(selectedProduct).src" class="w-full h-full object-contain">
+            <img x-show="activeMedia(selectedProduct).type==='image' && activeMedia(selectedProduct).src" :src="activeMedia(selectedProduct).src" class="w-full h-full object-contain">
+            <div x-show="!allMedia(selectedProduct).length" class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-navy to-navy-600 text-gold-100">
+              <span class="font-display font-bold tracking-widest">MJIC</span>
+              <span class="text-xs text-white/70 mt-1" x-text="selectedProduct.category"></span>
+            </div>
             <video x-show="activeMedia(selectedProduct).type==='video'" :src="activeMedia(selectedProduct).src" controls class="w-full h-full object-contain bg-navy"></video>
             <iframe x-show="activeMedia(selectedProduct).type==='youtube'" :src="activeMedia(selectedProduct).src" class="w-full h-full" frameborder="0" allowfullscreen></iframe>
 
@@ -1935,7 +1947,7 @@ function mjApp(){
       brandName: "CUSTOMIZED JACKETS", brandTagline: "AND MORE", logoImage: "",
       heroEyebrow: "We build brands through", heroTitle: "CUSTOMIZED JACKETS AND MORE",
       heroDescription: "Since 2004, Michael Jeffrey International Company has manufactured varsity jackets, corporate uniforms, and branded giveaways for enterprises, government offices, and organizations across the Philippines and abroad — from a 20-piece pilot order to full nationwide rollouts.",
-      heroImg1: "/images/site/hero1.jpg", heroImg2: "/images/site/hero2.jpg", heroImg3: "/images/site/hero3.jpg",
+      heroImg1: "/images/site/fleece.jpg", heroImg2: "/images/site/microfiber.jpg", heroImg3: "/images/company-uniforms/1.jpg",
       explainerVideoUrl: "/videos/mjic-client-journey.webm", explainerVideoType: "file", ealaPhoto: "",
       facebook: "", instagram: "", tiktok: "", youtube: ""
     }),
@@ -2115,6 +2127,8 @@ function mjApp(){
 
     defaultProducts(){
       const productImages = {
+// One unique photo per design. Accessories have no photo in the library, so they use the branded placeholder (empty img).
+      const productImages = {
 varsity1:'/images/site/varsity-letterman.jpg',
 varsity2:'/images/site/varsity-collegiate.jpg',
 varsity3:'/images/site/varsity-satin.jpg',
@@ -2124,29 +2138,27 @@ exec3:'/images/site/corporate.jpg',
 wind1:'/images/site/windbreaker.jpg',
 wind2:'/images/site/windbreaker-hood.jpg',
 hivis1:'/images/site/hivis.jpg',
-hivis2:'/images/site/hivis.jpg',
 bomber1:'/images/site/sublimation-racing.jpg',
 bomber2:'/images/site/sublimation-org.jpg',
+polo1:'/images/company-uniforms/3.jpg',
+polo2:'/images/company-uniforms/5.jpg',
+polo3:'/images/company-uniforms/4.jpg',
 scrub1:'/images/site/scrub.jpg',
 scrub2:'/images/site/labgown.jpg',
-coverall1:'/images/site/coverall.jpg',
-polo3:'/images/site/coverall.jpg',
-polo1:'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=900&q=82',
-tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=900&q=82'
+coverall1:'/images/site/coverall.jpg'
 };
-      const img = (seed) => productImages[seed] || productImages.exec1;
+      const img = (seed) => productImages[seed] || '';
       const P = (id,title,category,moq,leadTime,desc,seed) => ({id,title,category,moq,leadTime,description:desc,img:img(seed)});
       return [
         P(1,'Classic Letterman Varsity Jacket','Custom Varsity Jackets',20,'12–15 business days','Wool-blend body with leather-look sleeves, fully customizable patches and chenille lettering.','varsity1'),
         P(2,'Lined Collegiate Jacket','Custom Varsity Jackets',20,'12–15 business days','Heavyweight lining for cooler climates, embroidered crest included.','varsity2'),
         P(3,'Satin Varsity Jacket','Custom Varsity Jackets',20,'12–15 business days','Lightweight satin shell, popular for org and batch jackets.','varsity3'),
         P(4,'Executive Softshell Jacket','Executive Company & Corporate Jackets',20,'10–14 business days','Water-repellent softshell with chest embroidery, boardroom-ready silhouette.','exec1'),
-        P(5,'Corporate Padded Vest','Executive Company & Corporate Jackets',20,'10–14 business days','Layerable padded vest for uniforms worn indoors and outdoors.','exec2'),
+        P(5,'Corporate Padded Vest','Executive Company & Corporate Jackets',20,'10–14 business days','Quilted padded jacket for indoor and outdoor staff uniforms, with MJIC logo placement on the chest.','exec2'),
         P(6,'Formal Corporate Blazer-Jacket','Executive Company & Corporate Jackets',20,'14–18 business days','Structured blazer-cut jacket for client-facing and executive staff.','exec3'),
         P(7,'Packable Windbreaker','Water-Resistant Windbreakers',20,'10–12 business days','Lightweight, packable, taped seams for site and field teams.','wind1'),
         P(8,'Hooded Water-Resistant Windbreaker','Water-Resistant Windbreakers',20,'10–12 business days','Adjustable hood, water-resistant shell, ideal for outdoor event staff.','wind2'),
         P(9,'Class 2 High-Vis Reflector Jacket','High-Vis Reflector Jackets',20,'8–10 business days','Meets standard visibility requirements for site and traffic personnel.','hivis1'),
-        P(10,'High-Vis Reflector Vest-Jacket Combo','High-Vis Reflector Jackets',20,'8–10 business days','Detachable sleeves convert jacket to vest for warehouse and logistics teams.','hivis2'),
         P(11,'Full Sublimation Racing Bomber','Full Sublimation Bomber Jackets',20,'12–15 business days','Full sublimation print — unlimited colors and graphics, no design limit.','bomber1'),
         P(12,'Full Sublimation Esports/Org Bomber','Full Sublimation Bomber Jackets',20,'12–15 business days','Popular for esports orgs, batch jackets, and community groups.','bomber2'),
         P(13,'Pique Corporate Polo Shirt','Corporate Polo Shirts & Uniforms',20,'7–10 business days','Breathable pique cotton, embroidered logo, unisex cut.','polo1'),
@@ -2156,7 +2168,7 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
         P(17,'Lab Gown / Clinic Coat','Hospital Scrub Suits & Lab Gowns',20,'10–12 business days','Button-front lab gown for clinics, laboratories, and pharmacies.','scrub2'),
         P(18,'Canvas Eco Tote Bag','Eco Bags, Tote Bags, Backpacks & Giveaways',50,'7–10 business days','Reusable canvas tote, printed or embroidered branding.','tote1'),
         P(19,'Corporate Backpack Giveaway Set','Eco Bags, Tote Bags, Backpacks & Giveaways',50,'10–12 business days','Padded laptop compartment, branded front panel — popular for onboarding kits.','tote2'),
-        P(20,'Heavy-Duty Coverall Uniform','Military & Coverall Heavy-Duty Uniforms',20,'12–15 business days','Reinforced stitching and ripstop panels for industrial and field use.','coverall1'),
+        P(20,'Heavy-Duty Coverall Uniform','Military & Coverall Heavy-Duty Uniforms',20,'12–15 business days','Tailored tan coverall with reinforced stitching for industrial and field crews.','coverall1'),
         P(21,'Woven Custom Lanyard','Customized Lanyards',100,'5–7 business days','Woven logo lanyard with breakaway safety clip and metal clasp.','lanyard1'),
         P(22,'Full Sublimation Lanyard (Full-Color)','Customized Lanyards',100,'5–7 business days','Edge-to-edge full-color dye-sublimation print for detailed logos or sponsor marks.','lanyard2'),
         P(23,'Ceramic Corporate Mug','Customized Mugs',50,'7–10 business days','11oz ceramic mug, single-color or full-color logo print, dishwasher-safe options.','mug1'),
@@ -2184,18 +2196,18 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
       }
       const defaultProducts = this.defaultProducts();
       const storedProducts = safeLS.get('mji_products', null);
-      this.products = storedProducts || defaultProducts;
+      this.products = storedProducts ? storedProducts.filter(product=>product.id!==10) : defaultProducts;
       if(storedProducts){
         this.products.forEach(product=>{
           const replacement = defaultProducts.find(defaultProduct=> defaultProduct.id===product.id);
-          if(replacement && typeof product.img==='string' && /picsum\.photos|images\.unsplash\.com/.test(product.img) && !/unsplash/.test(replacement.img)) product.img = replacement.img;
+          if(replacement && typeof product.img==='string' && /picsum\.photos|images\.unsplash\.com|^\/images\//.test(product.img)) product.img = replacement.img;
         });
         this.saveProducts();
       } else this.saveProducts();
-      if(['heroImg1','heroImg2','heroImg3'].some(k=>/picsum\.photos|images\.unsplash\.com/.test(this.siteSettings[k]||''))){
-        this.siteSettings.heroImg1 = '/images/site/hero1.jpg';
-        this.siteSettings.heroImg2 = '/images/site/hero2.jpg';
-        this.siteSettings.heroImg3 = '/images/site/hero3.jpg';
+      if(['heroImg1','heroImg2','heroImg3'].some(k=>/picsum\.photos|images\.unsplash\.com|\/images\/site\/hero[123]\.jpg/.test(this.siteSettings[k]||''))){
+        this.siteSettings.heroImg1 = '/images/site/fleece.jpg';
+        this.siteSettings.heroImg2 = '/images/site/microfiber.jpg';
+        this.siteSettings.heroImg3 = '/images/company-uniforms/1.jpg';
         safeLS.set('mji_site_settings', this.siteSettings);
       }
       const fabricSwatches = {"Microfiber":"microfiber","Michael Angelo":"michael-angelo","Diamond Ripstop":"diamond-ripstop","Honeycomb / Pique":"honeycomb-pique","Dri-Fit / Performance Knit":"dri-fit","Oxford / Broadcloth":"oxford","Softshell":"softshell","Scrub Suit Poly-Cotton":"scrub-polycotton","Canvas / Twill":"canvas-twill","Cotton Fleece":"cotton-fleece","Taslan":"taslan","Varsity Satin":"varsity-satin"};
@@ -2690,7 +2702,7 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
     // ---- Product media gallery (Alibaba-style: main image + extra photos/videos) ----
     allMedia(p){
       if(!p) return [];
-      const media = [{type:'image', src:p.img}];
+      const media = p.img ? [{type:'image', src:p.img}] : [];
       (p.gallery || []).forEach(g=>{
         if(g.type==='youtube'){ media.push({type:'youtube', src:this.youtubeEmbedUrl(g.src)}); }
         else { media.push({type:g.type||'image', src:g.src}); }
@@ -3202,7 +3214,7 @@ tote1:'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit
 
       this.products.push({
         id: Date.now(), title:n.title, category:n.category, moq:n.moq||20,
-        img: n.img || '/images/site/varsity-letterman.jpg',
+        img: n.img || '/images/company-uniforms/2.jpg',
         description: n.description || '', leadTime:n.leadTime||'10–14 business days'
       });
       this.saveProducts();
