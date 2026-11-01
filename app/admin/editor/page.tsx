@@ -9,10 +9,13 @@ type LibraryItem = { src: string; label: string };
 
 const LIBRARY_MIME = 'application/x-mjic-library';
 const EDIT_PAGES = [
-  { id: 'home', label: 'Home', src: '/index.html?cms=editor' },
-  { id: 'production', label: 'Production workflow', src: '/production-workflow?cms=editor' },
-  { id: 'capabilities', label: 'Capabilities', src: '/capabilities?cms=editor' },
-  { id: 'advantages', label: 'Competitive advantage', src: '/advantages?cms=editor' },
+  { id: 'home', label: 'Home', src: '/index.html?cms=editor', anchor: null },
+  { id: 'production', label: 'Production workflow', src: '/production-workflow?cms=editor', anchor: null },
+  { id: 'capabilities', label: 'Capabilities', src: '/capabilities?cms=editor', anchor: null },
+  { id: 'advantages', label: 'Competitive advantage', src: '/advantages?cms=editor', anchor: null },
+  { id: 'catalog', label: 'Catalog', src: '/index.html?cms=editor', anchor: 'catalog' },
+  { id: 'fabrics', label: 'Fabrics', src: '/index.html?cms=editor', anchor: 'fabrics' },
+  { id: 'faq', label: 'FAQ', src: '/index.html?cms=editor', anchor: 'faq' },
 ] as const;
 
 type FrameMessage = {
@@ -45,6 +48,7 @@ export default function EditorPage() {
   const [frameKey, setFrameKey] = useState(0);
   const [pageId, setPageId] = useState<(typeof EDIT_PAGES)[number]['id']>('home');
   const editPage = EDIT_PAGES.find((p) => p.id === pageId) ?? EDIT_PAGES[0];
+  const anchor = editPage.anchor;
   const frameRef = useRef<HTMLIFrameElement>(null);
   const draftRef = useRef<SiteDoc | null>(null);
   const [library, setLibrary] = useState<LibraryItem[]>([]);
@@ -84,7 +88,13 @@ export default function EditorPage() {
     frameObserverRef.current = observer;
     observer.observe(frameDoc.body);
     syncFrameHeight();
-  }, [syncFrameHeight]);
+    // The frame is not scrollable (it grows to its content), so the outer page scrolls to the section instead.
+    const target = anchor ? frameDoc.getElementById(anchor) : null;
+    if (target && frameRef.current) {
+      const top = frameRef.current.getBoundingClientRect().top + window.scrollY + target.getBoundingClientRect().top - 96;
+      window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+    }
+  }, [syncFrameHeight, anchor]);
 
   useEffect(() => () => frameObserverRef.current?.disconnect(), []);
 

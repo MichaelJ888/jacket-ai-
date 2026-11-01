@@ -96,6 +96,27 @@ alter table public.payment_verifications enable row level security;
 create index if not exists payment_verification_created_idx on public.payment_verifications (created_at desc);
 revoke all on public.payment_verifications from anon, authenticated;
 
+create table if not exists public.studio_jobs (
+  id uuid default gen_random_uuid() primary key,
+  source_url text not null,
+  face_url text,
+  logo_url text,
+  swap_url text,
+  output_url text,
+  enhance_scale int not null default 2,
+  status text not null default 'queued',
+  stage_prediction_id text,
+  webhook_token text not null,
+  error text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  decided_at timestamptz
+);
+
+alter table public.studio_jobs enable row level security;
+create index if not exists studio_jobs_created_idx on public.studio_jobs (created_at desc);
+revoke all on public.studio_jobs from anon, authenticated;
+
 create table if not exists public.project_costings (
   id uuid default gen_random_uuid() primary key,
   project_name text,
@@ -1074,6 +1095,17 @@ create table if not exists public.production_updates (
 alter table public.production_updates enable row level security;
 revoke all on public.production_updates from anon, authenticated;
 create index if not exists production_updates_created_at_idx on public.production_updates (created_at desc);
+
+-- Trust-roster logos sent from the CEO's Telegram chat ("logo <client>" caption). One row per roster client; read via /api/client-logos.
+create table if not exists public.client_logos (
+  slug text primary key,
+  display_name text not null,
+  logo_url text not null,
+  storage_path text not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.client_logos enable row level security;
+revoke all on public.client_logos from anon, authenticated;
 
 -- Verified corporate clients & institutional partners (idempotent; do nothing on re-run so admin edits are kept).
 insert into public.crm_contacts (channel, external_id, name, company, stage, tags, notes) values
