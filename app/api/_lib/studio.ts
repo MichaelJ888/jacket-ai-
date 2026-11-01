@@ -15,6 +15,16 @@ type Supabase = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 export type StudioStage = 'swap' | 'enhance';
 export type StudioDecision = 'approve' | 'reject';
 
+// Replaces all source metadata (Replicate/camera/GPS) with an explicit MJIC originality tag.
+const STUDIO_ORIGINAL_EXIF = {
+  IFD0: {
+    Copyright: 'Michael Jeffrey International Corporation - original MJIC asset',
+    Artist: 'Michael Jeffrey International Corporation',
+    ImageDescription: 'Original MJIC asset (CEO AI Studio, face-anonymized)',
+    Software: 'MJIC CEO AI Studio',
+  },
+};
+
 export const STUDIO_JOB_COLUMNS = 'id, source_url, face_url, logo_url, output_url, status, error, enhance_scale, created_at, updated_at, decided_at';
 
 export type StudioJob = {
@@ -101,9 +111,9 @@ async function finalizeJob(supabase: Supabase, job: StudioJob, enhancedUrl: stri
       const logoMeta = await sharp(logo).metadata();
       const place = logoPlacementLeftChest(base.width ?? 1, base.height ?? 1, logoMeta.width ?? 1, logoMeta.height ?? 1);
       const logoPng = await sharp(logo).resize({ width: place.width }).png().toBuffer();
-      composed = await sharp(enhanced).composite([{ input: logoPng, left: place.left, top: place.top }]).jpeg({ quality: 92 }).toBuffer();
+      composed = await sharp(enhanced).composite([{ input: logoPng, left: place.left, top: place.top }]).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
     } else {
-      composed = await sharp(enhanced).jpeg({ quality: 92 }).toBuffer();
+      composed = await sharp(enhanced).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
     }
 
     await supabase.storage.createBucket(STUDIO_OUTPUT_BUCKET, { public: true });

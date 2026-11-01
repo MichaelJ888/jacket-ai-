@@ -172,7 +172,10 @@ export default function CeoAiStudioPage() {
       </section>
 
       <section>
-        <h2 className="mb-4 text-lg font-bold">Jobs</h2>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h2 className="text-lg font-bold">Jobs</h2>
+          <a href="/api/admin/studio/zip" className="rounded-md bg-zinc-900 px-3 py-2 text-sm font-semibold text-white">Download batch (ZIP)</a>
+        </div>
         {jobs.length === 0 && <p className="text-sm text-zinc-500">No jobs yet.</p>}
         <div className="grid gap-4 md:grid-cols-3">
           {jobs.map((job) => (
