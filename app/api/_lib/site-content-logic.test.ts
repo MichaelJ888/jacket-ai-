@@ -78,7 +78,7 @@ test('sanitizeSiteDoc rejects malformed section order', () => {
   assert.equal(sanitizeSiteDoc({ sectionOrder: '#top' }).ok, false);
   assert.equal(sanitizeSiteDoc({ sectionOrder: [1] }).ok, false);
   assert.equal(sanitizeSiteDoc({ sectionOrder: Array.from({ length: 201 }, (_, i) => `s${i}`) }).ok, false);
-  assert.equal(sanitizeSiteDoc({ sectionOrder: ['x'.repeat(301)] }).ok, false);
+  assert.equal(sanitizeSiteDoc({ sectionOrder: ['x'.repeat(401)] }).ok, false);
 });
 
 test('sanitizeSiteDoc accepts a background image and opacity, and rejects bad ones', () => {

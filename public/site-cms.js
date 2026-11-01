@@ -3,6 +3,8 @@
 
   var EDITOR = new URLSearchParams(location.search).get('cms') === 'editor';
   var IN_FRAME = window.parent !== window;
+  // Home keys stay unprefixed so already-published content keeps matching; other pages are namespaced to avoid collisions.
+  var PAGE_PREFIX = /\/index\.html$/.test(location.pathname) || location.pathname === '/' ? '' : location.pathname + '|';
   var POLL_MS = 20000;
   var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
   var DEFAULT_THEME = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF' };
@@ -103,7 +105,7 @@
       segs.unshift(node.tagName.toLowerCase() + ':' + idx);
       node = parent;
     }
-    return segs.join('/');
+    return PAGE_PREFIX + segs.join('/');
   }
 
   function isTextCandidate(el) {

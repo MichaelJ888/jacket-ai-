@@ -8,6 +8,12 @@ type Stage = 'checking' | 'login' | 'code' | 'editing';
 type LibraryItem = { src: string; label: string };
 
 const LIBRARY_MIME = 'application/x-mjic-library';
+const EDIT_PAGES = [
+  { id: 'home', label: 'Home', src: '/index.html?cms=editor' },
+  { id: 'production', label: 'Production workflow', src: '/production-workflow?cms=editor' },
+  { id: 'capabilities', label: 'Capabilities', src: '/capabilities?cms=editor' },
+  { id: 'advantages', label: 'Competitive advantage', src: '/advantages?cms=editor' },
+] as const;
 
 type FrameMessage = {
   source?: string;
@@ -37,6 +43,8 @@ export default function EditorPage() {
   const [draft, setDraft] = useState<SiteDoc | null>(null);
   const [dirty, setDirty] = useState(false);
   const [frameKey, setFrameKey] = useState(0);
+  const [pageId, setPageId] = useState<(typeof EDIT_PAGES)[number]['id']>('home');
+  const editPage = EDIT_PAGES.find((p) => p.id === pageId) ?? EDIT_PAGES[0];
   const frameRef = useRef<HTMLIFrameElement>(null);
   const draftRef = useRef<SiteDoc | null>(null);
   const [library, setLibrary] = useState<LibraryItem[]>([]);
@@ -295,6 +303,11 @@ export default function EditorPage() {
     <main className="flex min-h-screen flex-col bg-zinc-100">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
         <h1 className="mr-2 text-base font-bold text-zinc-900">Visual Editor</h1>
+        <nav className="flex flex-wrap gap-1">
+          {EDIT_PAGES.map((p) => (
+            <button key={p.id} onClick={() => setPageId(p.id)} className={`rounded px-2.5 py-1 text-xs font-medium ${pageId === p.id ? 'bg-zinc-900 text-white' : 'bg-zinc-200 text-zinc-800'}`}>{p.label}</button>
+          ))}
+        </nav>
         <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to pick a local photo (or upload) · Drag a library photo or image file onto a slot · Drag the corner handle to resize · Drag ☰ Move section or catalogue cards to reorder</span>
         <div className="ml-auto flex flex-wrap items-center gap-3">
           {draft && (
@@ -342,7 +355,7 @@ export default function EditorPage() {
           </div>
         </details>
       )}
-      <iframe key={frameKey} ref={frameRef} onLoad={onFrameLoad} src="/index.html?cms=editor" title="Live page editor" scrolling="no" className="block w-full border-0 bg-white" style={{ height: frameHeight }} />
+      <iframe key={`${pageId}-${frameKey}`} ref={frameRef} onLoad={onFrameLoad} src={editPage.src} title="Live page editor" scrolling="no" className="block w-full border-0 bg-white" style={{ height: frameHeight }} />
     </main>
   );
 }

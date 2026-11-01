@@ -23,9 +23,9 @@ export const ANNE_MANALO_CHAT_ID = '7329264426';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const IMAGE_URL = /^(https:\/\/|\/(?!\/))[^\s"'<>()]+$/;
-const MAX_TEXTS = 400;
-const MAX_IMAGES = 200;
-const MAX_KEY = 300;
+const MAX_TEXTS = 1500;
+const MAX_IMAGES = 600;
+const MAX_KEY = 400;
 const MAX_TEXT = 2000;
 const MAX_URL = 2000;
 const MAX_OFFSET = 2000;

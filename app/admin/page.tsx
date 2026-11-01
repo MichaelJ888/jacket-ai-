@@ -22,6 +22,7 @@ const button = "rounded bg-zinc-900 px-3 py-1 text-sm font-medium text-white dis
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
+  const [hub, setHub] = useState<"choose" | "dashboard">("choose");
   const [tab, setTab] = useState<"dashboard" | "prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "coo" | "recipients">("dashboard");
   const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
   const [oauthConfigured, setOauthConfigured] = useState(true);
@@ -117,6 +118,7 @@ export default function AdminPage() {
     if (params.get("meta")) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setTab("connect");
+      setHub("dashboard");
       setMessage(params.get("meta") === "connected"
         ? `Connected ${params.get("pages")} Page(s). ${params.get("failed") !== "0" ? `${params.get("failed")} could not auto-subscribe the webhook.` : "Webhooks subscribed automatically."}`
         : `Facebook connection failed: ${params.get("reason") || "unknown error"}`);
@@ -192,10 +194,27 @@ export default function AdminPage() {
         <div className="flex items-center gap-4">
           <a className="text-sm underline" href="/admin/editor">Visual editor</a>
           <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
-          <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
+          <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); setHub("choose"); }}>Sign out</button>
         </div>
       </div>
+      {hub === "choose" ? (
+        <section className="grid gap-4 md:grid-cols-2">
+          <button onClick={() => setHub("dashboard")} className="rounded-xl border border-zinc-200 bg-white p-6 text-left shadow-sm hover:border-zinc-900">
+            <h2 className="text-lg font-bold">System Dashboard &amp; AI Controls</h2>
+            <p className="mt-2 text-sm text-zinc-600">Analytics, AI swarm control, health checks, material and selling prices, knowledge base, CRM, Facebook and Telegram recipients.</p>
+          </button>
+          <a href="/admin/editor" className="rounded-xl border border-zinc-200 bg-white p-6 text-left shadow-sm hover:border-zinc-900">
+            <h2 className="text-lg font-bold">Live Visual Site Editor (Click-to-Edit)</h2>
+            <p className="mt-2 text-sm text-zinc-600">Full-screen live editing. Click any heading, text or image to edit, replace or restyle it on Home, Production workflow, Capabilities and Competitive advantage.</p>
+          </a>
+        </section>
+      ) : (
+        <>
+      <div className="mb-4">
+        <button className="text-sm underline" onClick={() => setHub("choose")}>← Back to hubs</button>
+      </div>
       <nav className="mb-4 flex gap-2">
+
         {([["dashboard", "Dashboard"], ["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["knowledge", "Knowledge Base"], ["overview", "Overview"], ["connect", "Connect Facebook / Instagram"], ["coo", "COO & all customers"], ["recipients", "Telegram recipients"]] as const).map(([id, label]) => (
           <button key={id} className={`rounded px-3 py-1 text-sm ${tab === id ? "bg-zinc-900 text-white" : "bg-zinc-200"}`} onClick={() => setTab(id)}>{label}</button>
         ))}
@@ -322,6 +341,8 @@ export default function AdminPage() {
           <List title="PDF quotes" rows={overview.quotes.map((q) => ({ id: q.quote_number, text: `${q.quote_number} · ${q.client_name || ""} · ${peso(q.total)}` }))} />
           <List title="Payment receipts (fraud check)" rows={overview.receipts.map((r, i) => ({ id: String(i), text: `${r.reference || "no ref"} · ${peso(r.detected_amount || 0)} · ${r.verified ? "verified" : "NOT verified"} · risk ${r.fraud_score}${r.fraud_flags?.length ? ` · ${r.fraud_flags.join(", ")}` : ""}` }))} />
         </section>
+      )}
+        </>
       )}
     </main>
   );
