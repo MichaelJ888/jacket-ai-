@@ -43,7 +43,7 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {"@type":"Question","name":"What is your minimum order quantity (MOQ)?","acceptedAnswer":{"@type":"Answer","text":"Company-wide minimum is 5 pieces for jackets and most uniforms; some categories like giveaways start at 50 pcs."}},
+    {"@type":"Question","name":"What is your minimum order quantity (MOQ)?","acceptedAnswer":{"@type":"Answer","text":"Company-wide minimum is 20 pieces for jackets and most uniforms; some categories like giveaways start at 50 pcs."}},
     {"@type":"Question","name":"Do you offer a free logo on jackets?","acceptedAnswer":{"@type":"Answer","text":"Yes, every jacket includes 1 free logo via embroidery, DTF, or silkscreen print, 1 to 3 inches wide."}},
     {"@type":"Question","name":"What is the lead time for bulk orders?","acceptedAnswer":{"@type":"Answer","text":"Typically 7 to 18 business days depending on product complexity and order volume."}},
     {"@type":"Question","name":"Do you deliver nationwide and worldwide?","acceptedAnswer":{"@type":"Answer","text":"Yes, delivery within Metro Manila is free, and we ship nationwide and internationally at cost."}}
@@ -474,6 +474,21 @@
   </div>
 </section>
 
+<!-- ============ CLIENT LIST (trust signals, directly under #trust) ============ -->
+<section id="clients" x-show="showClientList" x-cloak class="border-b hairline">
+  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 py-14">
+    <p class="text-xs uppercase tracking-wider text-navy-400 font-semibold mb-5">Companies we've worked with</p>
+    <div class="flex flex-wrap gap-3">
+      <template x-for="c in clientNames" :key="c.name">
+        <span class="border hairline rounded-full px-4 py-2 text-sm text-navy-400 flex items-center gap-2">
+          <img x-show="c.logo" :src="c.logo" class="w-5 h-5 object-contain rounded-full">
+          <span x-text="c.name"></span>
+        </span>
+      </template>
+    </div>
+  </div>
+</section>
+
 <!-- ============ CATALOG ============ -->
 <!-- ============ DESIGN STUDIO — LOGO MOCKUP + INSTANT PRICE QUOTE ============ -->
 <section id="mockup" class="relative overflow-hidden bg-gradient-to-br from-navy-50 via-white to-navy-50/60 border-y hairline py-24">
@@ -664,6 +679,102 @@
       <p class="text-white/60 text-xs" x-text="selectedFabric?.class === 'Class A' ? 'Class A premium fabric (+₱400 per piece)' : 'Class B standard fabric (included in base price)'"></p>
     </div>
     <a href="#mockup" class="bg-gold hover:bg-gold-600 text-navy font-display font-bold px-6 py-3 rounded-md transition-colors shrink-0">Continue to Design Studio →</a>
+  </div>
+</section>
+
+<!-- ============ ORDER WIZARD: style → fabric/color → logo → instant quote ============ -->
+<section id="order-wizard" class="bg-white border-b hairline py-20">
+  <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
+    <p class="text-xs uppercase tracking-wider text-navy-400 font-semibold mb-2">Custom Ordering Wizard</p>
+    <h2 class="font-display font-bold text-navy text-3xl sm:text-4xl tracking-tight mb-8">Build your order in 4 steps</h2>
+
+    <ol class="flex flex-wrap gap-x-6 gap-y-3 mb-10">
+      <template x-for="(s,i) in ['Choose Style','Fabric & Color','Logo / Mockup','Instant Quote']" :key="s">
+        <li class="flex items-center gap-2 text-sm">
+          <span class="w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs"
+                :class="wizStep > i+1 ? 'bg-emerald-600 text-white' : (wizStep === i+1 ? 'bg-navy text-gold-400' : 'bg-navy-50 text-navy-400')" x-text="i+1"></span>
+          <span :class="wizStep === i+1 ? 'text-navy font-semibold' : 'text-navy-400'" x-text="s"></span>
+        </li>
+      </template>
+    </ol>
+
+    <!-- Step 1 -->
+    <div x-show="wizStep === 1" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <template x-for="c in categories" :key="c">
+        <button type="button" @click="wizSelectCategory(c)" class="text-left border hairline rounded-lg p-4 hover:border-navy hover:bg-navy-50 transition-colors">
+          <span class="block font-semibold text-navy text-sm" x-text="c"></span>
+          <span class="block text-xs text-navy-400 mt-1">MOQ <span x-text="categoryMOQ[c] || 20"></span> pcs</span>
+        </button>
+      </template>
+    </div>
+
+    <!-- Step 2 -->
+    <div x-show="wizStep === 2" x-cloak>
+      <p class="text-sm text-navy-400 mb-4">Choose a fabric. Class A fabrics add ₱400 per piece.</p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <template x-for="f in fabrics" :key="f.name">
+          <button type="button" @click="wizFabric = f.name; wizColor = ''" class="text-left border rounded-lg p-4 transition-colors"
+                  :class="wizFabric === f.name ? 'border-navy bg-navy-50' : 'hairline hover:border-navy'">
+            <span class="block font-semibold text-navy text-sm" x-text="f.name"></span>
+            <span class="block text-xs text-navy-400 mt-1" x-text="f.class"></span>
+          </button>
+        </template>
+      </div>
+      <template x-if="wizFabricObj">
+        <div class="mb-6">
+          <p class="text-xs uppercase tracking-wider text-navy-400 font-semibold mb-2">Color (optional)</p>
+          <div class="flex flex-wrap gap-2">
+            <template x-for="col in wizFabricObj.colors" :key="col.name">
+              <button type="button" @click="wizColor = col.name" :title="col.name"
+                      class="flex items-center gap-2 border rounded-full px-3 py-1.5 text-xs"
+                      :class="wizColor === col.name ? 'border-navy font-semibold' : 'hairline'">
+                <span class="w-4 h-4 rounded-full border hairline" :style="'background:' + col.hex"></span>
+                <span x-text="col.name"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+      </template>
+      <div class="flex gap-3">
+        <button type="button" @click="wizBack()" class="border hairline rounded-md px-5 py-2.5 text-sm text-navy">← Back</button>
+        <button type="button" @click="wizNext()" class="bg-navy hover:bg-navy-700 text-white font-semibold px-5 py-2.5 rounded-md text-sm">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div x-show="wizStep === 3" x-cloak>
+      <p class="text-sm text-navy-400 mb-4">Upload your logo or mockup (optional). This is a local preview only — send the file with your order request on Telegram or Viber.</p>
+      <input type="file" accept="image/*" @change="wizSetLogo($event)" class="block text-sm text-navy-400 mb-4">
+      <template x-if="wizLogoUrl">
+        <img :src="wizLogoUrl" alt="Logo preview" class="max-h-40 rounded border hairline mb-6">
+      </template>
+      <div class="flex gap-3">
+        <button type="button" @click="wizBack()" class="border hairline rounded-md px-5 py-2.5 text-sm text-navy">← Back</button>
+        <button type="button" @click="wizNext()" class="bg-navy hover:bg-navy-700 text-white font-semibold px-5 py-2.5 rounded-md text-sm">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 4 -->
+    <div x-show="wizStep === 4" x-cloak class="max-w-xl">
+      <dl class="grid grid-cols-2 gap-y-2 text-sm mb-6">
+        <dt class="text-navy-400">Style</dt><dd class="text-navy font-semibold" x-text="wizCategory"></dd>
+        <dt class="text-navy-400">Fabric</dt><dd class="text-navy font-semibold" x-text="wizFabric + (wizFabricObj ? ' (' + wizFabricObj.class + ')' : '')"></dd>
+        <dt class="text-navy-400">Color</dt><dd class="text-navy font-semibold" x-text="wizColor || 'Not selected'"></dd>
+        <dt class="text-navy-400">Logo</dt><dd class="text-navy font-semibold" x-text="wizLogoUrl ? 'Preview attached' : 'Not attached'"></dd>
+      </dl>
+      <label class="block text-sm text-navy-400 mb-1">Quantity (minimum <span x-text="wizMoq"></span> pcs)</label>
+      <input type="number" x-model.number="wizQty" :min="wizMoq" class="w-full border hairline rounded-md px-3 py-2 text-sm mb-4">
+      <div class="bg-navy-50 rounded-lg p-5 mb-6">
+        <p class="text-sm text-navy-400">Estimated per piece: <span class="font-semibold text-navy" x-text="'₱' + Math.round(wizUnit).toLocaleString()"></span></p>
+        <p class="text-sm text-navy-400">Quantity used: <span class="font-semibold text-navy" x-text="wizQtyValid"></span> pcs</p>
+        <p class="text-lg font-display font-bold text-navy mt-2">Estimated total: <span x-text="'₱' + wizTotal.toLocaleString()"></span></p>
+        <p class="text-[11px] text-navy-400 mt-2">Estimate only. The final, approved quotation is issued by our team.</p>
+      </div>
+      <div class="flex gap-3">
+        <button type="button" @click="wizBack()" class="border hairline rounded-md px-5 py-2.5 text-sm text-navy">← Back</button>
+        <button type="button" @click="wizAddToQuote()" class="bg-gold hover:bg-gold-600 text-navy font-display font-bold px-5 py-2.5 rounded-md text-sm">Add to quotation & request approval</button>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -982,18 +1093,6 @@
   <p class="text-[11px] text-navy-400 mt-3">Live forecast data via Open-Meteo (free, no API key needed).</p>
 </section>
 
-<!-- ============ CLIENT LIST ============ -->
-<section x-show="showClientList" x-cloak class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 py-14">
-  <p class="text-xs uppercase tracking-wider text-navy-400 font-semibold mb-5">Companies we've worked with</p>
-  <div class="flex flex-wrap gap-3">
-    <template x-for="c in clientNames" :key="c.name">
-      <span class="border hairline rounded-full px-4 py-2 text-sm text-navy-400 flex items-center gap-2">
-        <img x-show="c.logo" :src="c.logo" class="w-5 h-5 object-contain rounded-full">
-        <span x-text="c.name"></span>
-      </span>
-    </template>
-  </div>
-</section>
 <section id="contact" class="bg-navy py-20">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 grid lg:grid-cols-5 gap-12">
     <div class="lg:col-span-2 text-white">
@@ -2003,6 +2102,8 @@ function mjApp(){
     showTestimonials: safeLS.get('mji_show_testimonials', true),
     showClientList: safeLS.get('mji_show_clientlist', true),
     showLegal:false, legalTab:'privacy', showCookieNotice:false, openFaq:null,
+    wizStep:1, wizCategory:'', wizFabric:'', wizColor:'', wizQty:20, wizLogoUrl:'',
+    faqDrawerOpen:false, faqSearch:'',
     siteSettings: safeLS.get('mji_site_settings', {
       salesOffice: "Bonifacio Global City (BGC), Taguig City, Metro Manila",
       salesOfficeShort: "BGC, Taguig",
@@ -2959,6 +3060,39 @@ coverall1:'/images/site/coverall.jpg'
       this.showToast(p.title + ' added to quotation.');
     },
 
+    get wizMoq(){ return this.categoryMOQ[this.wizCategory] || 20; },
+    get wizQtyValid(){ return Math.max(this.wizMoq, Math.floor(Number(this.wizQty) || 0)); },
+    get wizFabricObj(){ return this.fabrics.find(f=>f.name===this.wizFabric); },
+    get wizUnit(){ return this.wizCategory ? this.getPricePerPiece(this.wizCategory, this.wizQtyValid) + (this.wizFabricObj?.class==='Class A' ? 400 : 0) : 0; },
+    get wizTotal(){ return Math.round(this.wizUnit * this.wizQtyValid); },
+    wizSelectCategory(cat){ this.wizCategory=cat; this.wizQty=this.categoryMOQ[cat]||20; this.wizStep=2; },
+    wizNext(){
+      if(this.wizStep===1 && !this.wizCategory) return this.showToast('Choose a style to continue.');
+      if(this.wizStep===2 && !this.wizFabric) return this.showToast('Choose a fabric to continue.');
+      this.wizStep=Math.min(4, this.wizStep+1);
+    },
+    wizBack(){ this.wizStep=Math.max(1, this.wizStep-1); },
+    wizSetLogo(e){
+      const f=e.target.files && e.target.files[0];
+      if(!f) return;
+      if(!/^image\//.test(f.type) || f.size > 8*1024*1024){ this.showToast('Upload an image under 8 MB.'); e.target.value=''; return; }
+      if(this.wizLogoUrl) URL.revokeObjectURL(this.wizLogoUrl);
+      this.wizLogoUrl=URL.createObjectURL(f);
+    },
+    wizAddToQuote(){
+      const f=this.wizFabricObj;
+      if(!this.wizCategory || !f){ this.showToast('Complete steps 1–2 first.'); return; }
+      this.quoteItems.push({id:'wiz-'+Date.now(), title:this.wizCategory+' — '+f.name+(this.wizColor?' ('+this.wizColor+')':''), category:this.wizCategory, img:'', tierQty:this.wizQtyValid, configuredPricePerPiece:this.wizUnit});
+      this.saveQuote();
+      this.showToast('Added to your quotation.');
+      this.wizStep=1; this.wizCategory=''; this.wizFabric=''; this.wizColor=''; this.wizQty=20;
+      document.getElementById('quote')?.scrollIntoView({behavior:'smooth'});
+    },
+    get faqResults(){
+      const q=this.faqSearch.trim().toLowerCase();
+      return q ? this.faqs.filter(f=>(f.q+' '+f.a).toLowerCase().includes(q)) : this.faqs;
+    },
+
     // Looks up the real per-piece price for a category at a given quantity, using the actual 2026 price list.
     getPricePerPiece(category, qty){
       const key = this.categoryPriceTable[category];
@@ -3691,6 +3825,34 @@ function fictionalLiveOrders() {
     <span class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider mt-1 block">● JUST NOW</span>
   </div>
   <button @click="showToast = false" class="text-slate-400 hover:text-slate-600 ml-auto">✕</button>
+</div>
+<!-- ============ FAQ & INSTANT ANSWERS DRAWER ============ -->
+<button type="button" x-show="!faqDrawerOpen" @click="faqDrawerOpen = true" aria-label="Open FAQ"
+        class="fixed bottom-24 left-5 z-40 bg-navy hover:bg-navy-700 text-white text-sm font-semibold px-4 py-3 rounded-full shadow-lg">FAQ</button>
+<div x-show="faqDrawerOpen" x-cloak class="fixed inset-0 z-50">
+  <div class="absolute inset-0 bg-navy-900/50" @click="faqDrawerOpen = false"></div>
+  <aside role="dialog" aria-label="Frequently asked questions" class="absolute right-0 top-0 h-full w-full sm:max-w-md bg-white shadow-2xl flex flex-col">
+    <div class="p-5 border-b hairline flex items-center justify-between">
+      <p class="font-display font-bold text-navy">Instant Answers</p>
+      <button type="button" @click="faqDrawerOpen = false" aria-label="Close FAQ" class="text-navy-400 hover:text-navy text-lg">✕</button>
+    </div>
+    <div class="p-5 space-y-4 overflow-y-auto">
+      <input type="search" x-model="faqSearch" placeholder="Search MOQ, samples, PhilGEPS…" class="w-full border hairline rounded-md px-3 py-2 text-sm">
+      <div class="flex flex-wrap gap-2">
+        <button type="button" @click="faqSearch = 'minimum'" class="border hairline rounded-full px-3 py-1 text-xs text-navy">Minimum order</button>
+        <button type="button" @click="faqSearch = 'sample'" class="border hairline rounded-full px-3 py-1 text-xs text-navy">Free samples</button>
+        <button type="button" @click="faqSearch = 'PhilGEPS'" class="border hairline rounded-full px-3 py-1 text-xs text-navy">PhilGEPS / BIR</button>
+        <button type="button" @click="faqSearch = 'lead time'" class="border hairline rounded-full px-3 py-1 text-xs text-navy">Delivery timeline</button>
+      </div>
+      <template x-for="f in faqResults" :key="f.q">
+        <details class="border hairline rounded-md p-3">
+          <summary class="cursor-pointer font-semibold text-sm text-navy" x-text="f.q"></summary>
+          <p class="text-sm text-navy-400 mt-2" x-text="f.a"></p>
+        </details>
+      </template>
+      <p x-show="faqResults.length === 0" class="text-sm text-navy-400">No match yet — message us on Telegram or Viber and we'll answer within the hour.</p>
+    </div>
+  </aside>
 </div>
 <script src="/live-ticker.js" defer></script>
 <script src="/site-cms.js" defer></script>
