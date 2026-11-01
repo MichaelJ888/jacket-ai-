@@ -189,7 +189,7 @@ export default function CapabilitiesPage() {
         </div>
         <div className="relative aspect-[4/3] overflow-hidden rounded-lg">
           <Image
-            src="/images/production%20tahian/9.jpg"
+            src="/images/production%20sewing%20area/9.jpg"
             alt="MJIC garments packed for shipment"
             fill
             sizes="(min-width:1024px) 50vw, 100vw"

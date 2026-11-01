@@ -94,7 +94,7 @@ const STAGES: Stage[] = [
       "Line supervisors check output each shift",
     ],
     photo: {
-      src: "/images/production%20tahian/1.jpg",
+      src: "/images/production%20sewing%20area/1.jpg",
       alt: "MJIC sewing line in production",
     },
   },
@@ -108,7 +108,7 @@ const STAGES: Stage[] = [
       "Defective pieces are repaired or replaced",
     ],
     photo: {
-      src: "/images/production%20tahian/8.jpg",
+      src: "/images/production%20sewing%20area/8.jpg",
       alt: "MJIC garment batch under inspection",
     },
   },
@@ -122,7 +122,7 @@ const STAGES: Stage[] = [
       "Packing list issued with each shipment",
     ],
     photo: {
-      src: "/images/production%20tahian/9.jpg",
+      src: "/images/production%20sewing%20area/9.jpg",
       alt: "MJIC garments packed for shipment",
     },
   },
