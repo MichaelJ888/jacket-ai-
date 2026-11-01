@@ -66,6 +66,30 @@ export function parseStudioCallback(data: string): { decision: StudioDecision; j
   return { decision: match[1].toLowerCase() === 'approve' ? 'approve' : 'reject', jobId: match[2] };
 }
 
+// Same shape for generated ad pictures: "studioad:approve:<uuid>".
+export function parseStudioAdCallback(data: string): { decision: StudioDecision; jobId: string } | null {
+  const match = data.match(/^studioad:(approve|reject):([\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/i);
+  if (!match) return null;
+  return { decision: match[1].toLowerCase() === 'approve' ? 'approve' : 'reject', jobId: match[2] };
+}
+
 export function studioJobPath(prefix: string, extension: string, id: string) {
   return `${prefix}/${Date.now()}-${id}.${extension}`;
+}
+
+export const STUDIO_CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'other'] as const;
+export type StudioMetadata = { productTitle: string; category: string; fabric: string | null; description: string | null };
+
+// Catalog and ads need a real title and category; fabric and description are optional.
+export function parseStudioMetadata(input: { productTitle?: unknown; category?: unknown; fabric?: unknown; description?: unknown }): StudioMetadata | null {
+  const clean = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
+  const productTitle = clean(input.productTitle, 120);
+  const category = clean(input.category, 40).toLowerCase();
+  if (!productTitle || !(STUDIO_CATEGORIES as readonly string[]).includes(category)) return null;
+  return {
+    productTitle,
+    category,
+    fabric: clean(input.fabric, 120) || null,
+    description: clean(input.description, 600) || null,
+  };
 }

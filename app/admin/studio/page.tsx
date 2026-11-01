@@ -9,8 +9,13 @@ type Job = {
   output_url: string | null;
   status: string;
   error: string | null;
+  product_title: string | null;
+  category: string | null;
+  in_catalog: boolean;
   created_at: string;
 };
+
+const CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'other'];
 
 const STATUS_LABEL: Record<string, string> = {
   queued: 'Queued',
@@ -40,6 +45,10 @@ export default function CeoAiStudioPage() {
   const [logo, setLogo] = useState<File | null>(null);
   const [anonymize, setAnonymize] = useState(true);
   const [scale, setScale] = useState<2 | 4>(4);
+  const [productTitle, setProductTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [fabric, setFabric] = useState('');
+  const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
@@ -80,6 +89,7 @@ export default function CeoAiStudioPage() {
     setError('');
     if (sources.length === 0) return setError('Choose at least one product photo.');
     if (anonymize && !face) return setError('Upload a synthetic face image, or turn off face anonymization.');
+    if (!productTitle.trim() || !category) return setError('Add a product title and category so the image can go to the catalog and ads.');
     setBusy(true);
     try {
       const faceUrl = anonymize && face ? await uploadFile(face, 'face') : null;
@@ -90,7 +100,7 @@ export default function CeoAiStudioPage() {
         const res = await fetch('/api/admin/studio/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceUrl, faceUrl, logoUrl, enhanceScale: scale }),
+          body: JSON.stringify({ sourceUrl, faceUrl, logoUrl, enhanceScale: scale, productTitle, category, fabric, description }),
         });
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (!res.ok) throw new Error(`${sources[i].name}: ${data.error ?? res.status}`);
@@ -103,6 +113,17 @@ export default function CeoAiStudioPage() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function setCatalog(id: string, inCatalog: boolean) {
+    setError('');
+    const res = await fetch('/api/admin/studio/catalog', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, inCatalog }),
+    });
+    if (!res.ok) setError((await res.json().catch(() => ({}))).error ?? 'Could not update the catalog');
+    loadJobs();
   }
 
   async function decide(id: string, decision: 'approve' | 'reject') {
@@ -151,6 +172,29 @@ export default function CeoAiStudioPage() {
             <span className="text-xs text-zinc-500">Transparent PNG works best.</span>
           </label>
         </div>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <label className="text-sm font-semibold">
+            Product title
+            <input value={productTitle} onChange={(e) => setProductTitle(e.target.value)} maxLength={120} placeholder="e.g. Corporate Polo — Navy" className="mt-1 block w-full rounded border border-zinc-300 px-2 py-1 text-sm font-normal" />
+          </label>
+          <label className="text-sm font-semibold">
+            Category
+            <select value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1 block w-full rounded border border-zinc-300 px-2 py-1 text-sm font-normal">
+              <option value="">Choose a category</option>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm font-semibold">
+            Fabric (optional)
+            <input value={fabric} onChange={(e) => setFabric(e.target.value)} maxLength={120} placeholder="e.g. 220gsm cotton pique" className="mt-1 block w-full rounded border border-zinc-300 px-2 py-1 text-sm font-normal" />
+          </label>
+          <label className="text-sm font-semibold">
+            Description (optional)
+            <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={600} className="mt-1 block w-full rounded border border-zinc-300 px-2 py-1 text-sm font-normal" />
+          </label>
+        </div>
         <div className="mt-4 flex flex-wrap items-center gap-6 text-sm">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={anonymize} onChange={(e) => setAnonymize(e.target.checked)} />
@@ -190,11 +234,17 @@ export default function CeoAiStudioPage() {
               )}
               <p className="text-sm font-semibold">{STATUS_LABEL[job.status] ?? job.status}</p>
               {job.error && <p className="mt-1 text-xs text-red-700">{job.error}</p>}
+              {job.product_title && <p className="mt-1 text-xs text-zinc-600">{job.product_title}{job.category ? ` · ${job.category}` : ''}</p>}
               {job.status === 'pending_approval' && (
                 <div className="mt-3 flex gap-2">
                   <button type="button" onClick={() => decide(job.id, 'approve')} className="flex-1 rounded bg-emerald-600 px-3 py-2 text-sm font-semibold text-white">Approve</button>
                   <button type="button" onClick={() => decide(job.id, 'reject')} className="flex-1 rounded bg-zinc-200 px-3 py-2 text-sm font-semibold">Reject</button>
                 </div>
+              )}
+              {['approved', 'posted'].includes(job.status) && job.output_url && (
+                <button type="button" onClick={() => setCatalog(job.id, !job.in_catalog)} className={`mt-3 w-full rounded px-3 py-2 text-sm font-semibold ${job.in_catalog ? 'bg-zinc-200' : 'bg-zinc-900 text-white'}`}>
+                  {job.in_catalog ? 'Remove from catalog' : 'Push to catalog'}
+                </button>
               )}
             </article>
           ))}

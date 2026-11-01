@@ -9,10 +9,11 @@ import {
   buildFaceSwapInput,
   logoPlacementLeftChest,
   studioJobPath,
+  type StudioMetadata,
 } from './studio-logic';
 
 type Supabase = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
-export type StudioStage = 'swap' | 'enhance';
+export type StudioStage = 'swap' | 'enhance' | 'backdrop';
 export type StudioDecision = 'approve' | 'reject';
 
 // Replaces all source metadata (Replicate/camera/GPS) with an explicit MJIC originality tag.
@@ -25,7 +26,7 @@ const STUDIO_ORIGINAL_EXIF = {
   },
 };
 
-export const STUDIO_JOB_COLUMNS = 'id, source_url, face_url, logo_url, output_url, status, error, enhance_scale, created_at, updated_at, decided_at';
+export const STUDIO_JOB_COLUMNS = 'id, source_url, face_url, logo_url, output_url, status, error, enhance_scale, product_title, category, fabric, description, in_catalog, featured_at, ad_status, ad_url, created_at, updated_at, decided_at';
 
 export type StudioJob = {
   id: string;
@@ -41,7 +42,7 @@ export type StudioJob = {
   error: string | null;
 };
 
-export async function createStudioJob(supabase: Supabase, input: { sourceUrl: string; faceUrl: string | null; logoUrl: string | null; enhanceScale: number }) {
+export async function createStudioJob(supabase: Supabase, input: { sourceUrl: string; faceUrl: string | null; logoUrl: string | null; enhanceScale: number; metadata: StudioMetadata | null }) {
   const { data, error } = await supabase
     .from('studio_jobs')
     .insert({
@@ -49,6 +50,10 @@ export async function createStudioJob(supabase: Supabase, input: { sourceUrl: st
       face_url: input.faceUrl,
       logo_url: input.logoUrl,
       enhance_scale: input.enhanceScale,
+      product_title: input.metadata?.productTitle ?? null,
+      category: input.metadata?.category ?? null,
+      fabric: input.metadata?.fabric ?? null,
+      description: input.metadata?.description ?? null,
       status: 'queued',
       webhook_token: randomUUID(),
     })
@@ -67,7 +72,10 @@ export async function startStage(supabase: Supabase, job: StudioJob, stage: Stud
 
   const prediction = stage === 'swap'
     ? await createReplicatePrediction('codeplugtech/face-swap', buildFaceSwapInput(job.source_url, job.face_url ?? ''), webhookUrl.toString())
-    : await createReplicatePrediction('nightmareai/real-esrgan', buildEnhanceInput(job.swap_url ?? job.source_url, job.enhance_scale), webhookUrl.toString());
+    : stage === 'enhance'
+      ? await createReplicatePrediction('nightmareai/real-esrgan', buildEnhanceInput(job.swap_url ?? job.source_url, job.enhance_scale), webhookUrl.toString())
+      // Verified input schema for 851-labs/background-remover: image (required), background_type, format.
+      : await createReplicatePrediction('851-labs/background-remover', { image: job.output_url ?? '', background_type: 'rgba', format: 'png' }, webhookUrl.toString());
 
   await supabase
     .from('studio_jobs')
@@ -79,6 +87,11 @@ export async function startStage(supabase: Supabase, job: StudioJob, stage: Stud
 // Handles a completed Replicate prediction. Idempotent: stale or duplicate callbacks are ignored.
 export async function handleStageCompleted(supabase: Supabase, job: StudioJob, stage: StudioStage, prediction: ReplicatePrediction, origin: string) {
   if (job.stage_prediction_id !== prediction.id) return { ignored: true };
+  // The backdrop is an enhancement only: if it fails, the enhanced photo still ships.
+  if (stage === 'backdrop' && prediction.status !== 'succeeded') {
+    await finalizeJob(supabase, job, job.output_url ?? '', null);
+    return { finalized: true, backdrop: 'skipped' };
+  }
   if (prediction.status !== 'succeeded') {
     await failStage(supabase, job.id, new Error(`${stage} ${prediction.status}: ${prediction.error ?? 'no detail'}`), `${stage} ${prediction.status}`, prediction.error);
     return { failed: true };
@@ -97,23 +110,51 @@ export async function handleStageCompleted(supabase: Supabase, job: StudioJob, s
     return { advanced: 'enhance' };
   }
 
-  await finalizeJob(supabase, { ...job, output_url: outputUrl }, outputUrl);
+  if (stage === 'enhance') {
+    await supabase.from('studio_jobs').update({ output_url: outputUrl, stage_prediction_id: null, updated_at: new Date().toISOString() }).eq('id', job.id);
+    const enhanced = { ...job, output_url: outputUrl };
+    try {
+      await startStage(supabase, enhanced, 'backdrop', origin);
+      return { advanced: 'backdrop' };
+    } catch {
+      await finalizeJob(supabase, enhanced, outputUrl, null);
+      return { finalized: true, backdrop: 'skipped' };
+    }
+  }
+
+  await finalizeJob(supabase, job, job.output_url ?? '', outputUrl);
   return { finalized: true };
 }
 
-async function finalizeJob(supabase: Supabase, job: StudioJob, enhancedUrl: string) {
+// Lays the background-removed product on a soft studio sweep. Any failure keeps the enhanced photo, so a model outage never blocks a job.
+async function applyStudioBackdrop(enhanced: Buffer, cutoutUrl: string): Promise<Buffer> {
+  try {
+    const cutout = await downloadImage(cutoutUrl);
+    const meta = await sharp(enhanced).metadata();
+    const width = meta.width ?? 1;
+    const height = meta.height ?? 1;
+    const sweep = Buffer.from(`<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg"><defs><radialGradient id="s" cx="50%" cy="40%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d4d4d8"/></radialGradient></defs><rect width="100%" height="100%" fill="url(#s)"/></svg>`);
+    const product = await sharp(cutout).resize(width, height, { fit: 'fill' }).png().toBuffer();
+    return await sharp(sweep).composite([{ input: product, top: 0, left: 0 }]).png().toBuffer();
+  } catch {
+    return enhanced;
+  }
+}
+
+async function finalizeJob(supabase: Supabase, job: StudioJob, enhancedUrl: string, cutoutUrl: string | null) {
   try {
     const enhanced = await downloadImage(enhancedUrl);
+    const base = cutoutUrl ? await applyStudioBackdrop(enhanced, cutoutUrl) : enhanced;
     let composed: Buffer;
     if (job.logo_url) {
       const logo = await downloadImage(job.logo_url);
-      const base = await sharp(enhanced).metadata();
+      const baseMeta = await sharp(base).metadata();
       const logoMeta = await sharp(logo).metadata();
-      const place = logoPlacementLeftChest(base.width ?? 1, base.height ?? 1, logoMeta.width ?? 1, logoMeta.height ?? 1);
+      const place = logoPlacementLeftChest(baseMeta.width ?? 1, baseMeta.height ?? 1, logoMeta.width ?? 1, logoMeta.height ?? 1);
       const logoPng = await sharp(logo).resize({ width: place.width }).png().toBuffer();
-      composed = await sharp(enhanced).composite([{ input: logoPng, left: place.left, top: place.top }]).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
+      composed = await sharp(base).composite([{ input: logoPng, left: place.left, top: place.top }]).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
     } else {
-      composed = await sharp(enhanced).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
+      composed = await sharp(base).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
     }
 
     await supabase.storage.createBucket(STUDIO_OUTPUT_BUCKET, { public: true });

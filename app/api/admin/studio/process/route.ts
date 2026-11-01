@@ -3,7 +3,7 @@ import { getSupabaseAdmin } from '../../../_lib/integrations';
 import { editorChatFromRequest } from '../../../_lib/site-content';
 import { REPLICATE_BILLING_MESSAGE } from '../../../_lib/replicate';
 import { createStudioJob, failStage, startStage } from '../../../_lib/studio';
-import { isAllowedStudioAssetUrl } from '../../../_lib/studio-logic';
+import { isAllowedStudioAssetUrl, parseStudioMetadata } from '../../../_lib/studio-logic';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
   if (!process.env.REPLICATE_API_KEY) return NextResponse.json({ error: 'REPLICATE_API_KEY is not configured' }, { status: 500 });
 
-  const body = (await request.json().catch(() => null)) as { sourceUrl?: unknown; faceUrl?: unknown; logoUrl?: unknown; enhanceScale?: unknown } | null;
+  const body = (await request.json().catch(() => null)) as { sourceUrl?: unknown; faceUrl?: unknown; logoUrl?: unknown; enhanceScale?: unknown; productTitle?: unknown; category?: unknown; fabric?: unknown; description?: unknown } | null;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!body || !isAllowedStudioAssetUrl(body.sourceUrl, supabaseUrl)) return NextResponse.json({ error: 'sourceUrl must be an uploaded studio image.' }, { status: 400 });
   if (body.faceUrl != null && !isAllowedStudioAssetUrl(body.faceUrl, supabaseUrl)) return NextResponse.json({ error: 'faceUrl must be an uploaded studio image.' }, { status: 400 });
@@ -24,10 +24,11 @@ export async function POST(request: Request) {
   const faceUrl = typeof body.faceUrl === 'string' ? body.faceUrl : null;
   const logoUrl = typeof body.logoUrl === 'string' ? body.logoUrl : null;
   const enhanceScale = body.enhanceScale === 4 ? 4 : 2;
+  const metadata = parseStudioMetadata(body);
   const origin = new URL(request.url).origin;
 
   try {
-    const job = await createStudioJob(supabase, { sourceUrl: body.sourceUrl, faceUrl, logoUrl, enhanceScale });
+    const job = await createStudioJob(supabase, { sourceUrl: body.sourceUrl, faceUrl, logoUrl, enhanceScale, metadata });
     try {
       await startStage(supabase, job, faceUrl ? 'swap' : 'enhance', origin);
     } catch (error) {

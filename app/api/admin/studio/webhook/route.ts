@@ -12,7 +12,7 @@ export async function POST(request: Request) {
   const jobId = url.searchParams.get('job') ?? '';
   const token = url.searchParams.get('token') ?? '';
   const stage = url.searchParams.get('stage');
-  if (!/^[0-9a-f-]{36}$/i.test(jobId) || (stage !== 'swap' && stage !== 'enhance')) return NextResponse.json({ error: 'Bad request' }, { status: 400 });
+  if (!/^[0-9a-f-]{36}$/i.test(jobId) || !(stage === 'swap' || stage === 'enhance' || stage === 'backdrop')) return NextResponse.json({ error: 'Bad request' }, { status: 400 });
 
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });

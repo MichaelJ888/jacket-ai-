@@ -117,6 +117,17 @@ alter table public.studio_jobs enable row level security;
 create index if not exists studio_jobs_created_idx on public.studio_jobs (created_at desc);
 revoke all on public.studio_jobs from anon, authenticated;
 
+-- Catalog metadata (required before catalog push), public catalog flag, weekly rotation and ad state.
+alter table public.studio_jobs add column if not exists product_title text;
+alter table public.studio_jobs add column if not exists category text;
+alter table public.studio_jobs add column if not exists fabric text;
+alter table public.studio_jobs add column if not exists description text;
+alter table public.studio_jobs add column if not exists in_catalog boolean not null default false;
+alter table public.studio_jobs add column if not exists featured_at timestamptz;
+alter table public.studio_jobs add column if not exists ad_status text;
+alter table public.studio_jobs add column if not exists ad_url text;
+create index if not exists studio_jobs_catalog_idx on public.studio_jobs (in_catalog, featured_at);
+
 create table if not exists public.project_costings (
   id uuid default gen_random_uuid() primary key,
   project_name text,

@@ -23,9 +23,29 @@ on:
     - cron: '0 22 * * *'    # content slot 6:00 AM Manila; also client pulse 6:00 AM Manila
     - cron: '0 5 * * *'     # client pulse 1:00 PM Manila
     - cron: '30 1 * * *'    # CEO boost advisor 9:30 AM Manila
+    - cron: '0 2 * * 1'     # studio catalog weekly photo rotation, Monday 10am Manila
+    - cron: '0 1 * * *'     # studio daily picture ads for CEO approval, 9:00 AM Manila
   workflow_dispatch: {}
 
 jobs:
+  studio-daily-ads:
+    if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build studio picture ads for CEO approval
+        run: |
+          curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/studio-ads" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
+  studio-catalog-rotate:
+    if: github.event.schedule == '0 2 * * 1' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Rotate studio catalog featured photo
+        run: |
+          curl -sf -X GET "${{ secrets.APP_BASE_URL }}/api/cron/studio-rotate" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
   embroidery-pickup-alerts:
     if: github.event.schedule == '*/5 * * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

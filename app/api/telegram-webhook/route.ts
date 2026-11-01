@@ -7,7 +7,8 @@ import { pickTelegramMedia } from '../_lib/telegram-logic';
 import { claimTelegramUpdate, downloadTelegramMedia, startTyping } from '../_lib/telegram-media';
 import { rateLimitResponse } from '../_lib/rate-limit';
 import { decideStudioJob, postApprovedStudioJob } from '../_lib/studio';
-import { parseStudioCallback } from '../_lib/studio-logic';
+import { decideStudioAd, postApprovedStudioAd } from '../_lib/studio-ads';
+import { parseStudioAdCallback, parseStudioCallback } from '../_lib/studio-logic';
 import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
 import { advanceOrder, confirmDeposit, createOrder } from '../_lib/order-lifecycle';
@@ -145,6 +146,36 @@ export async function POST(req: Request) {
           await sendTelegramDirectMessage(String(callbackChatId), 'Approved. Ipo-post na sa Facebook at Instagram.');
         } else {
           await sendTelegramDirectMessage(String(callbackChatId), 'Rejected. Hindi ito ipo-post.');
+        }
+        return NextResponse.json({ ok: true });
+      }
+
+      const studioAdAction = parseStudioAdCallback(callbackData);
+      if (callbackId && studioAdAction) {
+        const supabase = getSupabaseAdmin();
+        if (!supabase) {
+          await answerTelegramCallbackQuery(String(callbackId), 'Supabase is not configured.');
+          return NextResponse.json({ ok: true });
+        }
+        const result = await decideStudioAd(supabase, studioAdAction.jobId, studioAdAction.decision);
+        if (result.error) {
+          await answerTelegramCallbackQuery(String(callbackId), 'Could not save this decision. Please try again.');
+          return NextResponse.json({ ok: true });
+        }
+        if (!result.data) {
+          await answerTelegramCallbackQuery(String(callbackId), 'This ad was already handled or is unavailable.');
+          if (callback.message?.message_id) await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+          return NextResponse.json({ ok: true });
+        }
+
+        const approved = studioAdAction.decision === 'approve';
+        await answerTelegramCallbackQuery(String(callbackId), approved ? 'Approved. Posting ad...' : 'Ad rejected.');
+        if (callback.message?.message_id) await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+        if (approved) {
+          after(() => postApprovedStudioAd(supabase, studioAdAction.jobId));
+          await sendTelegramDirectMessage(String(callbackChatId), 'Ad approved. Ipo-post na sa social media.');
+        } else {
+          await sendTelegramDirectMessage(String(callbackChatId), 'Ad rejected. Hindi ito ipo-post.');
         }
         return NextResponse.json({ ok: true });
       }

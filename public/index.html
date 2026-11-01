@@ -830,6 +830,54 @@
   <p x-show="filteredProducts.length===0" class="text-center text-navy-400 py-16 text-sm">No products match your search. Try a different keyword or category.</p>
 </section>
 
+<!-- ============ STUDIO COLLECTION (approved CEO AI Studio photos, loaded from /api/studio/catalog) ============ -->
+<section id="studio-collection" class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 pb-20" hidden>
+  <div class="mb-10">
+    <p class="text-gold-600 font-semibold text-sm mb-2">Latest Studio Shoots</p>
+    <h2 class="font-display font-bold text-navy text-3xl sm:text-4xl tracking-tight">Fresh from our studio.</h2>
+  </div>
+  <div id="studio-collection-grid" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6"></div>
+  <script>
+    (function () {
+      fetch('/api/studio/catalog', { cache: 'no-store' })
+        .then(function (res) { return res.ok ? res.json() : { items: [] }; })
+        .then(function (data) {
+          var items = (data && data.items) || [];
+          if (!items.length) return;
+          var grid = document.getElementById('studio-collection-grid');
+          items.forEach(function (item) {
+            var card = document.createElement('div');
+            card.className = 'border hairline rounded-lg overflow-hidden bg-white flex flex-col';
+            var img = document.createElement('img');
+            img.src = item.output_url;
+            img.alt = item.product_title || 'MJIC product';
+            img.loading = 'lazy';
+            img.className = 'w-full aspect-[3/4] object-cover bg-navy-50';
+            var body = document.createElement('div');
+            body.className = 'p-4';
+            var cat = document.createElement('p');
+            cat.className = 'text-[11px] font-semibold text-gold-600 uppercase tracking-wide mb-1';
+            cat.textContent = item.category || '';
+            var title = document.createElement('h3');
+            title.className = 'font-display font-bold text-navy text-sm leading-snug mb-1';
+            title.textContent = item.product_title || '';
+            var fabric = document.createElement('p');
+            fabric.className = 'text-xs text-navy-400';
+            fabric.textContent = [item.fabric, item.description].filter(Boolean).join(' · ');
+            body.appendChild(cat);
+            body.appendChild(title);
+            body.appendChild(fabric);
+            card.appendChild(img);
+            card.appendChild(body);
+            grid.appendChild(card);
+          });
+          document.getElementById('studio-collection').hidden = false;
+        })
+        .catch(function () {});
+    })();
+  </script>
+</section>
+
 <!-- ============ QUOTATION BUILDER + PAYMENT ============ -->
 <section id="quote" class="relative overflow-hidden bg-gradient-to-br from-navy-50/60 via-white to-navy-50/60 border-y hairline py-24">
   <div class="pointer-events-none absolute -bottom-24 -left-24 w-96 h-96 rounded-full bg-gold/10 blur-3xl"></div>
