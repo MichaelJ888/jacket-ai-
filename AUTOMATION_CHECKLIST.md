@@ -114,6 +114,7 @@ Env: optional `ADMIN_PASSWORD` (separate admin login).
 | `/api/admin/editor/login`, `/verify` | Password (+ OTP) | Issues the 6-digit OTP via Telegram DM, then sets the httpOnly `mjic_editor` cookie (8 h). |
 | `/api/admin/editor` GET / POST / DELETE | Editor cookie | Read draft, publish (sanitised), sign out. |
 | `/api/admin/editor/media` | Editor cookie | Image upload (PNG/JPEG/WebP/GIF, 5 MB) to public bucket `site-media`. |
+| `/api/updates` | GET public, POST/DELETE editor cookie | "Latest From the Floor" feed. Reads/writes table `production_updates` (RLS on, service role only). Status badges: cutting/embroidery/sewing/quality/dispatch/update. |
 | `/api/admin/analytics` | Admin bearer | 14-day Manila-time enquiries, orders, sample status, log severity, job heartbeats, alert metrics. Feeds the `/admin` Dashboard tab. |
 
 - Storage: table `site_content` (key `site` for the document, `editor_otp:<chatId>` for OTP hashes). RLS on, service role only.

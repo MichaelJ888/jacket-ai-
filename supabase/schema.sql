@@ -1060,3 +1060,17 @@ create table if not exists public.site_content (
 alter table public.site_content enable row level security;
 revoke all on public.site_content from anon, authenticated;
 
+
+-- Public "Latest From the Floor" feed: production updates posted from the Admin Panel, read via /api/updates (service role only).
+create table if not exists public.production_updates (
+  id bigint generated always as identity primary key,
+  media_url text,
+  media_type text not null default 'none' check (media_type in ('image','video','youtube','none')),
+  embed_url text,
+  caption text not null default '',
+  status text not null default 'update' check (status in ('cutting','embroidery','sewing','quality','dispatch','update')),
+  created_at timestamptz not null default now()
+);
+alter table public.production_updates enable row level security;
+revoke all on public.production_updates from anon, authenticated;
+create index if not exists production_updates_created_at_idx on public.production_updates (created_at desc);
