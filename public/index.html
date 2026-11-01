@@ -481,7 +481,7 @@
     <div class="flex flex-wrap gap-3">
       <template x-for="c in clientNames" :key="c.name">
         <span class="border hairline rounded-full px-4 py-2 text-sm text-navy-400 flex items-center gap-2">
-          <img x-show="c.logo" :src="c.logo" class="w-5 h-5 object-contain rounded-full">
+          <img x-show="c.logo" :src="c.logo" alt="" loading="lazy" decoding="async" @error="$el.style.display='none'" class="w-5 h-5 object-contain rounded-full">
           <span x-text="c.name"></span>
         </span>
       </template>
@@ -743,8 +743,9 @@
 
     <!-- Step 3 -->
     <div x-show="wizStep === 3" x-cloak>
-      <p class="text-sm text-navy-400 mb-4">Upload your logo or mockup (optional). This is a local preview only — send the file with your order request on Telegram or Viber.</p>
-      <input type="file" accept="image/*" @change="wizSetLogo($event)" class="block text-sm text-navy-400 mb-4">
+      <p class="text-sm text-navy-400 mb-4">Upload your logo or mockup (optional). It is saved automatically to our secure file store, so you do not need to send the file separately.</p>
+      <input type="file" accept="image/png,image/jpeg,image/webp" @change="wizSetLogo($event)" class="block text-sm text-navy-400 mb-2">
+      <p x-show="wizLogoStatus" x-cloak class="text-xs mb-4" :class="wizLogoStored ? 'text-emerald-700' : 'text-navy-400'" x-text="wizLogoStatus"></p>
       <template x-if="wizLogoUrl">
         <img :src="wizLogoUrl" alt="Logo preview" class="max-h-40 rounded border hairline mb-6">
       </template>
@@ -760,7 +761,7 @@
         <dt class="text-navy-400">Style</dt><dd class="text-navy font-semibold" x-text="wizCategory"></dd>
         <dt class="text-navy-400">Fabric</dt><dd class="text-navy font-semibold" x-text="wizFabric + (wizFabricObj ? ' (' + wizFabricObj.class + ')' : '')"></dd>
         <dt class="text-navy-400">Color</dt><dd class="text-navy font-semibold" x-text="wizColor || 'Not selected'"></dd>
-        <dt class="text-navy-400">Logo</dt><dd class="text-navy font-semibold" x-text="wizLogoUrl ? 'Preview attached' : 'Not attached'"></dd>
+        <dt class="text-navy-400">Logo</dt><dd class="text-navy font-semibold" x-text="wizLogoStored ? 'Saved automatically' : (wizLogoUrl ? 'Preview only (upload pending)' : 'Not attached')"></dd>
       </dl>
       <label class="block text-sm text-navy-400 mb-1">Quantity (minimum <span x-text="wizMoq"></span> pcs)</label>
       <input type="number" x-model.number="wizQty" :min="wizMoq" class="w-full border hairline rounded-md px-3 py-2 text-sm mb-4">
@@ -1904,7 +1905,7 @@
           <template x-for="(c, idx) in clientNames" :key="c.name+idx">
             <div class="flex items-center justify-between border hairline rounded-md px-3 py-1.5">
               <div class="flex items-center gap-2">
-                <img x-show="c.logo" :src="c.logo" class="w-5 h-5 object-contain">
+                <img x-show="c.logo" :src="c.logo" alt="" loading="lazy" decoding="async" @error="$el.style.display='none'" class="w-5 h-5 object-contain">
                 <p class="text-xs text-navy" x-text="c.name"></p>
               </div>
               <button @click="removeClientName(idx)" class="text-red-500 text-xs">Remove</button>
@@ -2102,7 +2103,7 @@ function mjApp(){
     showTestimonials: safeLS.get('mji_show_testimonials', true),
     showClientList: safeLS.get('mji_show_clientlist', true),
     showLegal:false, legalTab:'privacy', showCookieNotice:false, openFaq:null,
-    wizStep:1, wizCategory:'', wizFabric:'', wizColor:'', wizQty:20, wizLogoUrl:'',
+    wizStep:1, wizCategory:'', wizFabric:'', wizColor:'', wizQty:20, wizLogoUrl:'', wizLogoStored:'', wizLogoStatus:'',
     faqDrawerOpen:false, faqSearch:'',
     siteSettings: safeLS.get('mji_site_settings', {
       salesOffice: "Bonifacio Global City (BGC), Taguig City, Metro Manila",
@@ -2399,17 +2400,21 @@ coverall1:'/images/site/coverall.jpg'
       this.testimonials = safeLS.get('mji_testimonials', null) || this.defaultTestimonials;
 
       const verifiedClients = [
-        'Panasonic Manufacturing Philippines','Department of Health (DOH)','Office of the President (OP)',
-        'Nokia Philippines','Smart Communications','Globe Telecom','Robinsons Land Corporation (RLC)',
-        'University of the East (UE)','Philippine Power Industries Corporation','Metro Logistics Group'
-      ].map(name=>({name, logo:''}));
+        ['Panasonic Manufacturing Philippines','panasonic.png'], ['Department of Health (DOH)','doh.png'], ['Office of the President (OP)','office-of-the-president.png'],
+        ['Nokia Philippines','nokia.png'], ['Smart Communications','smart.png'], ['Globe Telecom','globe.png'], ['Robinsons Land Corporation (RLC)','rlc.png'],
+        ['University of the East (UE)','ue.png'], ['Philippine Power Industries Corporation','philippine-power-industries.png'], ['Metro Logistics Group','metro-logistics.png']
+      ].map(([name, file])=>({name, logo:'/images/clients/'+file}));
       const storedClients = safeLS.get('mji_client_names', null);
-      // Replace the old demo placeholder list with the verified list; otherwise keep custom edits and re-add any verified client they dropped.
+      // Replace the old demo placeholder list with the verified list; otherwise keep custom edits, backfill logos for verified clients, and re-add any verified client they dropped.
       if(!Array.isArray(storedClients) || storedClients.some(c=>/ABC Manufacturing|XYZ Business|Prime Retail|Summit Construction|National Health/.test(c.name))) {
         this.clientNames = verifiedClients;
       } else {
         const have = new Set(storedClients.map(c=>c.name));
-        this.clientNames = [...storedClients, ...verifiedClients.filter(c=>!have.has(c.name))];
+        const logoByName = new Map(verifiedClients.map(c=>[c.name, c.logo]));
+        this.clientNames = [
+          ...storedClients.map(c=>(!c.logo && logoByName.has(c.name)) ? {...c, logo:logoByName.get(c.name)} : c),
+          ...verifiedClients.filter(c=>!have.has(c.name))
+        ];
       }
 
       this.$nextTick(()=> { lucide.createIcons(); this.renderMockup(); });
@@ -3078,14 +3083,29 @@ coverall1:'/images/site/coverall.jpg'
       if(!/^image\//.test(f.type) || f.size > 8*1024*1024){ this.showToast('Upload an image under 8 MB.'); e.target.value=''; return; }
       if(this.wizLogoUrl) URL.revokeObjectURL(this.wizLogoUrl);
       this.wizLogoUrl=URL.createObjectURL(f);
+      this.wizUploadLogo(f);
+    },
+    async wizUploadLogo(f){
+      this.wizLogoStored=''; this.wizLogoStatus='Saving your logo…';
+      try{
+        const form=new FormData(); form.append('file', f);
+        const res=await fetch('/api/wizard/logo', {method:'POST', body:form});
+        const data=await res.json().catch(()=>({}));
+        if(!res.ok || !data.url) throw new Error(data.error||'Upload failed');
+        this.wizLogoStored=data.url; this.wizLogoStatus='Logo saved ✓ — no need to send it separately.';
+      }catch(err){
+        this.wizLogoStatus='Logo could not be saved automatically. You can still send the file on Telegram or Viber.';
+      }
     },
     wizAddToQuote(){
       const f=this.wizFabricObj;
       if(!this.wizCategory || !f){ this.showToast('Complete steps 1–2 first.'); return; }
-      this.quoteItems.push({id:'wiz-'+Date.now(), title:this.wizCategory+' — '+f.name+(this.wizColor?' ('+this.wizColor+')':''), category:this.wizCategory, img:'', tierQty:this.wizQtyValid, configuredPricePerPiece:this.wizUnit});
+      if(this.wizLogoUrl && !this.wizLogoStored && this.wizLogoStatus.startsWith('Saving')){ this.showToast('Please wait a moment while your logo is saved.'); return; }
+      this.quoteItems.push({id:'wiz-'+Date.now(), title:this.wizCategory+' — '+f.name+(this.wizColor?' ('+this.wizColor+')':''), category:this.wizCategory, img:'', tierQty:this.wizQtyValid, configuredPricePerPiece:this.wizUnit, logoUrl:this.wizLogoStored});
       this.saveQuote();
+      this.persistLead({name:'', company:'', contact:'', message:'Wizard quote request: '+this.wizCategory+' — '+f.name+(this.wizColor?' ('+this.wizColor+')':'')+', qty '+this.wizQtyValid, source:'wizard-quote', details:{category:this.wizCategory, fabric:f.name, color:this.wizColor||'', qty:this.wizQtyValid, logoUrl:this.wizLogoStored||''}});
       this.showToast('Added to your quotation.');
-      this.wizStep=1; this.wizCategory=''; this.wizFabric=''; this.wizColor=''; this.wizQty=20;
+      this.wizStep=1; this.wizCategory=''; this.wizFabric=''; this.wizColor=''; this.wizQty=20; this.wizLogoStored=''; this.wizLogoStatus='';
       document.getElementById('quote')?.scrollIntoView({behavior:'smooth'});
     },
     get faqResults(){
