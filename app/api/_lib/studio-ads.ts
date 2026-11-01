@@ -8,8 +8,10 @@ type Supabase = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 
 const AD_WIDTH = 1080;
 const AD_HEIGHT = 1350;
-const AD_CTA = 'MOQ 20 pcs  ·  Libreng pre-production sample';
+const AD_CTA = 'Libreng pre-production sample  ·  Viber / Telegram to order';
 const AD_BRAND = 'Michael Jeffrey International Corp.';
+export const AD_FREE_SIGNALS = ['FREE Delivery within Metro Manila', 'FREE Digital Mock-Up  ·  FREE 1 Logo Embroidery'] as const;
+export const AD_B2B_TERMS = '20-pc MOQ  ·  Direct-to-Factory  ·  Corporate & School Bulk';
 
 export function escapeXml(value: string) {
   return value.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[ch] ?? ch);
@@ -25,14 +27,23 @@ export function adOverlaySvg(title: string, category: string) {
   <defs>
     <linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#000" stop-opacity="0"/>
-      <stop offset="1" stop-color="#000" stop-opacity="0.82"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0.85"/>
+    </linearGradient>
+    <linearGradient id="fadeTop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#000" stop-opacity="0"/>
     </linearGradient>
   </defs>
-  <rect x="0" y="880" width="${AD_WIDTH}" height="${AD_HEIGHT - 880}" fill="url(#fade)"/>
-  <text x="70" y="1090" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="72" font-weight="700">${escapeXml(clip(title, 34))}</text>
-  <text x="70" y="1160" fill="#e5e7eb" font-family="Arial, Helvetica, sans-serif" font-size="38">${escapeXml(clip(category, 48))}</text>
-  <text x="70" y="1240" fill="#fbbf24" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700">${escapeXml(AD_CTA)}</text>
-  <text x="70" y="1300" fill="#d1d5db" font-family="Arial, Helvetica, sans-serif" font-size="30">${escapeXml(AD_BRAND)}</text>
+  <rect x="0" y="0" width="${AD_WIDTH}" height="210" fill="url(#fadeTop)"/>
+  <rect x="0" y="860" width="${AD_WIDTH}" height="${AD_HEIGHT - 860}" fill="url(#fade)"/>
+  <text x="70" y="150" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="104" font-weight="900">CUSTOMIZED</text>
+  <text x="70" y="1020" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="700">${escapeXml(clip(title, 26))}</text>
+  <text x="70" y="1078" fill="#e5e7eb" font-family="Arial, Helvetica, sans-serif" font-size="32">${escapeXml(clip(category, 48))}</text>
+  <text x="70" y="1140" fill="#fbbf24" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700">${escapeXml(AD_FREE_SIGNALS[0])}</text>
+  <text x="70" y="1192" fill="#fff" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="700">${escapeXml(AD_FREE_SIGNALS[1])}</text>
+  <text x="70" y="1244" fill="#e5e7eb" font-family="Arial, Helvetica, sans-serif" font-size="28">${escapeXml(AD_B2B_TERMS)}</text>
+  <text x="70" y="1292" fill="#fbbf24" font-family="Arial, Helvetica, sans-serif" font-size="30" font-weight="700">${escapeXml(AD_CTA)}</text>
+  <text x="70" y="1336" fill="#d1d5db" font-family="Arial, Helvetica, sans-serif" font-size="24">${escapeXml(AD_BRAND)}</text>
 </svg>`;
 }
 
@@ -81,7 +92,7 @@ export async function generateStudioAd(supabase: Supabase, jobId: string) {
 
     await sendTelegramPhoto(
       adUrl,
-      `Boss, ad ready (job <code>${escapeTelegramHtml(job.id.slice(0, 8))}</code>): <b>${escapeTelegramHtml(job.product_title)}</b>. I-tap ang <b>Approve</b> para i-post sa social media, o <b>Reject</b> para i-discard.`,
+      `Boss, ad ready (job <code>${escapeTelegramHtml(job.id.slice(0, 8))}</code>): <b>${escapeTelegramHtml(job.product_title)}</b>\nCUSTOMIZED · FREE Delivery Metro Manila · FREE Digital Mock-Up · FREE 1 Logo Embroidery · 20-pc MOQ · Direct-to-Factory\nI-tap ang <b>Approve</b> para i-post sa social media, o <b>Reject</b> para i-discard.`,
       adButtons(job.id),
     );
     return { generated: true as const, adUrl };

@@ -189,9 +189,10 @@ export default function AdminPage() {
 
   return (
     <main className="mx-auto max-w-5xl p-6 text-zinc-900">
-      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-2">
+      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-3">
         <a href="/admin/editor" className="rounded-lg bg-white px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-zinc-100">🎨 Open Live Visual Site Editor</a>
         <a href="/admin/studio" className="rounded-lg bg-amber-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-amber-300">📸 Open CEO AI Studio &amp; Enhancer</a>
+        <a href="/admin/seo" className="rounded-lg bg-sky-300 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-sky-200">📈 Open SEO Rank Tracker</a>
       </nav>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">MJIC Admin</h1>
