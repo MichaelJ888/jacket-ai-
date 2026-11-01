@@ -878,6 +878,10 @@
               <span x-text="updateStatusMeta(u.status).label"></span>
             </span>
             <p class="text-sm text-navy leading-relaxed" x-text="u.caption"></p>
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+              <button type="button" @click="inquireFeedViber(u)" class="flex-1 min-w-[12rem] inline-flex items-center justify-center gap-1.5 bg-gold hover:bg-gold-600 text-navy font-display font-bold text-xs px-4 py-2.5 rounded-md transition-colors" title="Opens Viber with this batch pre-filled — needs the Viber app installed"><i data-lucide="message-circle" class="w-3.5 h-3.5"></i> Inquire About This Design/Batch</button>
+              <button type="button" @click="inquireFeedTelegram(u)" class="text-xs font-semibold border border-navy text-navy rounded-md px-3 py-2.5 hover:bg-navy hover:text-white transition-colors" title="Opens Telegram with this batch pre-filled — choose the MJIC bot to send">Telegram</button>
+            </div>
             <p class="text-[11px] text-navy-400 mt-auto pt-3 border-t hairline flex items-center gap-1.5">
               <i data-lucide="clock" class="w-3.5 h-3.5 shrink-0"></i>
               <span x-text="timeAgo(u)"></span><template x-if="u.date && timeAgo(u) !== u.date"><span class="text-navy-300">·</span></template><template x-if="u.date && timeAgo(u) !== u.date"><span x-text="u.date"></span></template>
@@ -3170,6 +3174,24 @@ coverall1:'/images/site/coverall.jpg'
       navigator.clipboard?.writeText(plain).catch(()=>{});
       this.showToast('Inquiry copied — paste it once Viber opens.');
       window.open('viber://chat?number=%2B'+this.siteSettings.viberNumber, '_blank');
+    },
+
+    // Viber's forward URI caps pre-filled text at 200 chars, so the batch title is trimmed.
+    feedInquiryText(u){
+      const raw = String(u.caption || '').replace(/\s+/g, ' ').trim();
+      const title = raw ? (raw.length > 90 ? raw.slice(0, 89).trimEnd() + '…' : raw) : 'MJIC production update';
+      return 'Hi MJIC! I\'d like to inquire about this design/batch: "' + title + '". Please share pricing and MOQ.';
+    },
+    inquireFeedViber(u){
+      const msg = this.feedInquiryText(u);
+      this.persistLead({name:'', company:'', contact:'', message:msg, source:'feed-inquiry', details:{updateId:u.id, channel:'viber'}});
+      window.open('viber://forward?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+    },
+    // Telegram bot links cannot carry text, so this opens Telegram's share composer with the message filled in.
+    inquireFeedTelegram(u){
+      const msg = this.feedInquiryText(u);
+      this.persistLead({name:'', company:'', contact:'', message:msg, source:'feed-inquiry', details:{updateId:u.id, channel:'telegram'}});
+      window.open('https://t.me/share/url?url=' + encodeURIComponent(location.origin) + '&text=' + encodeURIComponent(msg), '_blank', 'noopener');
     },
 
     uploadSignature(e){
