@@ -1074,3 +1074,17 @@ create table if not exists public.production_updates (
 alter table public.production_updates enable row level security;
 revoke all on public.production_updates from anon, authenticated;
 create index if not exists production_updates_created_at_idx on public.production_updates (created_at desc);
+
+-- Verified corporate clients & institutional partners (idempotent; do nothing on re-run so admin edits are kept).
+insert into public.crm_contacts (channel, external_id, name, company, stage, tags, notes) values
+  ('corporate_partner', 'panasonic-ph', 'Panasonic Manufacturing Philippines', 'Panasonic Manufacturing Philippines', 'won', '{verified,corporate-partner}', 'Verified corporate client'),
+  ('corporate_partner', 'doh', 'Department of Health (DOH)', 'Department of Health (DOH)', 'won', '{verified,institutional-partner}', 'Verified institutional partner'),
+  ('corporate_partner', 'office-of-the-president', 'Office of the President (OP)', 'Office of the President (OP)', 'won', '{verified,institutional-partner}', 'Verified institutional partner'),
+  ('corporate_partner', 'nokia-ph', 'Nokia Philippines', 'Nokia Philippines', 'won', '{verified,corporate-partner}', 'Verified corporate client'),
+  ('corporate_partner', 'smart-communications', 'Smart Communications', 'Smart Communications', 'won', '{verified,corporate-partner}', 'Verified corporate client'),
+  ('corporate_partner', 'globe-telecom', 'Globe Telecom', 'Globe Telecom', 'won', '{verified,corporate-partner}', 'Verified corporate client'),
+  ('corporate_partner', 'robinsons-land', 'Robinsons Land Corporation (RLC)', 'Robinsons Land Corporation (RLC)', 'won', '{verified,corporate-partner}', 'Verified corporate client'),
+  ('corporate_partner', 'university-of-the-east', 'University of the East (UE)', 'University of the East (UE)', 'won', '{verified,institutional-partner}', 'Verified institutional partner'),
+  ('corporate_partner', 'philippine-power-industries', 'Philippine Power Industries Corporation', 'Philippine Power Industries Corporation', 'won', '{verified,corporate-partner}', 'Verified corporate client'),
+  ('corporate_partner', 'metro-logistics-group', 'Metro Logistics Group', 'Metro Logistics Group', 'won', '{verified,corporate-partner}', 'Verified corporate client')
+on conflict (channel, external_id) do nothing;

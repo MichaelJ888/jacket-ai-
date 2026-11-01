@@ -2303,9 +2303,13 @@ coverall1:'/images/site/coverall.jpg'
         'University of the East (UE)','Philippine Power Industries Corporation','Metro Logistics Group'
       ].map(name=>({name, logo:''}));
       const storedClients = safeLS.get('mji_client_names', null);
-      // Replace the old demo placeholder list with the verified list; keep any custom edits otherwise.
-      this.clientNames = (!Array.isArray(storedClients) || storedClients.some(c=>/ABC Manufacturing|XYZ Business|Prime Retail|Summit Construction|National Health/.test(c.name)))
-        ? verifiedClients : storedClients;
+      // Replace the old demo placeholder list with the verified list; otherwise keep custom edits and re-add any verified client they dropped.
+      if(!Array.isArray(storedClients) || storedClients.some(c=>/ABC Manufacturing|XYZ Business|Prime Retail|Summit Construction|National Health/.test(c.name))) {
+        this.clientNames = verifiedClients;
+      } else {
+        const have = new Set(storedClients.map(c=>c.name));
+        this.clientNames = [...storedClients, ...verifiedClients.filter(c=>!have.has(c.name))];
+      }
 
       this.$nextTick(()=> { lucide.createIcons(); this.renderMockup(); });
       this.updateCountdown();
