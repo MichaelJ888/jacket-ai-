@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '../_lib/integrations';
 import { editorChatFromRequest } from '../_lib/site-content';
+import { formatManila } from '../_lib/manila-time';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +32,7 @@ function toFeedItem(row: UpdateRow) {
     caption: row.caption,
     status: row.status,
     ts,
-    date: new Date(ts).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
+    date: formatManila(ts, { month: 'short', day: 'numeric', year: 'numeric' }),
   };
 }
 

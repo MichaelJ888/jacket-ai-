@@ -1,10 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { getSupabaseAdmin } from '../../../_lib/integrations';
 import { editorChatFromRequest } from '../../../_lib/site-content';
+import { STUDIO_JOB_COLUMNS, decideStudioJob, postApprovedStudioJob } from '../../../_lib/studio';
 
 export const dynamic = 'force-dynamic';
 
-const COLUMNS = 'id, source_url, face_url, logo_url, output_url, status, error, enhance_scale, created_at, updated_at, decided_at';
+const COLUMNS = STUDIO_JOB_COLUMNS;
 
 export async function GET(request: Request) {
   if (!editorChatFromRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -15,7 +16,7 @@ export async function GET(request: Request) {
   return NextResponse.json({ jobs: data ?? [] });
 }
 
-// Approval gate: nothing is posted to social media from here. Approving only marks the output as ready for a later publisher.
+// Approval = auto-post: approving queues the image for Facebook + Instagram immediately (same path as the Telegram button).
 export async function PATCH(request: Request) {
   if (!editorChatFromRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
@@ -25,14 +26,12 @@ export async function PATCH(request: Request) {
   if (typeof body?.id !== 'string' || (body.decision !== 'approve' && body.decision !== 'reject')) {
     return NextResponse.json({ error: 'Send an id and decision (approve or reject).' }, { status: 400 });
   }
-  const { data, error } = await supabase
-    .from('studio_jobs')
-    .update({ status: body.decision === 'approve' ? 'approved' : 'rejected', decided_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-    .eq('id', body.id)
-    .eq('status', 'pending_approval')
-    .select(COLUMNS)
-    .maybeSingle();
+  const { data, error } = await decideStudioJob(supabase, body.id, body.decision);
   if (error) return NextResponse.json({ error: 'Could not record the decision.' }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Job is not waiting for approval.' }, { status: 409 });
+  if (body.decision === 'approve') {
+    const jobId = body.id;
+    after(() => postApprovedStudioJob(supabase, jobId));
+  }
   return NextResponse.json({ job: data });
 }

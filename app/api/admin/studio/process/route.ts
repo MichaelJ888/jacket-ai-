@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseAdmin } from '../../../_lib/integrations';
 import { editorChatFromRequest } from '../../../_lib/site-content';
-import { createStudioJob, failJob, startStage } from '../../../_lib/studio';
+import { REPLICATE_BILLING_MESSAGE } from '../../../_lib/replicate';
+import { createStudioJob, failStage, startStage } from '../../../_lib/studio';
 import { isAllowedStudioAssetUrl } from '../../../_lib/studio-logic';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,8 @@ export async function POST(request: Request) {
     try {
       await startStage(supabase, job, faceUrl ? 'swap' : 'enhance', origin);
     } catch (error) {
-      await failJob(supabase, job.id, error instanceof Error ? error.message : 'Could not start Replicate stage');
+      const billing = await failStage(supabase, job.id, error, 'Could not start Replicate stage');
+      if (billing) return NextResponse.json({ error: REPLICATE_BILLING_MESSAGE, code: 'replicate_billing', jobId: job.id }, { status: 402 });
       throw error;
     }
     return NextResponse.json({ ok: true, jobId: job.id });

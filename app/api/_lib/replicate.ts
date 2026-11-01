@@ -10,6 +10,21 @@ export type ReplicatePrediction = {
 
 const API = 'https://api.replicate.com/v1';
 
+export const REPLICATE_BILLING_MESSAGE =
+  'Replicate billing needs a top-up: add credit at https://replicate.com/account/billing, then start the job again.';
+
+// Replicate answers out-of-credit requests with 402 or a billing-related detail string.
+export function isReplicateBillingFailure(status: number | null, detail: string | null | undefined) {
+  return status === 402 || /insufficient|credit|billing|payment|spend limit/i.test(detail ?? '');
+}
+
+export class ReplicateBillingError extends Error {
+  constructor() {
+    super(REPLICATE_BILLING_MESSAGE);
+    this.name = 'ReplicateBillingError';
+  }
+}
+
 export async function createReplicatePrediction(model: string, input: Record<string, unknown>, webhookUrl: string): Promise<ReplicatePrediction> {
   const token = process.env.REPLICATE_API_KEY;
   if (!token) throw new Error('REPLICATE_API_KEY is not configured');
@@ -20,7 +35,10 @@ export async function createReplicatePrediction(model: string, input: Record<str
     signal: AbortSignal.timeout(20_000),
   });
   const data = (await response.json().catch(() => ({}))) as ReplicatePrediction & { detail?: string };
-  if (!response.ok) throw new Error(`Replicate ${response.status}: ${data.detail ?? 'request failed'}`);
+  if (!response.ok) {
+    if (isReplicateBillingFailure(response.status, data.detail)) throw new ReplicateBillingError();
+    throw new Error(`Replicate ${response.status}: ${data.detail ?? 'request failed'}`);
+  }
   return data;
 }
 

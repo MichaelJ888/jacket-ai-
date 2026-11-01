@@ -2420,6 +2420,7 @@ coverall1:'/images/site/coverall.jpg'
       this.$nextTick(()=> { lucide.createIcons(); this.renderMockup(); });
       this.updateCountdown();
       this.loadNews();
+      this.loadClientLogos();
       this.loadWeather();
       this.loadLiveSports();
       // Icons: convert only when Alpine inserts a new <i data-lucide>, batched to one frame.
@@ -2923,6 +2924,18 @@ coverall1:'/images/site/coverall.jpg'
       if(s < 86400) return Math.floor(s/3600)+'h ago';
       if(s < 7*86400) return Math.floor(s/86400)+'d ago';
       return u.date || new Date(ts).toLocaleDateString('en-PH', {month:'short', day:'numeric', year:'numeric'});
+    },
+
+    // Trust-roster logos uploaded from Telegram/admin; clients without a logo keep the text pill.
+    async loadClientLogos(){
+      try{
+        const res = await fetch('/api/client-logos', {cache:'no-store'});
+        if(!res.ok) return;
+        const rows = await res.json();
+        if(!Array.isArray(rows) || !rows.length) return;
+        const logoByName = new Map(rows.map(r=>[r.name, r.logo]));
+        this.clientNames = this.clientNames.map(c=> logoByName.has(c.name) ? {...c, logo: logoByName.get(c.name)} : c);
+      }catch(e){ /* keep the text-pill fallback */ }
     },
 
     // Cloud feed (Supabase via /api/updates) merged with any device-only legacy posts — zero data loss.

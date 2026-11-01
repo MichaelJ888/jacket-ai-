@@ -6,12 +6,16 @@ import { compactConversationIfNeeded } from '../_lib/ceo-memory';
 import { pickTelegramMedia } from '../_lib/telegram-logic';
 import { claimTelegramUpdate, downloadTelegramMedia, startTyping } from '../_lib/telegram-media';
 import { rateLimitResponse } from '../_lib/rate-limit';
+import { decideStudioJob, postApprovedStudioJob } from '../_lib/studio';
+import { parseStudioCallback } from '../_lib/studio-logic';
 import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
 import { advanceOrder, confirmDeposit, createOrder } from '../_lib/order-lifecycle';
 import { buildClientPulseMessage, findOrdersByRef, listOpenOrders, parseMoveInput, parseOrderInput } from '../_lib/client-pulse';
 import { DEPOSIT_RECEIVED } from '../_lib/order-stages';
 import { applyClientUpdates, parseClientScreenshot } from '../_lib/vision-parse';
+import { handleClientLogoUpload } from '../_lib/client-logos';
+import { parseLogoCaption } from '../_lib/client-logos-logic';
 import { addSubconJob, completeSubconJob, handleAttendanceMessage, isAttendanceChat, logSewerOutput, markPayrollPaid } from '../_lib/payroll';
 import {
   clockInStaff,
@@ -115,6 +119,36 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
 
+      const studioAction = parseStudioCallback(callbackData);
+      if (callbackId && studioAction) {
+        const supabase = getSupabaseAdmin();
+        if (!supabase) {
+          await answerTelegramCallbackQuery(String(callbackId), 'Supabase is not configured.');
+          return NextResponse.json({ ok: true });
+        }
+        const result = await decideStudioJob(supabase, studioAction.jobId, studioAction.decision);
+        if (result.error) {
+          await answerTelegramCallbackQuery(String(callbackId), 'Could not save this decision. Please try again.');
+          return NextResponse.json({ ok: true });
+        }
+        if (!result.data) {
+          await answerTelegramCallbackQuery(String(callbackId), 'This studio image was already handled or is unavailable.');
+          if (callback.message?.message_id) await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+          return NextResponse.json({ ok: true });
+        }
+
+        const approved = studioAction.decision === 'approve';
+        await answerTelegramCallbackQuery(String(callbackId), approved ? 'Approved. Posting to Facebook and Instagram...' : 'Rejected.');
+        if (callback.message?.message_id) await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+        if (approved) {
+          after(() => postApprovedStudioJob(supabase, studioAction.jobId));
+          await sendTelegramDirectMessage(String(callbackChatId), 'Approved. Ipo-post na sa Facebook at Instagram.');
+        } else {
+          await sendTelegramDirectMessage(String(callbackChatId), 'Rejected. Hindi ito ipo-post.');
+        }
+        return NextResponse.json({ ok: true });
+      }
+
       const dispMatch = callbackData.match(/^disp:(approve|reject):([\da-f-]{36})$/i);
       if (callbackId && dispMatch) {
         const [, action, dispatchId] = dispMatch;
@@ -184,6 +218,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true });
       }
       const media = picked.media!;
+      const logoCommand = (media.kind === 'photo' || media.kind === 'image-file') ? parseLogoCaption(text) : null;
       // Instant ack so the CEO never sees silence while the download/vision parse runs (failures ignored).
       const ackText = media.kind === 'photo' || media.kind === 'image-file' ? 'Na-receive ko ang larawan, pinoproseso na...' : 'Na-receive ko ang voice note, pinoproseso na...';
       await sendTelegramDirectMessage(String(chatId), ackText).catch(() => undefined);
@@ -196,6 +231,9 @@ export async function POST(req: Request) {
           if ('error' in file) {
             await reportCriticalError('telegram-media-download-failed', new Error(`downloadTelegramMedia failed: ${file.error}`), { kind: media.kind, size: media.size, mediaType: media.mediaType });
             answer = 'Hindi ko ma-download yung file, Boss. Subukan ulit o mas maliit na photo.';
+          } else if (logoCommand) {
+            // "logo <client>" caption: save as the trust-roster logo, skipping the client-list vision parse.
+            answer = await handleClientLogoUpload(logoCommand.ref, file);
           } else if (media.kind === 'photo' || media.kind === 'image-file') {
             // Fast path: lightweight vision parse for client-list / chat screenshots (cheap model, token-efficient).
             const parsed = await parseClientScreenshot(file, text);
@@ -268,7 +306,7 @@ export async function POST(req: Request) {
     if (!reply) {
       const ceoUserId = process.env.TELEGRAM_CEO_USER_ID;
       if (!ceoUserId || String(message.from?.id) !== ceoUserId) {
-        await sendTelegramDirectMessage(String(chatId), 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, CLIENTS.');
+        await sendTelegramDirectMessage(String(chatId), 'Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, URGENT Jonathan <bilin>, EMERGENCY Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, CLIENTS. Client logo: ipadala ang PNG/JPG/WebP bilang file na may caption "logo <client>".');
         return NextResponse.json({ ok: true });
       }
       const ceoText = text.replace(/@\w*bot\b/gi, '').trim() || text;

@@ -55,6 +55,8 @@ function manilaSlot(daysFromToday: number, hourManila: number, minuteManila = 0)
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysFromToday, hourManila - 8, minuteManila, 0));
 }
 
+const CONTENT_SYSTEM_PROMPT = 'You are the social media manager of MJIC, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write engaging Taglish posts. NEVER state prices, discounts, or delivery promises. Never mention being an AI.';
+
 async function generateIdeas(count: number): Promise<IdeaPost[]> {
   if (!process.env.GEMINI_API_KEY) return [];
   try {
@@ -62,7 +64,7 @@ async function generateIdeas(count: number): Promise<IdeaPost[]> {
     const recent = supabase ? (await supabase.from('content_calendar').select('caption').order('created_at', { ascending: false }).limit(8)).data || [] : [];
     const result = await generateText({
       model: google('gemini-3.6-flash'),
-      system: 'You are the social media manager of MJIC, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write engaging Taglish posts. NEVER state prices, discounts, or delivery promises. Never mention being an AI. Return ONLY a JSON array.',
+      system: `${CONTENT_SYSTEM_PROMPT} Return ONLY a JSON array.`,
       prompt: `Create ${count} distinct post ideas as JSON: [{"theme":"...","caption":"max 280 chars, ends with a call to action to message us","hashtags":["#MJIC", "..."],"video":true|false,"videoPrompt":"only if video: a vivid 8-second vertical cinematic scene description, no text overlays"}]. About 1 in 4 should be video. Avoid repeating these recent captions:\n${recent.map((row) => `- ${row.caption}`).join('\n') || '(none yet)'}`,
       abortSignal: AbortSignal.timeout(40000),
     });
@@ -350,6 +352,90 @@ async function publishTiktok(row: CalendarRow, mediaUrl: string | null) {
   return { id: body.data?.publish_id || '', url: null as string | null };
 }
 
+type PublishSummary = { published: number; failed: number; needsCredentials: string[]; credentialIssues: Record<string, string> };
+
+// Claims one READY row and publishes it. Shared by the slot publisher and approved studio posts.
+async function publishCalendarRow(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, row: CalendarRow, validateMeta: ReturnType<typeof createMetaPublishingPreflight>, summary: PublishSummary) {
+  // Atomic claim: overlapping publisher runs (slot crons + */45 job) must not post the same row twice.
+  const { data: claimed, error: claimError } = await supabase.from('content_calendar').update({ attempts: row.attempts + 1 }).eq('id', row.id).eq('status', 'READY').eq('attempts', row.attempts).select('id');
+  if (claimError) {
+    console.error(`Content publisher could not claim row ${row.id}:`, claimError.message);
+    summary.failed += 1;
+    return;
+  }
+  if (!claimed?.length) return;
+  try {
+    const media = await resolveMedia(row);
+    if (row.media_type === 'video' && !media.url) throw new Error('video file not available yet');
+    const result = row.platform === 'facebook' ? await publishFacebook(row, media.url, validateMeta)
+      : row.platform === 'instagram' ? await publishInstagram(row, media.url, validateMeta)
+        : row.platform === 'youtube' ? await publishYoutube(row, media.storagePath)
+          : await publishTiktok(row, media.url);
+    await supabase.from('content_calendar').update({ status: 'PUBLISHED', external_post_id: result.id, post_url: result.url, published_at: new Date().toISOString(), error: null }).eq('id', row.id);
+    summary.published += 1;
+    void sendTelegramMessage(`<b>POSTED on ${row.platform.toUpperCase()}</b>\n${escapeTelegramHtml(row.caption.slice(0, 200))}${result.url ? `\n${escapeTelegramHtml(result.url)}` : ''}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof MissingCredentials) {
+      await supabase.from('content_calendar').update({ status: 'NEEDS_CREDENTIALS', error: message, attempts: row.attempts }).eq('id', row.id);
+      if (!summary.needsCredentials.includes(row.platform)) summary.needsCredentials.push(row.platform);
+      summary.credentialIssues[row.platform] = message;
+    } else {
+      const attempts = row.attempts + 1;
+      await supabase.from('content_calendar').update({ attempts, error: message.slice(0, 500), status: attempts >= 3 ? 'FAILED' : 'READY' }).eq('id', row.id);
+      summary.failed += 1;
+      if (attempts >= 3) void sendTelegramMessage(`<b>POST FAILED (${row.platform})</b>\n${escapeTelegramHtml(message.slice(0, 300))}`);
+    }
+  }
+}
+
+// Writes the caption for an approved studio image. Same guardrails as the content planner (no prices, no AI mention).
+async function studioCaption(imageUrl: string): Promise<string> {
+  if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is not configured');
+  const result = await generateText({
+    model: google('gemini-3.6-flash'),
+    system: CONTENT_SYSTEM_PROMPT,
+    messages: [{
+      role: 'user',
+      content: [
+        { type: 'text', text: 'Write one engaging Facebook/Instagram caption (max 280 chars) for this custom jacket photo. Describe only what is visible, and end with a call to action to message us. Return only the caption text.' },
+        { type: 'image', image: new URL(imageUrl) },
+      ],
+    }],
+    abortSignal: AbortSignal.timeout(40000),
+  });
+  const caption = result.text.trim().slice(0, 600);
+  if (caption.length < 10) throw new Error('Caption generation returned no usable text');
+  return caption;
+}
+
+// Approved studio image -> Facebook Page and Instagram, published now rather than at the next slot.
+// Missing Meta credentials park the row as NEEDS_CREDENTIALS, so the existing requeue logic picks it up later.
+export async function publishApprovedStudioImage(imageUrl: string) {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) throw new Error('Supabase is not configured');
+  const caption = await studioCaption(imageUrl);
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('content_calendar')
+    .insert((['facebook', 'instagram'] as const).map((platform) => ({
+      platform,
+      media_type: 'image',
+      caption,
+      hashtags: ['#MJIC'],
+      media_url: imageUrl,
+      scheduled_at: now,
+      status: 'READY',
+    })))
+    .select('*');
+  if (error || !data) throw new Error('Could not queue the approved studio post');
+
+  const validateMeta = createMetaPublishingPreflight();
+  const summary: PublishSummary = { published: 0, failed: 0, needsCredentials: [], credentialIssues: {} };
+  for (const row of data as CalendarRow[]) await publishCalendarRow(supabase, row, validateMeta, summary);
+  return summary;
+}
+
 export async function runContentPipeline(origin: string, validateMeta = createMetaPublishingPreflight()) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { error: 'Supabase is not configured' };
@@ -371,40 +457,8 @@ export async function runContentPipeline(origin: string, validateMeta = createMe
     .order('scheduled_at')
     .limit(4);
 
-  const summary = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [] as string[], credentialIssues: {} as Record<string, string> };
-  for (const row of (data || []) as CalendarRow[]) {
-    // Atomic claim: overlapping publisher runs (slot crons + */45 job) must not post the same row twice.
-    const { data: claimed, error: claimError } = await supabase.from('content_calendar').update({ attempts: row.attempts + 1 }).eq('id', row.id).eq('status', 'READY').eq('attempts', row.attempts).select('id');
-    if (claimError) {
-      console.error(`Content publisher could not claim row ${row.id}:`, claimError.message);
-      summary.failed += 1;
-      continue;
-    }
-    if (!claimed?.length) continue;
-    try {
-      const media = await resolveMedia(row);
-      if (row.media_type === 'video' && !media.url) throw new Error('video file not available yet');
-      const result = row.platform === 'facebook' ? await publishFacebook(row, media.url, validateMeta)
-        : row.platform === 'instagram' ? await publishInstagram(row, media.url, validateMeta)
-          : row.platform === 'youtube' ? await publishYoutube(row, media.storagePath)
-            : await publishTiktok(row, media.url);
-      await supabase.from('content_calendar').update({ status: 'PUBLISHED', external_post_id: result.id, post_url: result.url, published_at: new Date().toISOString(), error: null }).eq('id', row.id);
-      summary.published += 1;
-      void sendTelegramMessage(`<b>POSTED on ${row.platform.toUpperCase()}</b>\n${escapeTelegramHtml(row.caption.slice(0, 200))}${result.url ? `\n${escapeTelegramHtml(result.url)}` : ''}`);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (error instanceof MissingCredentials) {
-        await supabase.from('content_calendar').update({ status: 'NEEDS_CREDENTIALS', error: message, attempts: row.attempts }).eq('id', row.id);
-        if (!summary.needsCredentials.includes(row.platform)) summary.needsCredentials.push(row.platform);
-        summary.credentialIssues[row.platform] = message;
-      } else {
-        const attempts = row.attempts + 1;
-        await supabase.from('content_calendar').update({ attempts, error: message.slice(0, 500), status: attempts >= 3 ? 'FAILED' : 'READY' }).eq('id', row.id);
-        summary.failed += 1;
-        if (attempts >= 3) void sendTelegramMessage(`<b>POST FAILED (${row.platform})</b>\n${escapeTelegramHtml(message.slice(0, 300))}`);
-      }
-    }
-  }
+  const summary: PublishSummary & { videosStarted: unknown; videoErrors: string[] } = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [], credentialIssues: {} };
+  for (const row of (data || []) as CalendarRow[]) await publishCalendarRow(supabase, row, validateMeta, summary);
 
   for (const platform of summary.needsCredentials) {
     if (platform !== 'facebook' && platform !== 'instagram') {

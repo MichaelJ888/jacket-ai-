@@ -166,7 +166,7 @@ export async function fetchWithRetry(input: string, init: RequestInit, maxRetrie
   return null;
 }
 
-type TelegramInlineKeyboard = {
+export type TelegramInlineKeyboard = {
   inline_keyboard: Array<Array<{ text: string; callback_data: string }>>;
 };
 
@@ -268,7 +268,8 @@ export async function removeTelegramInlineKeyboard(chatId: string, messageId: nu
 
 // Sends a logo/reference photo to the operations Telegram chat. Accepts either
 // a public http(s) URL (sent directly) or a data: URL (uploaded as multipart).
-export async function sendTelegramPhoto(imageSource: string, caption: string) {
+// replyMarkup (inline buttons) goes only to the primary (CEO) chat, same as sendTelegramMessage.
+export async function sendTelegramPhoto(imageSource: string, caption: string, replyMarkup?: TelegramInlineKeyboard) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatIds = await getOpsChatIds();
   if (!token || !chatIds.length || !imageSource) return;
@@ -277,13 +278,14 @@ export async function sendTelegramPhoto(imageSource: string, caption: string) {
   const dataMatch = isUrl ? null : imageSource.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
   if (!isUrl && !dataMatch) return;
 
-  await Promise.all(chatIds.map(async (chatId) => {
+  await Promise.all(chatIds.map(async (chatId, index) => {
+    const markup = replyMarkup && index === 0 ? replyMarkup : null;
     try {
       if (isUrl) {
         await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: chatId, photo: imageSource, caption: sanitizeTelegramText(caption), parse_mode: 'HTML' }),
+          body: JSON.stringify({ chat_id: chatId, photo: imageSource, caption: sanitizeTelegramText(caption), parse_mode: 'HTML', ...(markup ? { reply_markup: markup } : {}) }),
         });
         return;
       }
@@ -293,6 +295,7 @@ export async function sendTelegramPhoto(imageSource: string, caption: string) {
       form.set('chat_id', chatId);
       form.set('caption', sanitizeTelegramText(caption));
       form.set('parse_mode', 'HTML');
+      if (markup) form.set('reply_markup', JSON.stringify(markup));
       form.set('photo', new Blob([buffer], { type: mimeType }), `logo.${mimeType.split('/')[1] || 'png'}`);
       await fetchWithRetry(`https://api.telegram.org/bot${token}/sendPhoto`, { method: 'POST', body: form });
     } catch (error) {

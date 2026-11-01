@@ -5,10 +5,25 @@ import {
   buildFaceSwapInput,
   isAllowedStudioAssetUrl,
   logoPlacementLeftChest,
+  parseStudioCallback,
   studioImageExtension,
 } from './studio-logic.ts';
 
 const SUPABASE = 'https://abc.supabase.co';
+
+test('parseStudioCallback reads approve and reject payloads', () => {
+  const id = '3f2a9c1e-8b7d-4e6f-9a0b-1c2d3e4f5a6b';
+  assert.deepEqual(parseStudioCallback(`studio:approve:${id}`), { decision: 'approve', jobId: id });
+  assert.deepEqual(parseStudioCallback(`studio:reject:${id}`), { decision: 'reject', jobId: id });
+});
+
+test('parseStudioCallback rejects unknown or malformed payloads', () => {
+  const id = '3f2a9c1e-8b7d-4e6f-9a0b-1c2d3e4f5a6b';
+  assert.equal(parseStudioCallback(`studio:delete:${id}`), null);
+  assert.equal(parseStudioCallback(`studio:approve:not-a-uuid`), null);
+  assert.equal(parseStudioCallback(`disp:approve:${id}`), null);
+  assert.equal(parseStudioCallback(`studio:approve:${id} extra`), null);
+});
 
 test('allows only https public storage URLs on the project host', () => {
   assert.equal(isAllowedStudioAssetUrl(`${SUPABASE}/storage/v1/object/public/studio-inputs/a.png`, SUPABASE), true);

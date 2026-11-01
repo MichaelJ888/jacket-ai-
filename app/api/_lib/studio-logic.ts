@@ -59,6 +59,13 @@ export function logoPlacementLeftChest(imageWidth: number, imageHeight: number, 
   };
 }
 
+// Telegram inline-button payload for a studio job, e.g. "studio:approve:<uuid>" (well under Telegram's 64-byte limit).
+export function parseStudioCallback(data: string): { decision: StudioDecision; jobId: string } | null {
+  const match = data.match(/^studio:(approve|reject):([\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12})$/i);
+  if (!match) return null;
+  return { decision: match[1].toLowerCase() === 'approve' ? 'approve' : 'reject', jobId: match[2] };
+}
+
 export function studioJobPath(prefix: string, extension: string, id: string) {
   return `${prefix}/${Date.now()}-${id}.${extension}`;
 }
