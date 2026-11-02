@@ -99,6 +99,8 @@ test('digitizeLogo creates stitches, QA, preview, and embroidery files', async (
   assert.ok(result.files.exp.length > 20);
   assert.ok(result.files.pes.length > 100);
   assert.ok(result.files.jef.length > 100);
+  assert.ok(result.files.vp3.length > 100);
+  assert.equal(result.files.vp3.subarray(0, 5).toString('ascii'), '%vsm%');
   assert.ok(result.qa.stitchCount > 0);
   assert.ok(result.qa.designWidthMm > 0);
   assert.ok(Array.isArray(result.qa.warnings));

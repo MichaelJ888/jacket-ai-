@@ -37,6 +37,7 @@ const FILE_LABELS: Array<[string, string]> = [
   ['logo.pes', 'Brother PES'],
   ['logo.exp', 'Melco EXP'],
   ['logo.jef', 'Janome JEF'],
+  ['logo.vp3', 'Pfaff/Husqvarna VP3'],
   ['preview.png', 'Preview (PNG)'],
 ];
 

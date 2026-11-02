@@ -268,6 +268,7 @@ export async function POST(req: Request) {
       'logo.exp': { buffer: digitized.files.exp, contentType: 'application/octet-stream' },
       'logo.pes': { buffer: digitized.files.pes, contentType: 'application/octet-stream' },
       'logo.jef': { buffer: digitized.files.jef, contentType: 'application/octet-stream' },
+      'logo.vp3': { buffer: digitized.files.vp3, contentType: 'application/octet-stream' },
     });
 
     const status = digitized.qa.needsHumanReview ? 'PENDING_MANUAL_DIGITIZING' : 'COMPLETED';

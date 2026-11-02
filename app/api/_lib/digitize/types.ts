@@ -62,6 +62,7 @@ export type DigitizeFiles = {
   exp: Buffer;
   pes: Buffer;
   jef: Buffer;
+  vp3: Buffer;
 };
 
 export type DigitizeResult = {

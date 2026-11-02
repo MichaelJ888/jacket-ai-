@@ -585,11 +585,226 @@ export function encodeJef(stitches: Stitch[], colors: ThreadColor[]) {
   return Buffer.from(bytes);
 }
 
+type Vp3Block = { stitches: WriterStitch[]; thread: ThreadColor };
+
+function vp3ColorBlocks(list: WriterStitch[], colors: ThreadColor[]): Vp3Block[] {
+  const threadAt = (index: number) => colors[Math.min(index, colors.length - 1)];
+  const blocks: Vp3Block[] = [];
+  let threadIndex = 0;
+  let lastPos = 0;
+  list.forEach((stitch, pos) => {
+    if (stitch.command !== 'color-change') return;
+    blocks.push({ stitches: list.slice(lastPos, pos), thread: threadAt(threadIndex) });
+    threadIndex += 1;
+    lastPos = pos;
+  });
+  blocks.push({ stitches: list.slice(lastPos), thread: threadAt(threadIndex) });
+  return blocks;
+}
+
+// Mirrors pyembroidery's EmbEncoder.needle_to: long stitches get intermediate JUMP points. VP3 writes no
+// bytes for jumps, but they still count toward the header stitch count.
+function splitLongStitches(list: WriterStitch[]): WriterStitch[] {
+  const out: WriterStitch[] = [];
+  let needleX = 0;
+  let needleY = 0;
+  for (const stitch of list) {
+    const dx = stitch.x - needleX;
+    const dy = stitch.y - needleY;
+    if (stitch.command === 'stitch' && (Math.abs(dx) > VP3_MAX_STITCH || Math.abs(dy) > VP3_MAX_STITCH)) {
+      const steps = Math.max(Math.ceil(Math.abs(dx) / VP3_MAX_STITCH), Math.ceil(Math.abs(dy) / VP3_MAX_STITCH));
+      const stepX = dx / steps;
+      const stepY = dy / steps;
+      let qx = needleX;
+      let qy = needleY;
+      for (let q = 1; q < steps; q++) {
+        qx += stepX;
+        qy += stepY;
+        out.push({ x: qx, y: qy, command: 'jump', color: stitch.color });
+      }
+    }
+    out.push(stitch);
+    needleX = stitch.x;
+    needleY = stitch.y;
+  }
+  return out;
+}
+
+const VP3_MAX_STITCH = 255;
+
+// Pfaff/Husqvarna VP3 writer, ported from pyembroidery's Vp3Writer (MIT). Coordinates are 0.1 mm units.
+export function encodeVp3(stitches: Stitch[], colors: ThreadColor[]) {
+  let list: WriterStitch[] = stitches.map((stitch) => ({
+    x: roundUnit(stitch.x),
+    y: roundUnit(stitch.y),
+    command: stitch.command,
+    color: stitch.color,
+  }));
+  if (!list.length || list[list.length - 1].command !== 'end') {
+    const last = list[list.length - 1];
+    list.push({ x: last?.x ?? 0, y: last?.y ?? 0, command: 'end', color: last?.color ?? 0 });
+  }
+  list = splitLongStitches(list);
+  const bytes: number[] = [];
+  const u8 = (value: number) => bytes.push(value & 0xff);
+  const i16 = (value: number) => bytes.push((value >> 8) & 0xff, value & 0xff);
+  const i24 = (value: number) => bytes.push((value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff);
+  const i32 = (value: number) => bytes.push((value >>> 24) & 0xff, (value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff);
+  const utf16be = (value: string) => {
+    for (const ch of value) {
+      const code = ch.charCodeAt(0);
+      bytes.push((code >> 8) & 0xff, code & 0xff);
+    }
+  };
+  const str16 = (value: string) => {
+    i16(value.length * 2);
+    utf16be(value);
+  };
+  const str8 = (value: string) => {
+    const encoded = Buffer.from(value, 'utf8');
+    i16(encoded.length);
+    appendBytes(bytes, encoded);
+  };
+  const placeholder = () => {
+    const start = bytes.length;
+    i32(0);
+    return start;
+  };
+  const patch = (start: number) => {
+    const value = bytes.length - start - 4;
+    bytes[start] = (value >>> 24) & 0xff;
+    bytes[start + 1] = (value >> 16) & 0xff;
+    bytes[start + 2] = (value >> 8) & 0xff;
+    bytes[start + 3] = value & 0xff;
+  };
+
+  const writeThread = (thread: ThreadColor) => {
+    bytes.push(0x01, 0x00);
+    const [r, g, b] = thread.rgb;
+    i24((r << 16) | (g << 8) | b);
+    bytes.push(0x00, 0x00, 0x00, 0x05, 0x28);
+    str8('');
+    str8(`#${thread.hex.replace('#', '').toLowerCase()}`);
+    str8('');
+  };
+
+  const writeStitches = (block: WriterStitch[], firstX: number, firstY: number) => {
+    bytes.push(0x00, 0x01, 0x00);
+    const start = placeholder();
+    bytes.push(0x0a, 0xf6, 0x00);
+    let lastX = firstX;
+    let lastY = firstY;
+    for (const stitch of block) {
+      if (stitch.command === 'end') {
+        bytes.push(0x80, 0x03);
+        break;
+      }
+      if (stitch.command === 'color-change' || stitch.command === 'jump') continue;
+      if (stitch.command === 'trim') {
+        bytes.push(0x80, 0x03);
+        continue;
+      }
+      const dx = Math.trunc(stitch.x - lastX);
+      const dy = Math.trunc(stitch.y - lastY);
+      lastX += dx;
+      lastY += dy;
+      if (dx >= -127 && dx <= 127 && dy >= -127 && dy <= 127) {
+        u8(dx);
+        u8(dy);
+      } else {
+        bytes.push(0x80, 0x01);
+        i16(dx);
+        i16(dy);
+        bytes.push(0x80, 0x02);
+      }
+    }
+    patch(start);
+  };
+
+  const writeColorBlock = (first: boolean, centerX: number, centerY: number, block: WriterStitch[], thread: ThreadColor) => {
+    bytes.push(0x00, 0x05, 0x00);
+    const start = placeholder();
+    let firstX = 0;
+    let firstY = 0;
+    let lastX = 0;
+    let lastY = 0;
+    if (block.length) {
+      firstX = first ? 0 : block[0].x;
+      firstY = first ? 0 : block[0].y;
+      lastX = block[block.length - 1].x;
+      lastY = block[block.length - 1].y;
+    }
+    i32(Math.trunc(firstX - centerX) * 100);
+    i32(Math.trunc(-(firstY - centerY)) * 100);
+    writeThread(thread);
+    i32(Math.trunc(lastX - firstX) * 100);
+    i32(Math.trunc(-(lastY - firstY)) * 100);
+    writeStitches(block, firstX, firstY);
+    u8(0);
+    patch(start);
+  };
+
+  const bounds = getBounds(list);
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+  const centerX = bounds.maxX - halfWidth;
+  const centerY = bounds.maxY - halfHeight;
+  const blocks = vp3ColorBlocks(list, colors);
+
+  bytes.push(...Buffer.from('%vsm%', 'utf8'));
+  u8(0);
+  str16('Produced by     Software Ltd');
+  bytes.push(0x00, 0x02, 0x00);
+  const filePlaceholder = placeholder();
+  str16('');
+  i32(Math.trunc(bounds.maxX) * 100);
+  i32(Math.trunc(bounds.minY) * -100);
+  i32(Math.trunc(bounds.minX) * 100);
+  i32(Math.trunc(bounds.maxY) * -100);
+  i32(list.length - list.filter((stitch) => stitch.command === 'end').length);
+  u8(0);
+  u8(blocks.length);
+  u8(12);
+  u8(0);
+  u8(1);
+
+  bytes.push(0x00, 0x03, 0x00);
+  const designPlaceholder = placeholder();
+  i32(Math.trunc(centerX) * 100);
+  i32(Math.trunc(centerY) * -100);
+  u8(0);
+  u8(0);
+  u8(0);
+  i32(Math.trunc(halfWidth) * -100);
+  i32(Math.trunc(halfWidth) * 100);
+  i32(Math.trunc(halfHeight) * -100);
+  i32(Math.trunc(halfHeight) * 100);
+  i32(Math.trunc(width) * 100);
+  i32(Math.trunc(height) * 100);
+  str16('');
+  bytes.push(0x64, 0x64);
+  i32(4096);
+  i32(0);
+  i32(0);
+  i32(4096);
+  bytes.push(0x78, 0x78, 0x50, 0x50, 0x01, 0x00);
+  str16('Produced by     Software Ltd');
+  i16(blocks.length);
+  blocks.forEach((block, index) => writeColorBlock(index === 0, centerX, centerY, block.stitches, block.thread));
+  patch(designPlaceholder);
+  patch(filePlaceholder);
+
+  return Buffer.from(bytes);
+}
+
 export function encodeAllFormats(stitches: Stitch[], colors: ThreadColor[], designName = 'MJIC') {
   return {
     dst: encodeDst(stitches, designName),
     exp: encodeExp(stitches),
     pes: encodePes(stitches, colors),
     jef: encodeJef(stitches, colors),
+    vp3: encodeVp3(stitches, colors),
   };
 }
