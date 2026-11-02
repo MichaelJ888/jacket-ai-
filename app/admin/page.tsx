@@ -8,7 +8,7 @@ import AnalyticsDashboard from "./analytics-dashboard";
 
 type Price = { key: string; name: string; category: string; unit: string; unit_cost: number; supplier_name: string | null; updated_at: string };
 type Overview = {
-  priceBook: Array<{ style: string; selling_price: number; target_margin_pct: number; labor_cost: number }>;
+  priceBook: Array<{ style: string; selling_price: number; labor_cost: number }>;
   costings: Array<{ id: string; client_name: string | null; project_name: string | null; style: string; quantity: number; total_cost: number; status: string }>;
   purchaseOrders: Array<{ po_number: string; supplier_name: string; material_type: string; total_cost: number; status: string }>;
   quotes: Array<{ quote_number: string; client_name: string | null; total: number }>;
@@ -152,7 +152,7 @@ export default function AdminPage() {
     await refresh();
   }
 
-  async function savePriceBook(row: { style: string; sellingPrice: number; targetMarginPct: number; laborCost: number }) {
+  async function savePriceBook(row: { style: string; sellingPrice: number; laborCost: number }) {
     const result = await call("/api/admin/price-book", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(row) });
     setMessage(result.ok ? `Saved ${row.style}` : result.data.error || "Save failed");
     await refresh();
@@ -368,17 +368,15 @@ function PriceRowEditor({ row, onSave, onDelete }: { row: Price; onSave: (row: {
   );
 }
 
-function BookRow({ style, current, onSave }: { style: string; current?: { selling_price: number; target_margin_pct: number; labor_cost: number }; onSave: (row: { style: string; sellingPrice: number; targetMarginPct: number; laborCost: number }) => void }) {
+function BookRow({ style, current, onSave }: { style: string; current?: { selling_price: number; labor_cost: number }; onSave: (row: { style: string; sellingPrice: number; laborCost: number }) => void }) {
   const [price, setPrice] = useState(String(current?.selling_price ?? 0));
-  const [margin, setMargin] = useState(String(current?.target_margin_pct ?? 35));
   const [labor, setLabor] = useState(String(current?.labor_cost ?? 0));
   return (
     <div className="mb-2 flex items-center gap-2 text-sm">
       <span className="w-28 capitalize">{style}</span>
-      <label>Price <input className={`${input} w-24`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></label>
+      <label>Market price @MOQ <input className={`${input} w-24`} type="number" value={price} onChange={(e) => setPrice(e.target.value)} /></label>
       <label>Labor <input className={`${input} w-24`} type="number" value={labor} onChange={(e) => setLabor(e.target.value)} /></label>
-      <label>Margin % <input className={`${input} w-20`} type="number" value={margin} onChange={(e) => setMargin(e.target.value)} /></label>
-      <button className={button} onClick={() => onSave({ style, sellingPrice: Number(price), targetMarginPct: Number(margin), laborCost: Number(labor) })}>Save</button>
+      <button className={button} onClick={() => onSave({ style, sellingPrice: Number(price), laborCost: Number(labor) })}>Save</button>
     </div>
   );
 }

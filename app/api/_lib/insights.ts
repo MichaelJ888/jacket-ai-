@@ -28,7 +28,7 @@ export async function pricingAdvice() {
     const now = computeBom({ style: row.style, quantity: 1, isSample: true }, prices).costing?.totalCost ?? 0;
     const then = computeBom({ style: row.style, quantity: 1, isSample: true }, past).costing?.totalCost ?? 0;
     const costPerPiece = now + Number(row.labor_cost || 0);
-    const advice = recommendPrice(costPerPiece, Number(row.target_margin_pct), Number(row.selling_price));
+    const advice = recommendPrice(costPerPiece, Number(row.selling_price));
     const last14 = (recent || []).filter((item) => item.style === row.style && item.created_at >= since14).length;
     const prev14 = (recent || []).filter((item) => item.style === row.style && item.created_at < since14).length;
     return {

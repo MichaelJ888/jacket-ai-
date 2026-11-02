@@ -85,7 +85,7 @@ export default function CreditsPanel({ token }: { token: string }) {
 
       <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
         <h3 className="font-semibold">Recent entries</h3>
-        <table className="mt-2 w-full text-left text-sm">
+        <div className="mt-2 overflow-x-auto"><table className="w-full text-left text-sm">
           <thead><tr className="text-zinc-500"><th>When</th><th>Provider</th><th>Kind</th><th>USD</th><th>Note</th></tr></thead>
           <tbody>
             {entries.map((e) => (
@@ -98,7 +98,7 @@ export default function CreditsPanel({ token }: { token: string }) {
               </tr>
             ))}
           </tbody>
-        </table>
+        </table></div>
       </div>
     </section>
   );
