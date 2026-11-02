@@ -19,6 +19,7 @@ export const CORE_MATERIALS = [
   { key: 'ribbing_set', name: 'Ribbing', category: 'trim', unit: 'sets' },
   { key: 'thread', name: 'Sewing thread', category: 'trim', unit: 'cones' },
   { key: 'embroidery_thread', name: 'Embroidery thread', category: 'trim', unit: 'cones' },
+  { key: 'embroidery_machine_hour', name: 'Embroidery machine time', category: 'labor', unit: 'hours' },
   { key: 'woven_label', name: 'Woven label', category: 'trim', unit: 'pieces' },
 ];
 

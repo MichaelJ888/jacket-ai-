@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { logClientActivity } from '../../_lib/client-activity';
 import { digitizeLogo } from '../../_lib/digitize/index.ts';
+import { buildDigitizeQuote, storeDigitizeQuote } from '../../_lib/digitize-quote';
 import { editorOrAdminAuthorized } from '../../_lib/site-content';
 import {
   createDigitizeJob,
@@ -36,6 +37,7 @@ type RequestBody = {
   maxColors?: unknown;
   embroideryJobId?: unknown;
   orderId?: unknown;
+  quantity?: unknown;
 };
 
 // Admin editor session, admin bearer, or the scheduler/cron token. Fails closed when none are configured.
@@ -229,6 +231,7 @@ export async function POST(req: Request) {
       digitized.qa.warnings.push(`Design is under ${MIN_DESIGN_MM} mm on one side; below the minimum safe embroidery size.`);
       digitized.qa.needsHumanReview = true;
     }
+    const quote = await buildDigitizeQuote(digitized.qa.stitchCount, orderId, toPositiveNumber(body.quantity) || undefined);
     const uploads = await uploadEmbroideryArtifacts(prefix, {
       'preview.png': { buffer: digitized.previewPng, contentType: 'image/png' },
       'logo.dst': { buffer: digitized.files.dst, contentType: 'application/octet-stream' },
@@ -253,12 +256,14 @@ export async function POST(req: Request) {
         provider: 'built-in-typescript',
         status,
         qa: digitized.qa,
+        quote,
         storagePaths: uploads.storagePaths,
         signedUrls: uploads.signedUrls,
         sourceMimeType: loaded.mimeType,
       }),
     });
     if (result.error) return NextResponse.json({ error: result.error }, { status: 502 });
+    await storeDigitizeQuote(orderId, quote);
 
     if (orderId) {
       await logClientActivity({
@@ -283,6 +288,7 @@ export async function POST(req: Request) {
       requiresManualDigitizing: digitized.qa.needsHumanReview,
       job: result.data,
       qa: digitized.qa,
+      quote,
       files: uploads.signedUrls,
     });
   } catch (error) {

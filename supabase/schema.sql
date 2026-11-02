@@ -1169,3 +1169,6 @@ update public.orders set stage_entered_at = coalesce(updated_at, created_at, now
 -- Auto-digitizer: each digitized logo links to the customer order it was made for.
 alter table public.digitize_jobs add column if not exists order_id uuid references public.orders(id);
 create index if not exists digitize_jobs_order_idx on public.digitize_jobs (order_id);
+
+-- Stitch-based quote (machine time + 1.2x cost floor) written by the auto-digitizer for the linked order.
+alter table public.orders add column if not exists digitize_quote jsonb not null default '{}'::jsonb;

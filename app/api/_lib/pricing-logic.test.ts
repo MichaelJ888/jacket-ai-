@@ -1,6 +1,32 @@
 ﻿import assert from 'node:assert/strict';
 import test from 'node:test';
-import { quoteBulkOrder, recommendPrice, volumeDiscountPct, volumeLadder, tierUnitPrice } from './pricing-logic.ts';
+import { digitizeQuote, quoteBulkOrder, recommendPrice, volumeDiscountPct, volumeLadder, tierUnitPrice } from './pricing-logic.ts';
+
+test('digitizeQuote converts stitches to machine time and cost per piece', () => {
+  const q = digitizeQuote({ stitchCount: 7000, machineRatePerHour: 300, quantity: 100, garmentCostPerPiece: 200 });
+  assert.equal(q.machineMinutesPerPiece, 10);
+  assert.equal(q.embroideryCostPerPiece, 50);
+  assert.equal(q.unitCostPerPiece, 250);
+  assert.equal(q.machineMinutesTotal, 1000);
+  assert.ok(q.costFloorPerPiece >= 300, 'floor is at least 1.2x unit cost');
+  assert.equal(q.costFloorTotal, q.costFloorPerPiece * 100);
+  assert.equal(q.action, 'NO_PRICE');
+});
+
+test('digitizeQuote with zero machine rate charges no embroidery cost and sanitizes bad input', () => {
+  const q = digitizeQuote({ stitchCount: -5, machineRatePerHour: NaN, quantity: 0, currentUnitPrice: 0 });
+  assert.equal(q.stitchCount, 0);
+  assert.equal(q.machineRatePerHour, 0);
+  assert.equal(q.embroideryCostPerPiece, 0);
+  assert.equal(q.quantity, 0);
+  assert.equal(q.currentUnitPrice, null);
+});
+
+test('digitizeQuote flags a current price below the floor as RAISE', () => {
+  const q = digitizeQuote({ stitchCount: 7000, machineRatePerHour: 300, quantity: 20, garmentCostPerPiece: 200, currentUnitPrice: 100 });
+  assert.equal(q.action, 'RAISE');
+  assert.ok((q.suggestedUnitPrice ?? 0) > 100);
+});
 
 test('quoteBulkOrder enforces 20-pc MOQ and charges catalog price x qty only', () => {
   const short = quoteBulkOrder(500, 12);

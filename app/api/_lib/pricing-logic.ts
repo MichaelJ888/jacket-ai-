@@ -64,3 +64,48 @@ export function recommendPrice(costPerPiece: number, currentPrice: number) {
   const changePct = currentPrice > 0 ? Number((((suggested - currentPrice) / currentPrice) * 100).toFixed(1)) : 0;
   return { floor, suggested, costCoverPct, changePct, action: suggested > currentPrice ? 'RAISE' : 'HOLD' } as const;
 }
+
+// Standard machine speed used by the digitizer QA estimate (stitches per minute).
+export const EMBROIDERY_STITCHES_PER_MIN = 700;
+
+function money(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+// Machine-time cost comes from the digitizer's stitch count; garment cost from the BOM costing per piece.
+// The 1.2x cost floor applies to the combined per-piece cost, and the current price is checked against it.
+export function digitizeQuote(input: {
+  stitchCount: number;
+  machineRatePerHour: number;
+  quantity?: number;
+  garmentCostPerPiece?: number;
+  currentUnitPrice?: number;
+}) {
+  const stitches = Number.isFinite(input.stitchCount) && input.stitchCount > 0 ? input.stitchCount : 0;
+  const rate = Number.isFinite(input.machineRatePerHour) && input.machineRatePerHour >= 0 ? input.machineRatePerHour : 0;
+  const pieces = Number.isFinite(input.quantity) && (input.quantity as number) > 0 ? Math.floor(input.quantity as number) : 0;
+  const garment = Number.isFinite(input.garmentCostPerPiece) && (input.garmentCostPerPiece as number) > 0 ? (input.garmentCostPerPiece as number) : 0;
+  const currentPrice = Number.isFinite(input.currentUnitPrice) && (input.currentUnitPrice as number) > 0 ? (input.currentUnitPrice as number) : 0;
+
+  const machineMinutesPerPiece = money(stitches / EMBROIDERY_STITCHES_PER_MIN);
+  const embroideryCostPerPiece = money((machineMinutesPerPiece / 60) * rate);
+  const unitCostPerPiece = money(garment + embroideryCostPerPiece);
+  const costFloorPerPiece = costFloorPrice(unitCostPerPiece);
+  const pricing = currentPrice > 0 ? recommendPrice(unitCostPerPiece, currentPrice) : null;
+
+  return {
+    stitchCount: stitches,
+    quantity: pieces,
+    machineRatePerHour: rate,
+    machineMinutesPerPiece,
+    machineMinutesTotal: money(machineMinutesPerPiece * pieces),
+    embroideryCostPerPiece,
+    garmentCostPerPiece: money(garment),
+    unitCostPerPiece,
+    costFloorPerPiece,
+    costFloorTotal: money(costFloorPerPiece * pieces),
+    currentUnitPrice: currentPrice || null,
+    action: pricing ? pricing.action : 'NO_PRICE',
+    suggestedUnitPrice: pricing ? pricing.suggested : null,
+  } as const;
+}
