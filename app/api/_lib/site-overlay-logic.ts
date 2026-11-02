@@ -11,10 +11,18 @@ const MAX_OVERLAY_CHARS = 1_500_000;
 
 export const B2B_SEO_KEYWORDS = [
   'Custom Jackets Philippines',
-  'Corporate Uniform Manufacturer Manila',
-  'Customized Apparel Supplier Cainta Rizal',
+  'Customized Corporate Uniform Manufacturer Manila',
+  'Customized Apparel Supplier Cainta Rizal and Taguig BGC',
   'Embroidery Services Philippines',
+  'Corporate Uniform Manufacturer Manila',
 ] as const;
+
+const FAQ_ITEMS = [
+  { q: 'What is the minimum order quantity?', a: 'The minimum order is 20 pieces per style.' },
+  { q: 'Is delivery free?', a: 'Delivery within Metro Manila is free.' },
+  { q: 'Do you provide a free mock-up?', a: 'Yes, a digital mock-up is free before production.' },
+  { q: 'Is the first logo embroidery free?', a: 'The first logo embroidery is free on your order.' },
+];
 
 export type SeoOverride = { keywords: string[]; jsonLd: Record<string, unknown>; updatedAt: string };
 
@@ -38,18 +46,34 @@ export function publicOverlay(doc: Record<string, unknown> | null | undefined): 
 // Merges the required B2B keywords into any existing override, keeping earlier ones and dropping duplicates.
 export function buildSeoOverride(existing: Partial<SeoOverride> | null | undefined, now: string): SeoOverride {
   const keywords = Array.from(new Set([...(existing?.keywords ?? []), ...B2B_SEO_KEYWORDS]));
+  const url = 'https://jacket-ai.vercel.app/';
   return {
     keywords,
     jsonLd: {
       '@context': 'https://schema.org',
-      '@type': 'Organization',
-      name: 'Michael Jeffrey International Corporation',
-      url: 'https://jacket-ai.vercel.app/',
-      description: 'Customized jackets, corporate uniforms, and embroidery services in the Philippines.',
-      areaServed: 'Philippines',
-      knowsAbout: keywords,
-      keywords: keywords.join(', '),
+      '@graph': [
+        {
+          '@type': 'Organization',
+          '@id': `${url}#organization`,
+          name: 'Michael Jeffrey International Corporation',
+          url,
+          description: 'Customized jackets, corporate uniforms, and embroidery services in the Philippines. Minimum order 20 pieces.',
+          areaServed: ['Philippines', 'Metro Manila', 'Cainta, Rizal', 'Taguig (BGC)', 'Manila'],
+          knowsAbout: keywords,
+          keywords: keywords.join(', '),
+        },
+        {
+          '@type': 'FAQPage',
+          '@id': `${url}#faq`,
+          mainEntity: FAQ_ITEMS.map((item) => ({
+            '@type': 'Question',
+            name: item.q,
+            acceptedAnswer: { '@type': 'Answer', text: item.a },
+          })),
+        },
+      ],
     },
     updatedAt: now,
   };
 }
+

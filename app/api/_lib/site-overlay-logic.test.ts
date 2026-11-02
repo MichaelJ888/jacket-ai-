@@ -26,5 +26,7 @@ test('buildSeoOverride injects every required B2B keyword once', () => {
   const second = buildSeoOverride({ keywords: ['Custom Jackets Philippines', 'Legacy Term'] }, '2026-01-02T00:00:00Z');
   assert.equal(second.keywords.filter((k) => k === 'Custom Jackets Philippines').length, 1);
   assert.ok(second.keywords.includes('Legacy Term'));
-  assert.equal(second.jsonLd['@type'], 'Organization');
+  assert.equal(second.jsonLd['@type'], undefined);
+  const graph = second.jsonLd['@graph'] as Array<{ '@type': string }>;
+  assert.deepEqual(graph.map((n) => n['@type']), ['Organization', 'FAQPage']);
 });

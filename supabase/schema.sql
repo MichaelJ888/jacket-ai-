@@ -1118,6 +1118,19 @@ create table if not exists public.client_logos (
 alter table public.client_logos enable row level security;
 revoke all on public.client_logos from anon, authenticated;
 
+-- AI provider credit ledger (Replicate, Fal): manual balance snapshots plus spend entries. Current balance = latest balance minus later spends. Read/written via /api/admin/credits (service role only).
+create table if not exists public.provider_credit_ledger (
+  id bigint generated always as identity primary key,
+  provider text not null check (provider in ('replicate','fal')),
+  kind text not null check (kind in ('balance','spend')),
+  amount_usd numeric(12,4) not null check (amount_usd >= 0),
+  note text not null default '',
+  created_at timestamptz not null default now()
+);
+create index if not exists provider_credit_ledger_provider_idx on public.provider_credit_ledger (provider, id);
+alter table public.provider_credit_ledger enable row level security;
+revoke all on public.provider_credit_ledger from anon, authenticated;
+
 -- Verified corporate clients & institutional partners (idempotent; do nothing on re-run so admin edits are kept).
 insert into public.crm_contacts (channel, external_id, name, company, stage, tags, notes) values
   ('corporate_partner', 'panasonic-ph', 'Panasonic Manufacturing Philippines', 'Panasonic Manufacturing Philippines', 'won', '{verified,corporate-partner}', 'Verified corporate client'),

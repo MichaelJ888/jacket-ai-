@@ -2582,7 +2582,10 @@ coverall1:'/images/site/coverall.jpg'
       };
       Object.entries(this.overlayStorageKeys).forEach(([key, storageKey])=> safeLS.set(storageKey, snapshot[key]));
       try{
-        const res = await fetch('/api/admin/editor/overlay', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify(snapshot)});
+        let adminToken = '';
+        try{ adminToken = sessionStorage.getItem('mjic_admin') || ''; }catch(_){}
+        const headers = {'Content-Type':'application/json', ...(adminToken ? {Authorization:'Bearer '+adminToken} : {})};
+        const res = await fetch('/api/admin/editor/overlay', {method:'POST', credentials:'same-origin', headers, body: JSON.stringify(snapshot)});
         if(res.status===401) return this.showToast('Saved on this device only. Sign in to the editor to publish to all visitors.');
         if(!res.ok) return this.showToast('Publish failed — saved on this device only. Please try again.');
         this.showToast('Published live for all visitors.');

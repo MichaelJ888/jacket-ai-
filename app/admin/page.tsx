@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import CooPanel from "./coo-panel";
 import RecipientsPanel from "./recipients-panel";
+import CreditsPanel from "./credits-panel";
 import AnalyticsDashboard from "./analytics-dashboard";
 
 type Price = { key: string; name: string; category: string; unit: string; unit_cost: number; supplier_name: string | null; updated_at: string };
@@ -23,7 +24,7 @@ export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
   const [hub, setHub] = useState<"choose" | "dashboard">("choose");
-  const [tab, setTab] = useState<"dashboard" | "prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "coo" | "recipients">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "coo" | "recipients" | "credits">("dashboard");
   const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
   const [oauthConfigured, setOauthConfigured] = useState(true);
   const [setup, setSetup] = useState<Array<{ id: string; label: string; ok: boolean; manual?: boolean; hint?: string; link?: string }>>([]);
@@ -220,7 +221,7 @@ export default function AdminPage() {
       </div>
       <nav className="mb-4 flex gap-2">
 
-        {([["dashboard", "Dashboard"], ["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["knowledge", "Knowledge Base"], ["overview", "Overview"], ["connect", "Connect Facebook / Instagram"], ["coo", "COO & all customers"], ["recipients", "Telegram recipients"]] as const).map(([id, label]) => (
+        {([["dashboard", "Dashboard"], ["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["knowledge", "Knowledge Base"], ["overview", "Overview"], ["connect", "Connect Facebook / Instagram"], ["coo", "COO & all customers"], ["recipients", "Telegram recipients"], ["credits", "AI credits"]] as const).map(([id, label]) => (
           <button key={id} className={`rounded px-3 py-1 text-sm ${tab === id ? "bg-zinc-900 text-white" : "bg-zinc-200"}`} onClick={() => setTab(id)}>{label}</button>
         ))}
       </nav>
@@ -229,6 +230,7 @@ export default function AdminPage() {
       {tab === "dashboard" && <AnalyticsDashboard token={token} />}
       {tab === "coo" && <CooPanel token={token} />}
       {tab === "recipients" && <RecipientsPanel token={token} />}
+      {tab === "credits" && <CreditsPanel token={token} />}
       {tab === "connect" && (
         <section>
           <p className="mb-3 text-sm text-zinc-600">One click: log in to Facebook, pick your Pages, and we save the long-lived Page token and subscribe the webhook automatically.</p>

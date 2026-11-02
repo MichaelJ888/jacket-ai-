@@ -1,4 +1,5 @@
 import { getSupabaseAdmin } from './integrations';
+import { isAdminAuthorized } from './auth';
 import { EDITOR_COOKIE, emptySiteDoc, readCookie, SITE_KEY, verifyEditorSession, type SiteDoc } from './site-content-logic';
 
 type Supabase = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
@@ -7,6 +8,11 @@ type Supabase = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 export function editorChatFromRequest(request: Request): string | null {
   const token = readCookie(request.headers.get('cookie'), EDITOR_COOKIE);
   return verifyEditorSession(token, process.env.EDITOR_PASSWORD, Date.now());
+}
+
+// Save paths accept either the editor cookie (/admin/editor) or the admin bearer token (/admin and the homepage editor).
+export function editorOrAdminAuthorized(request: Request): boolean {
+  return Boolean(editorChatFromRequest(request)) || isAdminAuthorized(request);
 }
 
 export async function loadSiteDoc(supabase: Supabase): Promise<SiteDoc> {

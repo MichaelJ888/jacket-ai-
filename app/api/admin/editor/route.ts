@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { EDITOR_COOKIE, EDITOR_SESSION_MS, sanitizeSiteDoc, signEditorSession } from '../../_lib/site-content-logic';
-import { editorChatFromRequest, loadSiteDoc, saveSiteDoc } from '../../_lib/site-content';
+import { editorChatFromRequest, editorOrAdminAuthorized, loadSiteDoc, saveSiteDoc } from '../../_lib/site-content';
 import { getSupabaseAdmin } from '../../_lib/integrations';
+import { externalizeDataImages } from '../../_lib/site-media';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,12 +30,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!editorChatFromRequest(request)) return unauthorized();
+  if (!editorOrAdminAuthorized(request)) return unauthorized();
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
 
-  const body = await request.json().catch(() => null);
-  const parsed = sanitizeSiteDoc(body);
+  const externalized = await externalizeDataImages(supabase, await request.json().catch(() => null));
+  if (!externalized.ok) return NextResponse.json({ error: externalized.error }, { status: 400 });
+  const parsed = sanitizeSiteDoc(externalized.body);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
   const { error, updatedAt } = await saveSiteDoc(supabase, parsed.doc);
