@@ -12,6 +12,17 @@ const LEVEL_STYLE: Record<HealthCheck["level"], string> = {
 };
 const LEVEL_LABEL: Record<HealthCheck["level"], string> = { ok: "OK", warn: "WARNING", red: "RED ALERT" };
 
+type Telemetry = {
+  time?: string;
+  database?: { ok: boolean; pingMs: number | null };
+  runtime?: { uptimeSec: number; rssMb: number; heapUsedMb: number };
+  jobs?: Array<{ job: string; label: string; state: string }>;
+  failingJobs?: number;
+};
+
+const POLL_ACTIVE_MS = 30_000;
+const POLL_BACKGROUND_MS = 120_000;
+
 export default function SystemHealthPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
@@ -19,6 +30,28 @@ export default function SystemHealthPage() {
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [telemetry, setTelemetry] = useState<Telemetry | null>(null);
+
+  useEffect(() => {
+    if (!authed) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const auth = sessionStorage.getItem("mjic_admin") || "";
+        const response = await fetch("/api/telemetry", { headers: { Authorization: `Bearer ${auth}` }, cache: "no-store" });
+        if (response.ok && !cancelled) setTelemetry((await response.json()) as Telemetry);
+      } catch {
+        // Keep the last good snapshot when a poll fails.
+      }
+      if (!cancelled) timer = setTimeout(poll, document.visibilityState === "visible" ? POLL_ACTIVE_MS : POLL_BACKGROUND_MS);
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [authed]);
 
   const request = useCallback(async (auth: string, method: "GET" | "POST") => {
     const response = await fetch("/api/admin/system-health", { method, headers: { Authorization: `Bearer ${auth}` }, cache: "no-store" });
@@ -115,6 +148,31 @@ export default function SystemHealthPage() {
         </div>
       </div>
       {message && <p className="mb-4 text-sm text-gray-700">{message}</p>}
+      {telemetry && (
+        <section aria-label="Live telemetry" className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded border p-3">
+            <p className="text-xs text-gray-500">Database</p>
+            <p className={`font-semibold ${telemetry.database?.ok ? "text-green-700" : "text-red-700"}`}>
+              {telemetry.database?.ok ? "Online" : "Down"} · {telemetry.database?.pingMs ?? "—"} ms
+            </p>
+          </div>
+          <div className="rounded border p-3">
+            <p className="text-xs text-gray-500">Memory (RSS / heap)</p>
+            <p className="font-semibold">{telemetry.runtime?.rssMb ?? "—"} / {telemetry.runtime?.heapUsedMb ?? "—"} MB</p>
+          </div>
+          <div className="rounded border p-3">
+            <p className="text-xs text-gray-500">Uptime</p>
+            <p className="font-semibold">{telemetry.runtime ? `${Math.floor(telemetry.runtime.uptimeSec / 60)} min` : "—"}</p>
+          </div>
+          <div className="rounded border p-3">
+            <p className="text-xs text-gray-500">Failing cron jobs</p>
+            <p className={`font-semibold ${telemetry.failingJobs ? "text-red-700" : "text-green-700"}`}>{telemetry.failingJobs ?? 0}</p>
+          </div>
+          <p className="col-span-2 text-xs text-gray-500 sm:col-span-4">
+            Huling update: {telemetry.time ? new Date(telemetry.time).toLocaleTimeString() : "—"} · auto-refresh 30s (aktibong tab) / 120s (background)
+          </p>
+        </section>
+      )}
       <ul className="flex flex-col gap-3">
         {checks.map((check) => (
           <li key={check.feature} className={`rounded border-l-4 p-4 ${LEVEL_STYLE[check.level]}`}>

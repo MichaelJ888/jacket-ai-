@@ -1144,3 +1144,18 @@ insert into public.crm_contacts (channel, external_id, name, company, stage, tag
   ('corporate_partner', 'philippine-power-industries', 'Philippine Power Industries Corporation', 'Philippine Power Industries Corporation', 'won', '{verified,corporate-partner}', 'Verified corporate client'),
   ('corporate_partner', 'metro-logistics-group', 'Metro Logistics Group', 'Metro Logistics Group', 'won', '{verified,corporate-partner}', 'Verified corporate client')
 on conflict (channel, external_id) do nothing;
+
+-- Append-only audit trail for CRM record changes (who changed what, before/after). Service-role only.
+create table if not exists public.client_activity_logs (
+  id uuid default gen_random_uuid() primary key,
+  entity_type text not null check (entity_type in ('lead', 'order', 'crm_contact')),
+  entity_id text not null,
+  action text not null,
+  actor text not null default 'system',
+  before_state jsonb,
+  after_state jsonb,
+  created_at timestamptz not null default now()
+);
+create index if not exists client_activity_logs_entity_idx on public.client_activity_logs (entity_type, entity_id, created_at desc);
+alter table public.client_activity_logs enable row level security;
+revoke all on public.client_activity_logs from anon, authenticated;
