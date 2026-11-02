@@ -671,6 +671,9 @@ create table if not exists public.material_prices (
 );
 alter table public.material_prices enable row level security;
 revoke all on public.material_prices from anon, authenticated;
+-- Seed the embroidery machine-hour rate (PHP 200/hr); only fills rows still at 0 so admin-edited prices are kept.
+insert into public.material_prices (key, name, category, unit, unit_cost) values ('embroidery_machine_hour', 'Embroidery machine time', 'labor', 'hours', 200)
+on conflict (key) do update set unit_cost = excluded.unit_cost, updated_at = now() where public.material_prices.unit_cost = 0;
 
 create table if not exists public.material_price_history (
   id uuid primary key default gen_random_uuid(),

@@ -19,7 +19,7 @@ export const CORE_MATERIALS = [
   { key: 'ribbing_set', name: 'Ribbing', category: 'trim', unit: 'sets' },
   { key: 'thread', name: 'Sewing thread', category: 'trim', unit: 'cones' },
   { key: 'embroidery_thread', name: 'Embroidery thread', category: 'trim', unit: 'cones' },
-  { key: 'embroidery_machine_hour', name: 'Embroidery machine time', category: 'labor', unit: 'hours' },
+  { key: 'embroidery_machine_hour', name: 'Embroidery machine time', category: 'labor', unit: 'hours', defaultCost: 200 },
   { key: 'woven_label', name: 'Woven label', category: 'trim', unit: 'pieces' },
 ];
 
@@ -37,7 +37,7 @@ export async function loadPrices(): Promise<PriceRow[]> {
   const have = new Set((existing || []).map((row) => row.key));
   const missing = CORE_MATERIALS.filter((item) => !have.has(item.key));
   if (missing.length) {
-    await supabase.from('material_prices').upsert(missing.map((item) => ({ ...item, unit_cost: 0 })), { onConflict: 'key', ignoreDuplicates: true });
+    await supabase.from('material_prices').upsert(missing.map(({ defaultCost, ...item }) => ({ ...item, unit_cost: defaultCost ?? 0 })), { onConflict: 'key', ignoreDuplicates: true });
     const { data } = await supabase.from('material_prices').select('*').order('category').order('name');
     return (data || []) as PriceRow[];
   }
