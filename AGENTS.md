@@ -74,9 +74,16 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Not implemented: underlay styles, auto-trim toggle, Pantone/Isacord mapping, Bernina ART/VIP output.
 
 
-## Completion log � thread color matcher + DBHS calibration
+## Completion log � thread color matcher + DBHS calibration
 - Commit ce23d2a: CIE76 Lab matcher (thread-match.ts), DST reader (dst-reader.ts), optional threadPalette in digitizer.
 - Tests: npm test 333/333 with MJIC_DST_FIXTURE; tsc --noEmit and eslint clean.
 - Prod: aliased https://jacket-ai.vercel.app; npm run verify:live 11/11.
 - Open: no Pantone/Isacord palette data loaded; DBHS max stitch 8.73mm vs worksheet 6.7mm (cap unchanged at 7.0mm).
 - public/image-library.json remains an unreviewed local change, intentionally not committed.
+
+## Completion log — DST decoder + image library (2026-11-03)
+- Commit f863a5e on main: DST records classified by bit masks (end 0xF3, color change 0xC3, sequin 0x43, jump 0x83) matching pyembroidery; color-change deltas applied. DBHS fixture unchanged (77.6x71.2 mm, ST 8740, CO 2).
+- public/image-library.json reviewed (+22 items, 0 removed, all files present) and committed.
+- Open: Isacord palette NOT loaded (deferred; needs official Amann chart export). Attached reference chart was DMC, not Isacord.
+- Open: DBHS max regular stitch measures 8.73 mm vs 6.7 mm worksheet; reader matches file bytes, so the discrepancy is in the source/worksheet, not the parser. Digitizer cap unchanged at 7.0 mm.
+- Verified: npm test 333/333 (MJIC_DST_FIXTURE set), tsc --noEmit and eslint clean; Vercel prod Ready; verify:live 11/11.
