@@ -58,23 +58,27 @@ export function readDstStats(buffer: Buffer): DstStats {
     const b0 = buffer[offset];
     const b1 = buffer[offset + 1];
     const b2 = buffer[offset + 2];
-    if (b0 === 0 && b1 === 0 && b2 === 0xf3) {
+    // Mask-based command decoding, matching the reference pyembroidery reader.
+    if ((b2 & 0xf3) === 0xf3) {
       hasEndMarker = true;
       break;
     }
-    if (b0 === 0 && b1 === 0 && b2 === 0xc3) {
-      colorChanges += 1;
-      continue;
-    }
     const { dx, dy } = decodeDelta(b0, b1, b2);
     const length = Math.hypot(dx, dy) / 10;
-    stitchRecords += 1;
-    if (b2 & 0x80 && (b2 & 0x03) === 0x03) {
+    if ((b2 & 0xc3) === 0xc3) {
+      colorChanges += 1;
+    } else if ((b2 & 0x43) === 0x43) {
+      // Sequin-mode toggle: positional only, not a stitch.
+    } else if ((b2 & 0x83) === 0x83) {
       flaggedJumps += 1;
       maxJump = Math.max(maxJump, length);
-    } else if (length > 0) {
-      maxStitch = Math.max(maxStitch, length);
-      minStitch = Math.min(minStitch, length);
+      stitchRecords += 1;
+    } else {
+      stitchRecords += 1;
+      if (length > 0) {
+        maxStitch = Math.max(maxStitch, length);
+        minStitch = Math.min(minStitch, length);
+      }
     }
     x += dx;
     y += dy;
