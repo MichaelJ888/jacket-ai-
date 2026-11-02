@@ -1,8 +1,9 @@
 import sharp from 'sharp';
+import { manilaDay } from './analytics-logic';
 import { publishApprovedStudioImage } from './content';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage, sendTelegramPhoto, type TelegramInlineKeyboard } from './integrations';
 import { downloadImage } from './replicate';
-import { STUDIO_OUTPUT_BUCKET, type StudioDecision } from './studio-logic';
+import { STUDIO_OUTPUT_BUCKET, studioThemeForDay, type StudioDecision } from './studio-logic';
 
 type Supabase = NonNullable<ReturnType<typeof getSupabaseAdmin>>;
 
@@ -102,20 +103,32 @@ export async function generateStudioAd(supabase: Supabase, jobId: string) {
   }
 }
 
-// Daily: up to `limit` catalog items without an ad yet. Failed ones are marked 'failed' so they are not retried every day.
-export async function runDailyStudioAds(supabase: Supabase, limit = 3) {
-  const { data: candidates } = await supabase
+// Daily: up to `limit` catalog items without an ad yet, preferring the day's theme categories (Manila calendar).
+// Falls back to any eligible item so the day never ships empty. Failed ones are marked 'failed' so they are not retried every day.
+export async function runDailyStudioAds(supabase: Supabase, limit = 3, manilaDate = manilaDay(new Date())) {
+  const theme = studioThemeForDay(manilaDate);
+  const eligible = () => supabase
     .from('studio_jobs')
     .select('id')
     .eq('in_catalog', true)
     .in('status', ['approved', 'posted'])
     .is('ad_status', null)
-    .order('created_at', { ascending: false })
-    .limit(limit);
+    .order('created_at', { ascending: false });
+
+  const { data: themed } = await eligible().in('category', [...theme.categories]).limit(limit);
+  const candidates = [...(themed ?? [])];
+  if (candidates.length < limit) {
+    const taken = new Set(candidates.map((row) => row.id));
+    const { data: any } = await eligible().limit(limit + taken.size);
+    for (const row of any ?? []) {
+      if (candidates.length >= limit) break;
+      if (!taken.has(row.id)) candidates.push(row);
+    }
+  }
 
   const results: Array<Record<string, unknown>> = [];
-  for (const row of candidates ?? []) results.push({ id: row.id, ...(await generateStudioAd(supabase, row.id)) });
-  return { processed: results.length, results };
+  for (const row of candidates) results.push({ id: row.id, ...(await generateStudioAd(supabase, row.id)) });
+  return { theme: theme.key, processed: results.length, results };
 }
 
 // Moves an ad out of pending_approval. The conditional update means a double tap decides only once.

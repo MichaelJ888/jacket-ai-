@@ -2,6 +2,7 @@
 import { runCeoAgent } from '../_lib/ceo-agent';
 import { devQueueCommand, queueDevTask } from '../_lib/dev-queue';
 import { routeCeoMessage, type DevRoute } from '../_lib/dev-queue-logic';
+import { answerPaymentStatus } from '../_lib/payment-status';
 import { compactConversationIfNeeded } from '../_lib/ceo-memory';
 import { pickTelegramMedia } from '../_lib/telegram-logic';
 import { claimTelegramUpdate, downloadTelegramMedia, startTyping } from '../_lib/telegram-media';
@@ -345,6 +346,12 @@ export async function POST(req: Request) {
       if (route.kind === 'command' || route.kind === 'dev') {
         const reply = route.kind === 'dev' ? await queueDevTask(route.task, route.explicit, update?.update_id) : await devQueueCommand(route.name, route.id);
         await sendTelegramDirectMessage(String(chatId), reply.slice(0, 4000));
+        return NextResponse.json({ ok: true });
+      }
+      // Payment questions are answered from database records only (never by the LLM).
+      const paymentReply = route.kind === 'ceo' && !(message.forward_date || message.forward_origin) ? await answerPaymentStatus(ceoText) : null;
+      if (paymentReply !== null) {
+        await sendTelegramDirectMessage(String(chatId), paymentReply.slice(0, 4000));
         return NextResponse.json({ ok: true });
       }
       after(async () => {

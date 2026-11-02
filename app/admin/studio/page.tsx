@@ -15,7 +15,7 @@ type Job = {
   created_at: string;
 };
 
-const CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'other'];
+const CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'giveaway', 'school-uniform', 'bag', 'other'];
 
 const STATUS_LABEL: Record<string, string> = {
   queued: 'Queued',

@@ -77,7 +77,26 @@ export function studioJobPath(prefix: string, extension: string, id: string) {
   return `${prefix}/${Date.now()}-${id}.${extension}`;
 }
 
-export const STUDIO_CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'other'] as const;
+export const STUDIO_CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'giveaway', 'school-uniform', 'bag', 'other'] as const;
+
+// Daily ad theme rotation. Five themes repeat in order by Manila calendar day (Day 6 = Day 1 again).
+export const STUDIO_AD_THEMES = [
+  { key: 'jackets', label: 'Customized Jackets (Varsity, Softshell, Bomber, Reflectorized)', categories: ['jacket'] },
+  { key: 'corporate-uniforms', label: 'Customized Company Uniforms & Corporate Attire', categories: ['uniform', 'corporate-wear'] },
+  { key: 'giveaways', label: 'Customized Corporate Giveaways & Promotional Merchandise', categories: ['giveaway', 'polo'] },
+  { key: 'school-uniforms', label: 'Customized School Uniforms & Campus Wear', categories: ['school-uniform', 'sports-jersey'] },
+  { key: 'bags-accessories', label: 'Customized Bags & Accessories', categories: ['bag'] },
+] as const;
+export type StudioAdTheme = (typeof STUDIO_AD_THEMES)[number];
+
+const DAY_MS = 86_400_000;
+
+// manilaDate is YYYY-MM-DD in Asia/Manila; the calendar date alone decides the theme, so every instance agrees.
+export function studioThemeForDay(manilaDate: string): StudioAdTheme {
+  const epochDay = Math.floor(Date.parse(`${manilaDate}T00:00:00Z`) / DAY_MS);
+  return STUDIO_AD_THEMES[((epochDay % STUDIO_AD_THEMES.length) + STUDIO_AD_THEMES.length) % STUDIO_AD_THEMES.length];
+}
+
 export type StudioMetadata = { productTitle: string; category: string; fabric: string | null; description: string | null };
 
 // Catalog and ads need a real title and category; fabric and description are optional.

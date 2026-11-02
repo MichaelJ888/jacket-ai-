@@ -4,6 +4,7 @@ import { withModelFallback } from './llm-pool.ts';
 import { findOrdersByRef, resolveStageInput } from './client-pulse.ts';
 import { advanceOrder, confirmDeposit, createOrder } from './order-lifecycle.ts';
 import { DEFAULT_ORDER_STAGE, DEPOSIT_RECEIVED } from './order-stages.ts';
+import { dedupeClientRecords } from './client-identity-logic.ts';
 
 // Lightweight, cost-efficient vision parser for chat screenshots (Viber, Messenger, etc.).
 // Uses the cheap tier (gemini flash-lite) — NOT the strong CEO model — to stay within token budget.
@@ -79,11 +80,16 @@ export async function parseClientScreenshot(image: { data: Uint8Array; mediaType
 
 // Apply parsed updates to the database: update existing orders, create new ones.
 // Returns per-client result lines for the Telegram confirmation.
-export async function applyClientUpdates(clients: ParsedClientUpdate[]): Promise<{ lines: string[]; updated: number; created: number; failed: number }> {
+export async function applyClientUpdates(input: ParsedClientUpdate[]): Promise<{ lines: string[]; updated: number; created: number; failed: number }> {
   const lines: string[] = [];
   let updated = 0;
   let created = 0;
   let failed = 0;
+
+  const { unique: clients, duplicates } = dedupeClientRecords(input);
+  for (const dup of duplicates) {
+    lines.push(`ℹ️ ${dup.clientName} — ddobleng entry sa screenshot, nilaktawan. I-send ulit kung hiwalay na project.`);
+  }
 
   for (const client of clients) {
     try {

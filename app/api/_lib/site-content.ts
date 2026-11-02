@@ -21,6 +21,16 @@ export async function saveSiteDoc(supabase: Supabase, doc: Omit<SiteDoc, 'update
   return { error: error?.message ?? null, updatedAt };
 }
 
+export async function readSiteKeys(supabase: Supabase, keys: string[]): Promise<Record<string, unknown>> {
+  const { data } = await supabase.from('site_content').select('key, value').in('key', keys);
+  return Object.fromEntries((data ?? []).map((row) => [row.key as string, row.value]));
+}
+
+export async function writeSiteKey(supabase: Supabase, key: string, value: unknown): Promise<string | null> {
+  const { error } = await supabase.from('site_content').upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  return error?.message ?? null;
+}
+
 export async function readOtpRow(supabase: Supabase, chatId: string) {
   const { data } = await supabase.from('site_content').select('value').eq('key', `editor_otp:${chatId}`).maybeSingle();
   return (data?.value ?? null) as { hash: string; expiresAt: number; attempts: number } | null;

@@ -2433,6 +2433,8 @@ coverall1:'/images/site/coverall.jpg'
       this.saveFabrics();
       this.chatLog = [{from:'bot', text:"Hi! I'm the MJ auto-assistant. Ask me about MOQ, pricing tiers, fabrics, lead time, delivery, or payment options."}];
 
+      this.hydrateFromServer();
+
       // Honest visitor counter — counts visits FROM THIS BROWSER ONLY (localStorage is per-device,
       // it cannot see other people's visits). For real cross-visitor analytics across all customers,
       // connect Google Analytics (free) — see note in Admin Panel.
@@ -2571,19 +2573,57 @@ coverall1:'/images/site/coverall.jpg'
       window.addEventListener('mouseup', onUp);
     },
 
-    saveAllChanges(){
-      safeLS.set('mji_site_settings', this.siteSettings);
-      safeLS.set('mji_products', this.products);
-      safeLS.set('mji_testimonials', this.testimonials);
-      safeLS.set('mji_client_names', this.clientNames);
-      safeLS.set('mji_updates', this.updates);
-      safeLS.set('mji_payment_qr', this.paymentQR);
-      safeLS.set('mji_show_testimonials', this.showTestimonials);
-      safeLS.set('mji_show_clientlist', this.showClientList);
-      safeLS.set('mji_crm_orders', this.crmOrders);
-      safeLS.set('mji_fabrics', this.fabrics);
-      safeLS.set('mji_team_schedules', this.teamSchedules);
-      this.showToast('All changes saved to this browser.');
+    async saveAllChanges(){
+      const snapshot = {
+        siteSettings: this.siteSettings, products: this.products, testimonials: this.testimonials,
+        clientNames: this.clientNames, updates: this.updates, paymentQR: this.paymentQR,
+        showTestimonials: this.showTestimonials, showClientList: this.showClientList,
+        crmOrders: this.crmOrders, fabrics: this.fabrics, teamSchedules: this.teamSchedules
+      };
+      Object.entries(this.overlayStorageKeys).forEach(([key, storageKey])=> safeLS.set(storageKey, snapshot[key]));
+      try{
+        const res = await fetch('/api/admin/editor/overlay', {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'}, body: JSON.stringify(snapshot)});
+        if(res.status===401) return this.showToast('Saved on this device only. Sign in to the editor to publish to all visitors.');
+        if(!res.ok) return this.showToast('Publish failed — saved on this device only. Please try again.');
+        this.showToast('Published live for all visitors.');
+      }catch(_){
+        this.showToast('Network error — saved on this device only. Please try again.');
+      }
+    },
+
+    overlayStorageKeys: {
+      siteSettings:'mji_site_settings', products:'mji_products', testimonials:'mji_testimonials',
+      clientNames:'mji_client_names', updates:'mji_updates', paymentQR:'mji_payment_qr',
+      showTestimonials:'mji_show_testimonials', showClientList:'mji_show_clientlist',
+      crmOrders:'mji_crm_orders', fabrics:'mji_fabrics', teamSchedules:'mji_team_schedules'
+    },
+
+    // Applies the published overlay and the DB-backed SEO override. Falls back silently to local data on failure.
+    async hydrateFromServer(){
+      try{
+        const res = await fetch('/api/site/overlay', {cache:'no-store'});
+        if(!res.ok) return;
+        const {overlay, seo} = await res.json();
+        if(overlay) Object.entries(overlay).forEach(([key, value])=>{
+          if(!(key in this.overlayStorageKeys)) return;
+          this[key] = value;
+          safeLS.set(this.overlayStorageKeys[key], value);
+        });
+        if(seo) this.applySeoOverride(seo);
+      }catch(_){}
+    },
+
+    applySeoOverride(seo){
+      if(Array.isArray(seo.keywords)){
+        let meta = document.querySelector('meta[name="keywords"]');
+        if(!meta){ meta = document.createElement('meta'); meta.name = 'keywords'; document.head.appendChild(meta); }
+        meta.content = seo.keywords.join(', ');
+      }
+      if(seo.jsonLd){
+        let script = document.getElementById('mji-seo-jsonld');
+        if(!script){ script = document.createElement('script'); script.type = 'application/ld+json'; script.id = 'mji-seo-jsonld'; document.head.appendChild(script); }
+        script.textContent = JSON.stringify(seo.jsonLd);
+      }
     },
 
     openAdminOrExplain(){

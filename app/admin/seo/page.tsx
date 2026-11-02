@@ -30,6 +30,22 @@ export default function SeoRankTrackerPage() {
   const [loading, setLoading] = useState(false);
   const [unauthorized, setUnauthorized] = useState(false);
 
+  const [injecting, setInjecting] = useState(false);
+  const [injectMsg, setInjectMsg] = useState('');
+
+  async function autoInject() {
+    setInjecting(true);
+    setInjectMsg('');
+    const res = await fetch('/api/admin/seo', { method: 'POST', cache: 'no-store' });
+    setInjecting(false);
+    if (res.status === 401) {
+      setUnauthorized(true);
+      return;
+    }
+    const body = (await res.json().catch(() => ({}))) as { error?: string; ok?: boolean };
+    setInjectMsg(res.ok && body.ok ? 'Keywords and JSON-LD schema published. They load on the live homepage.' : body.error ?? `Inject failed (${res.status}).`);
+  }
+
   async function runAudit() {
     setLoading(true);
     setError('');
@@ -76,6 +92,16 @@ export default function SeoRankTrackerPage() {
           </p>
         )}
         {error && <p className="mt-4 text-sm text-red-700">{error}</p>}
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t pt-4">
+          <button
+            onClick={() => void autoInject()}
+            disabled={injecting}
+            className="rounded-lg bg-emerald-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
+          >
+            {injecting ? 'Injecting…' : '⚡ Auto-Inject Best B2B Keywords & JSON-LD Schema'}
+          </button>
+          {injectMsg && <p className="text-sm text-zinc-700">{injectMsg}</p>}
+        </div>
 
         {data && (
           <div className="mt-5 space-y-5">
