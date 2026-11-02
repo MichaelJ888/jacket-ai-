@@ -18,6 +18,7 @@ export default function SystemHealthPage() {
   const [data, setData] = useState<HealthResponse | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const request = useCallback(async (auth: string, method: "GET" | "POST") => {
     const response = await fetch("/api/admin/system-health", { method, headers: { Authorization: `Bearer ${auth}` }, cache: "no-store" });
@@ -72,13 +73,19 @@ export default function SystemHealthPage() {
             void load(token);
           }}
         >
-          <input
-            type="password"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-            placeholder="Admin token"
-            className="rounded border px-3 py-2"
-          />
+          <div className="flex gap-2">
+            <input
+              type={showPassword ? "text" : "password"}
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
+              placeholder="Admin token"
+              autoComplete="current-password"
+              className="w-full rounded border px-3 py-2"
+            />
+            <button type="button" aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)} className="shrink-0 rounded border px-3 py-2 text-sm">
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           <button type="submit" disabled={busy || !token} className="rounded bg-black px-3 py-2 text-white disabled:opacity-50">
             {busy ? "Naglo-load..." : "Pumasok"}
           </button>

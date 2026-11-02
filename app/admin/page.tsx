@@ -42,6 +42,19 @@ export default function AdminPage() {
   const [knowledgeTitle, setKnowledgeTitle] = useState("");
   const [knowledgeContent, setKnowledgeContent] = useState("");
   const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [panelSize, setPanelSize] = useState<25 | 50 | 75 | 100>(100);
+
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("mjic_admin_panel_size"));
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved === 25 || saved === 50 || saved === 75 || saved === 100) setPanelSize(saved);
+  }, []);
+
+  function choosePanelSize(size: 25 | 50 | 75 | 100) {
+    setPanelSize(size);
+    localStorage.setItem("mjic_admin_panel_size", String(size));
+  }
 
   const call = useCallback(async (path: string, init: RequestInit = {}, auth = token) => {
     const response = await fetch(path, { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${auth}` }, cache: "no-store" });
@@ -179,7 +192,10 @@ export default function AdminPage() {
     return (
       <main className="mx-auto max-w-sm p-8">
         <h1 className="mb-4 text-xl font-bold">MJIC Admin</h1>
-        <input className={`${input} w-full`} type="password" placeholder="Admin password" value={token} onChange={(event) => setToken(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void login()} />
+        <div className="flex gap-2">
+          <input className={`${input} w-full`} type={showPassword ? "text" : "password"} placeholder="Admin password" autoComplete="current-password" value={token} onChange={(event) => setToken(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void login()} />
+          <button type="button" className="shrink-0 rounded border border-zinc-300 px-3 py-1 text-sm" aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Hide" : "Show"} password</button>
+        </div>
         <button className={`${button} mt-3`} onClick={() => void login()}>Sign in</button>
         {message && <p className="mt-3 text-sm text-red-600">{message}</p>}
       </main>
@@ -189,16 +205,24 @@ export default function AdminPage() {
   const peso = (value: number) => `₱${Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
 
   return (
-    <main className="mx-auto max-w-5xl p-6 text-zinc-900">
-      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-3">
+    <main className="mx-auto p-6 text-zinc-900" style={{ width: `${panelSize}%`, maxWidth: panelSize === 100 ? "64rem" : "100%", minWidth: "min(100%, 320px)" }}>
+      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-4">
         <a href="/admin/editor" className="rounded-lg bg-white px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-zinc-100">🎨 Open Live Visual Site Editor</a>
+        <a href="/admin/system-health" className="rounded-lg bg-emerald-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-emerald-300">🩺 Open System Health</a>
         <a href="/admin/studio" className="rounded-lg bg-amber-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-amber-300">📸 Open CEO AI Studio &amp; Enhancer</a>
         <a href="/admin/seo" className="rounded-lg bg-sky-300 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-sky-200">📈 Open SEO Rank Tracker</a>
       </nav>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">MJIC Admin</h1>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-1 text-xs" role="group" aria-label="Panel size">
+            <span className="mr-1 font-semibold">PANEL SIZE</span>
+            {([25, 50, 75, 100] as const).map((size) => (
+              <button key={size} type="button" aria-pressed={panelSize === size} onClick={() => choosePanelSize(size)} className={`rounded border px-2 py-1 ${panelSize === size ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white"}`}>{size}%</button>
+            ))}
+          </div>
           <a className="text-sm underline" href="/admin/editor">Visual editor</a>
+          <a className="text-sm underline" href="/admin/system-health">System health</a>
           <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
           <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); setHub("choose"); }}>Sign out</button>
         </div>
