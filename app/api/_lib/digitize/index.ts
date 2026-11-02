@@ -1,10 +1,10 @@
 import sharp from 'sharp';
 
 import { encodeAllFormats } from './encoders.ts';
+import { matchThreadColor, rgbToLab, type Lab } from './thread-match.ts';
 import { resolveStitchSettings } from './stitch-settings.ts';
 import type { DigitizeInput, DigitizeQa, DigitizeResult, QaThreadSummary, Stitch, ThreadColor } from './types.ts';
 
-type Lab = { l: number; a: number; b: number };
 type Region = {
   id: string;
   colorIndex: number;
@@ -49,27 +49,6 @@ function clamp(value: number, min: number, max: number) {
 
 function rgbToHex(rgb: [number, number, number]) {
   return `#${rgb.map((value) => value.toString(16).padStart(2, '0')).join('')}`;
-}
-
-function srgbToLinear(value: number) {
-  const channel = value / 255;
-  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
-}
-
-function rgbToLab(rgb: [number, number, number]): Lab {
-  const [r, g, b] = rgb.map(srgbToLinear) as [number, number, number];
-  const x = (r * 0.4124564 + g * 0.3575761 + b * 0.1804375) / 0.95047;
-  const y = r * 0.2126729 + g * 0.7151522 + b * 0.072175;
-  const z = (r * 0.0193339 + g * 0.119192 + b * 0.9503041) / 1.08883;
-  const pivot = (value: number) => (value > 0.008856 ? value ** (1 / 3) : 7.787 * value + 16 / 116);
-  const fx = pivot(x);
-  const fy = pivot(y);
-  const fz = pivot(z);
-  return {
-    l: 116 * fy - 16,
-    a: 500 * (fx - fy),
-    b: 200 * (fy - fz),
-  };
 }
 
 function labDistance(a: Lab, b: Lab) {
@@ -872,11 +851,14 @@ async function rasterize(input: DigitizeInput): Promise<Rasterized> {
     const rgb = paletteLabs[index].rgb;
     const colorIndex = colors.length;
     labelToColor.set(index, colorIndex);
+    const match = matchThreadColor(rgb, input.threadPalette ?? []);
     colors.push({
       index: colorIndex,
       rgb,
       hex: rgbToHex(rgb),
-      name: `Thread ${colorIndex + 1} ${rgbToHex(rgb).toUpperCase()}`,
+      name: match
+        ? `${match.entry.brand} ${match.entry.code} ${match.entry.name}`
+        : `Thread ${colorIndex + 1} ${rgbToHex(rgb).toUpperCase()}`,
     });
   }
 

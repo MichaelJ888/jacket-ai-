@@ -1,4 +1,5 @@
 import type { ResolvedStitchSettings } from './stitch-settings.ts';
+import type { ThreadPaletteEntry } from './thread-match.ts';
 
 export type DigitizeInput = {
   image: Buffer;
@@ -15,6 +16,7 @@ export type DigitizeInput = {
   minSpecklePx?: number;
   maxLongestSidePx?: number;
   designName?: string;
+  threadPalette?: ThreadPaletteEntry[];
 };
 
 export type StitchCommand = 'stitch' | 'jump' | 'trim' | 'color-change' | 'end';

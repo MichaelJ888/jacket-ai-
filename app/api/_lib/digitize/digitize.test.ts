@@ -130,3 +130,16 @@ test('DST output round-trips structurally and matches QA bounds', async () => {
   assert.ok(Math.abs(decodedWidthMm - result.qa.designWidthMm) < 15);
   assert.ok(Math.abs(decodedHeightMm - result.qa.designHeightMm) < 15);
 });
+
+test('digitizeLogo names threads from a supplied palette', async () => {
+  const image = await makeSyntheticLogo();
+  const result = await digitizeLogo({
+    image,
+    widthMm: 60,
+    maxColors: 4,
+    threadPalette: [{ brand: 'Isacord', code: '3335', name: 'Flag Blue', rgb: [0x16, 0x5d, 0xff] }],
+  });
+  assert.ok(result.colors.some((color) => color.name === 'Isacord 3335 Flag Blue'));
+  assert.ok(result.colors.some((color) => color.name.startsWith('Thread ')));
+});
+
