@@ -11,11 +11,18 @@ export type ReplicatePrediction = {
 
 const API = 'https://api.replicate.com/v1';
 
-// Estimated billed cost of a completed prediction: GPU run time × REPLICATE_USD_PER_SECOND. Returns 0 when the rate is unset.
+// Studio models (codeplugtech/face-swap, nightmareai/real-esrgan, 851-labs/background-remover) run on
+// A100/L40S hardware at $0.0014/$0.000975 per second. The default uses the A100 worst case so the credit
+// ledger never under-reports spend; set REPLICATE_USD_PER_SECOND to override, or 0 to disable recording.
+const DEFAULT_USD_PER_SECOND = 0.0014;
+
+// Estimated billed cost of a completed prediction: GPU run time × per-second rate.
 export function replicateSpendUsd(prediction: ReplicatePrediction): number {
-  const rate = Number(process.env.REPLICATE_USD_PER_SECOND);
+  const raw = process.env.REPLICATE_USD_PER_SECOND;
+  const parsed = raw === undefined ? NaN : Number(raw);
+  const rate = Number.isFinite(parsed) ? parsed : DEFAULT_USD_PER_SECOND;
   const seconds = prediction.metrics?.predict_time ?? 0;
-  if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(seconds) || seconds <= 0) return 0;
+  if (rate <= 0 || !Number.isFinite(seconds) || seconds <= 0) return 0;
   return seconds * rate;
 }
 
