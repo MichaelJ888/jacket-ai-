@@ -68,3 +68,8 @@ DURING work:
 Do not edit `agent_memory_events` rows directly via SQL — always go through
 `scripts/memory.mjs` so the log stays append-only and auditable.
 <!-- <<< projectmem bridge <<< -->
+
+## Completion log
+- 2026-11-02 — Digitizer (`/admin/digitizer`): fixed "Maximum call stack size exceeded" (spread `push(...)` on large PES/point arrays → loop appends). Added inch sizing (0.5–12 in), AI stitch auto-tune + fabric presets (`app/api/_lib/digitize/stitch-settings.ts`), advanced settings drawer, AI Smart Improve (high-precision pass), redesigned page. Commit `f52e546` on main; prod deploy Ready; `verify:live` 11/11; `npm test` 328/328; `tsc --noEmit` clean.
+- Not implemented: underlay styles, auto-trim toggle, Pantone/Isacord mapping, Bernina ART/VIP output.
+
