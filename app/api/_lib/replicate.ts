@@ -6,9 +6,18 @@ export type ReplicatePrediction = {
   status: 'starting' | 'processing' | 'succeeded' | 'failed' | 'canceled';
   output?: unknown;
   error?: string | null;
+  metrics?: { predict_time?: number | null };
 };
 
 const API = 'https://api.replicate.com/v1';
+
+// Estimated billed cost of a completed prediction: GPU run time × REPLICATE_USD_PER_SECOND. Returns 0 when the rate is unset.
+export function replicateSpendUsd(prediction: ReplicatePrediction): number {
+  const rate = Number(process.env.REPLICATE_USD_PER_SECOND);
+  const seconds = prediction.metrics?.predict_time ?? 0;
+  if (!Number.isFinite(rate) || rate <= 0 || !Number.isFinite(seconds) || seconds <= 0) return 0;
+  return seconds * rate;
+}
 
 export const REPLICATE_BILLING_MESSAGE =
   'Replicate billing needs a top-up: add credit at https://replicate.com/account/billing, then start the job again.';

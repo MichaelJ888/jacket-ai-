@@ -85,6 +85,7 @@ MASTER PRODUCT CATALOG:
 
 ORDERING SPECS, PROMOS & POLICIES:
 - MOQ (Minimum Order Quantity): Customized orders start at 20 pcs.
+- BASE PRICING (market rate at MOQ 20 pcs): ₱1,250/pc. Volume tiers: 50 pcs = 24% off (₱950/pc); 100 pcs = 32% off (₱850/pc). Quote only through the 'calculateMJICQuote' tool, which applies the tier discount and the cost-floor safety guard server-side; never compute or state a discounted unit price yourself.
 - EXCLUSIVE PROMOS & COMPLIMENTARY SERVICES:
   * FREE 1 Logo Setup (High-Density Embroidery or DTF Print)
   * FREE Digital Mock-up Design with Client's Company Logo(s)

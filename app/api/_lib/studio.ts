@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import { publishApprovedStudioImage } from './content';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage, sendTelegramPhoto, type TelegramInlineKeyboard } from './integrations';
-import { REPLICATE_BILLING_MESSAGE, ReplicateBillingError, createReplicatePrediction, downloadImage, isReplicateBillingFailure, replicateOutputUrl, type ReplicatePrediction } from './replicate';
+import { REPLICATE_BILLING_MESSAGE, ReplicateBillingError, createReplicatePrediction, downloadImage, isReplicateBillingFailure, replicateOutputUrl, replicateSpendUsd, type ReplicatePrediction } from './replicate';
+import { recordProviderSpend } from './credits';
 import {
   STUDIO_OUTPUT_BUCKET,
   buildEnhanceInput,
@@ -98,6 +99,7 @@ export async function handleStageCompleted(supabase: Supabase, job: StudioJob, s
   }
 
   const outputUrl = replicateOutputUrl(prediction);
+  await recordProviderSpend('replicate', replicateSpendUsd(prediction), `Studio ${stage} ${job.id.slice(0, 8)}`);
   if (stage === 'swap') {
     await supabase.from('studio_jobs').update({ swap_url: outputUrl, stage_prediction_id: null }).eq('id', job.id);
     const next = { ...job, swap_url: outputUrl };
