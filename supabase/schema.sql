@@ -1159,3 +1159,9 @@ create table if not exists public.client_activity_logs (
 create index if not exists client_activity_logs_entity_idx on public.client_activity_logs (entity_type, entity_id, created_at desc);
 alter table public.client_activity_logs enable row level security;
 revoke all on public.client_activity_logs from anon, authenticated;
+
+-- Phase gate: every forward stage change needs a next action + completion date; stage_entered_at drives the 48h Red Alert.
+alter table public.orders add column if not exists next_action_item text;
+alter table public.orders add column if not exists target_completion_date date;
+alter table public.orders add column if not exists stage_entered_at timestamptz;
+update public.orders set stage_entered_at = coalesce(updated_at, created_at, now()) where stage_entered_at is null;

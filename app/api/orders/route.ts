@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../_lib/auth';
 import { getSupabaseAdmin, reportCriticalError } from '../_lib/integrations';
-import { advanceOrder, confirmDeposit, createOrder } from '../_lib/order-lifecycle';
+import { advanceOrder, confirmDeposit, createOrder, setOrderPlan } from '../_lib/order-lifecycle';
+import { isRedAlert } from '../_lib/order-plan';
 
 export const dynamic = 'force-dynamic';
 
-// GET ?id=<uuid> -> one order with its POs and event timeline; otherwise the 50 latest orders.
+// GET ?id=<uuid> -> one order with its POs and event timeline; otherwise the 50 latest orders. Each order carries `redAlert` (stuck 48h+).
 export async function GET(request: Request) {
   if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
+  const nowMs = Date.now();
   const id = new URL(request.url).searchParams.get('id');
   if (id) {
     const [order, events, purchaseOrders] = await Promise.all([
@@ -18,16 +20,17 @@ export async function GET(request: Request) {
       supabase.from('purchase_orders').select('po_number, supplier_name, material_type, total_cost, status').eq('order_id', id),
     ]);
     if (!order.data) return NextResponse.json({ error: 'Order not found' }, { status: 404 });
-    return NextResponse.json({ order: order.data, events: events.data || [], purchaseOrders: purchaseOrders.data || [] });
+    return NextResponse.json({ order: { ...order.data, redAlert: isRedAlert(order.data, nowMs) }, events: events.data || [], purchaseOrders: purchaseOrders.data || [] });
   }
   const { data, error } = await supabase.from('orders').select('*').order('created_at', { ascending: false }).limit(50);
   if (error) return NextResponse.json({ error: error.message }, { status: 502 });
-  return NextResponse.json({ orders: data || [] });
+  return NextResponse.json({ orders: (data || []).map((order) => ({ ...order, redAlert: isRedAlert(order, nowMs) })) });
 }
 
 // POST { action: 'create', costingId?, contactId?, clientName?, projectName?, contactPhone?, deliveryAddress?, quantity?, totalAmount, depositAmount?, spec? | flat spec fields }
 // POST { action: 'confirm_deposit', orderId, verificationId? }   (manual override of the payment webhook)
-// POST { action: 'advance', orderId, stage, note? }
+// POST { action: 'advance', orderId, stage, note? }   (rejected until a plan is set for phase-gated stages)
+// POST { action: 'set_plan', orderId, nextActionItem, targetCompletionDate: 'YYYY-MM-DD' }
 export async function POST(request: Request) {
   if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
@@ -45,7 +48,11 @@ export async function POST(request: Request) {
       return NextResponse.json(result, { status: result.ok ? 200 : 404 });
     }
     if (body.action === 'advance') {
-      const result = await advanceOrder(orderId, String(body.stage || ''), typeof body.note === 'string' ? body.note.slice(0, 300) : '');
+      const result = await advanceOrder(orderId, String(body.stage || ''), typeof body.note === 'string' ? body.note.slice(0, 300) : '', 'admin-api');
+      return NextResponse.json(result, { status: result.ok ? 200 : 400 });
+    }
+    if (body.action === 'set_plan') {
+      const result = await setOrderPlan(orderId, { nextActionItem: body.nextActionItem, targetCompletionDate: body.targetCompletionDate }, 'admin-api');
       return NextResponse.json(result, { status: result.ok ? 200 : 400 });
     }
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });

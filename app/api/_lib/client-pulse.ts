@@ -1,5 +1,6 @@
 import { ORDER_STAGES, PIPELINE_STAGES, stageNumber } from './order-stages.ts';
 import { escapeTelegramHtml, getSupabaseAdmin } from './integrations.ts';
+import { isRedAlert } from './order-plan.ts';
 
 export type OpenOrder = {
   id: string;
@@ -11,7 +12,12 @@ export type OpenOrder = {
   stage: string;
   updated_at: string | null;
   created_at: string | null;
+  stage_entered_at?: string | null;
+  next_action_item?: string | null;
+  target_completion_date?: string | null;
 };
+
+const ORDER_COLUMNS = 'id, order_number, client_name, project_name, quantity, total_amount, stage, updated_at, created_at, stage_entered_at, next_action_item, target_completion_date';
 
 // What the boss needs to do next for each pipeline stage (Taglish, action-first).
 export const STAGE_NEXT_ACTION: Record<string, string> = {
@@ -133,10 +139,7 @@ export async function listOpenOrders(limit = 100): Promise<OpenOrder[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('orders')
-    .select('id, order_number, client_name, project_name, quantity, total_amount, stage, updated_at, created_at')
-    .not('stage', 'in', '("COMPLETED","CANCELLED")')
-    .order('updated_at', { ascending: true })
-    .limit(limit);
+    .select(ORDER_COLUMNS)
   return (data as OpenOrder[] | null) || [];
 }
 
@@ -148,7 +151,7 @@ export async function findOrdersByRef(ref: string): Promise<OpenOrder[]> {
   if (!cleaned) return [];
   const { data: byNumber } = await supabase
     .from('orders')
-    .select('id, order_number, client_name, project_name, quantity, total_amount, stage, updated_at, created_at')
+    .select(ORDER_COLUMNS)
     .ilike('order_number', cleaned)
     .not('stage', 'in', '("COMPLETED","CANCELLED")')
     .limit(5);
@@ -156,7 +159,7 @@ export async function findOrdersByRef(ref: string): Promise<OpenOrder[]> {
   const pattern = `%${cleaned.replace(/[%_]/g, '')}%`;
   const { data } = await supabase
     .from('orders')
-    .select('id, order_number, client_name, project_name, quantity, total_amount, stage, updated_at, created_at')
+    .select(ORDER_COLUMNS)
     .or(`client_name.ilike.${pattern},project_name.ilike.${pattern}`)
     .not('stage', 'in', '("COMPLETED","CANCELLED")')
     .order('updated_at', { ascending: true })
@@ -192,9 +195,13 @@ export function buildOrderPulseMessage(order: OpenOrder, index: number, total: n
   const lines = [
     `<b>${index + 1}/${total} · ${name}</b>${project} · ${peso(order.total_amount)}`,
     `${progress}${age}`,
+    isRedAlert(order, now.getTime()) ? `🚨 <b>RED ALERT</b> — stuck ng 48h+ sa stage na ito.` : '',
+    order.next_action_item
+      ? `🎯 Next: ${escapeTelegramHtml(order.next_action_item)} · Target: <b>${escapeTelegramHtml(order.target_completion_date || 'walang date')}</b>`
+      : `⛔ Walang next action/target — i-set: /update_${escapeTelegramHtml(order.order_number)} next: &lt;action&gt; | target: YYYY-MM-DD`,
     `👉 <b>${escapeTelegramHtml(action)}</b>`,
     `<i>Update: type "${escapeTelegramHtml(order.order_number)} &lt;update&gt;" o mag-send ng photo/voice.</i>`,
-  ];
+  ].filter(Boolean);
   return lines.join('\n');
 }
 

@@ -12,7 +12,8 @@ import { decideStudioAd, postApprovedStudioAd } from '../_lib/studio-ads';
 import { parseStudioAdCallback, parseStudioCallback } from '../_lib/studio-logic';
 import { resolveApproval } from '../_lib/ceo-control';
 import { approveDispatch } from '../_lib/dispatch';
-import { advanceOrder, confirmDeposit, createOrder } from '../_lib/order-lifecycle';
+import { advanceOrder, confirmDeposit, createOrder, setOrderPlan } from '../_lib/order-lifecycle';
+import { manilaDateKey, parseUpdateInput, UPDATE_USAGE } from '../_lib/order-plan';
 import { buildClientPulseMessage, findOrdersByRef, listOpenOrders, parseMoveInput, parseOrderInput } from '../_lib/client-pulse';
 import { DEPOSIT_RECEIVED } from '../_lib/order-stages';
 import { applyClientUpdates, parseClientScreenshot } from '../_lib/vision-parse';
@@ -28,6 +29,7 @@ import {
   answerTelegramCallbackQuery,
   decideMediaAdApproval,
   detectAndBindAnneChat,
+  escapeTelegramHtml,
   generateStaffLinkCode,
   getPayrollSummary,
   getStaffByChatId,
@@ -329,6 +331,8 @@ export async function POST(req: Request) {
       reply = buildClientPulseMessage(await listOpenOrders());
     } else if (/^order$/i.test(command)) {
       reply = await handleOrderCreateCommand(text.slice(text.indexOf(command) + command.length).trim());
+    } else if (/^\/?update_/i.test(command)) {
+      reply = await handleOrderUpdateCommand(command.replace(/^\/?update_/i, '').replace(/@\w+$/, ''), text.slice(text.indexOf(command) + command.length).trim());
     } else if (/^move$/i.test(command)) {
       reply = await handleOrderMoveCommand(text.slice(text.indexOf(command) + command.length).trim());
     } else if (/^start$/i.test(command)) {
@@ -424,10 +428,26 @@ async function handleOrderMoveCommand(raw: string) {
   const order = matches[0];
   const result = parsed.stage === DEPOSIT_RECEIVED
     ? await confirmDeposit(order.id, null)
-    : await advanceOrder(order.id, parsed.stage, 'via Telegram');
+    : await advanceOrder(order.id, parsed.stage, 'via Telegram', 'telegram');
   if (!result.ok) return `❌ ${order.order_number}: ${result.error}`;
   const newStage = parsed.stage === DEPOSIT_RECEIVED ? 'S06_SIZING' : parsed.stage;
   return `✅ ${order.order_number} · ${order.client_name || order.project_name}: ${order.stage} → ${newStage}`;
+}
+
+// "/update_<ref> next: <action> | target: YYYY-MM-DD" sets the plan the next phase gate requires.
+async function handleOrderUpdateCommand(ref: string, raw: string) {
+  if (!ref) return escapeTelegramHtml(UPDATE_USAGE);
+  const parsed = parseUpdateInput(raw, manilaDateKey(Date.now()));
+  if ('error' in parsed) return escapeTelegramHtml(parsed.error);
+  const matches = await findOrdersByRef(ref);
+  if (!matches.length) return escapeTelegramHtml(`Walang open order na match sa "${ref}". I-type ang CLIENTS para makita lahat.`);
+  if (matches.length > 1) {
+    return escapeTelegramHtml(`Maraming match sa "${ref}":\n${matches.map((order) => `- ${order.order_number} · ${order.client_name || order.project_name} (${order.stage})`).join('\n')}\nGamitin ang ORD-number.`);
+  }
+  const order = matches[0];
+  const result = await setOrderPlan(order.id, { nextActionItem: parsed.plan.next_action_item, targetCompletionDate: parsed.plan.target_completion_date }, 'telegram');
+  if (!result.ok) return escapeTelegramHtml(`❌ ${order.order_number}: ${result.error}`);
+  return `🎯 ${escapeTelegramHtml(order.order_number)} · ${escapeTelegramHtml(order.client_name || order.project_name || 'order')}\nNext: ${escapeTelegramHtml(parsed.plan.next_action_item)}\nTarget: <b>${escapeTelegramHtml(parsed.plan.target_completion_date)}</b>`;
 }
 
 async function handleLinkCommand(staffName: StaffName) {

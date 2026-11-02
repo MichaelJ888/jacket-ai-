@@ -4,10 +4,15 @@ import { completeSubconJobsForOrder } from './payroll';
 import { canTransition, DEFAULT_ORDER_STAGE, DEPOSIT_STAGE_NO, defaultDepositAmount, requiresDepositFirst, stageNumber } from './order-stages';
 import { normalizeOrderSpec, orderSpecToColumns, type OrderSpec } from './order-spec';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from './integrations';
+import { logClientActivity } from './client-activity';
+import { isPhaseGatedTarget, manilaDateKey, missingPlanFields, validatePlanInput } from './order-plan';
 
 type OrderRow = {
   id: string;
   order_number: string;
+  next_action_item: string | null;
+  target_completion_date: string | null;
+  stage_entered_at: string | null;
   costing_id: string | null;
   contact_id: string | null;
   client_name: string | null;
@@ -73,13 +78,18 @@ export async function createOrder(input: {
   return { order: data as OrderRow, error: null };
 }
 
-async function setStage(order: OrderRow, to: string, note: string, extra: Record<string, unknown> = {}) {
+async function setStage(order: OrderRow, to: string, note: string, extra: Record<string, unknown> = {}, actor = 'system') {
   const supabase = getSupabaseAdmin();
   if (!supabase) return false;
+  const now = new Date().toISOString();
+  // Entering an active phase restarts the 48h stage timer and clears the plan, so the next phase needs a fresh one.
+  const phaseChange = to === 'ON_HOLD' || to === 'CANCELLED' ? {} : { stage_entered_at: now, next_action_item: null, target_completion_date: null };
+  const before = { stage: order.stage, next_action_item: order.next_action_item, target_completion_date: order.target_completion_date };
   // Compare-and-set on the current stage so concurrent callers can't double-apply a transition.
-  const { data } = await supabase.from('orders').update({ stage: to, updated_at: new Date().toISOString(), ...extra }).eq('id', order.id).eq('stage', order.stage).select('id');
+  const { data } = await supabase.from('orders').update({ stage: to, updated_at: now, ...phaseChange, ...extra }).eq('id', order.id).eq('stage', order.stage).select('id');
   if (!data?.length) return false;
   await supabase.from('order_events').insert({ order_id: order.id, from_stage: order.stage, to_stage: to, note });
+  await logClientActivity({ entityType: 'order', entityId: order.id, action: 'stage_changed', actor, before, after: { stage: to, note } });
   order.stage = to;
   return true;
 }
@@ -151,7 +161,22 @@ async function depositWasVerified(order: OrderRow): Promise<boolean> {
   return (data || []).some((event) => past(event.to_stage) || past(event.from_stage));
 }
 
-export async function advanceOrder(orderId: string, to: string, note = '') {
+// Sets the next action + completion date for the order's upcoming phase; required before advancing into one.
+export async function setOrderPlan(orderId: string, input: { nextActionItem?: unknown; targetCompletionDate?: unknown }, actor = 'system') {
+  const supabase = getSupabaseAdmin();
+  const order = await loadOrder(orderId);
+  if (!supabase || !order) return { ok: false, plan: null, error: 'Order not found' };
+  if (order.stage === 'COMPLETED' || order.stage === 'CANCELLED') return { ok: false, plan: null, error: `Order is already ${order.stage}` };
+  const checked = validatePlanInput(input, manilaDateKey(Date.now()));
+  if ('error' in checked) return { ok: false, plan: null, error: checked.error };
+  const before = { next_action_item: order.next_action_item, target_completion_date: order.target_completion_date };
+  const { error } = await supabase.from('orders').update(checked.plan).eq('id', orderId);
+  if (error) return { ok: false, plan: null, error: error.message };
+  await logClientActivity({ entityType: 'order', entityId: orderId, action: 'plan_set', actor, before, after: checked.plan });
+  return { ok: true, plan: checked.plan, error: null };
+}
+
+export async function advanceOrder(orderId: string, to: string, note = '', actor = 'system') {
   const supabase = getSupabaseAdmin();
   const order = await loadOrder(orderId);
   if (!supabase || !order) return { ok: false, error: 'Order not found' };
@@ -159,11 +184,17 @@ export async function advanceOrder(orderId: string, to: string, note = '') {
   if (requiresDepositFirst(order.stage, to, order.stage === 'ON_HOLD' ? await depositWasVerified(order) : false)) {
     return { ok: false, error: 'Deposit not verified yet — confirm the down payment before Stage 06 and beyond' };
   }
+  if (isPhaseGatedTarget(to)) {
+    const missing = missingPlanFields(order);
+    if (missing.length) {
+      return { ok: false, error: `Itakda muna ang next action at target date: /update_${order.order_number} next: ... | target: YYYY-MM-DD` };
+    }
+  }
 
   const from = order.stage;
   const extra: Record<string, unknown> = {};
   if (to === 'COMPLETED') extra.delivered_at = new Date().toISOString();
-  if (!(await setStage(order, to, note || `Moved from ${from}`, extra))) return { ok: false, error: 'Order changed concurrently, retry' };
+  if (!(await setStage(order, to, note || `Moved from ${from}`, extra, actor))) return { ok: false, error: 'Order changed concurrently, retry' };
   const notices: string[] = [];
 
   if (to === 'S11_DISPATCH') {
