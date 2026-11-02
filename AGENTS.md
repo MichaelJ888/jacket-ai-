@@ -73,3 +73,10 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - 2026-11-02 — Digitizer (`/admin/digitizer`): fixed "Maximum call stack size exceeded" (spread `push(...)` on large PES/point arrays → loop appends). Added inch sizing (0.5–12 in), AI stitch auto-tune + fabric presets (`app/api/_lib/digitize/stitch-settings.ts`), advanced settings drawer, AI Smart Improve (high-precision pass), redesigned page. Commit `f52e546` on main; prod deploy Ready; `verify:live` 11/11; `npm test` 328/328; `tsc --noEmit` clean.
 - Not implemented: underlay styles, auto-trim toggle, Pantone/Isacord mapping, Bernina ART/VIP output.
 
+
+## Completion log � thread color matcher + DBHS calibration
+- Commit ce23d2a: CIE76 Lab matcher (thread-match.ts), DST reader (dst-reader.ts), optional threadPalette in digitizer.
+- Tests: npm test 333/333 with MJIC_DST_FIXTURE; tsc --noEmit and eslint clean.
+- Prod: aliased https://jacket-ai.vercel.app; npm run verify:live 11/11.
+- Open: no Pantone/Isacord palette data loaded; DBHS max stitch 8.73mm vs worksheet 6.7mm (cap unchanged at 7.0mm).
+- public/image-library.json remains an unreviewed local change, intentionally not committed.
