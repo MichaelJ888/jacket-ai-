@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 
 import { encodeAllFormats } from './encoders.ts';
+import { resolveStitchSettings } from './stitch-settings.ts';
 import type { DigitizeInput, DigitizeQa, DigitizeResult, QaThreadSummary, Stitch, ThreadColor } from './types.ts';
 
 type Lab = { l: number; a: number; b: number };
@@ -40,9 +41,6 @@ type Rasterized = {
 };
 
 const DEFAULT_MAX_COLORS = 6;
-const DEFAULT_FILL_STITCH_MM = 2.6;
-const DEFAULT_ROW_SPACING_MM = 0.4;
-const DEFAULT_PULL_COMP_MM = 0.25;
 const PREVIEW_BACKGROUND = '#f6f7fb';
 
 function clamp(value: number, min: number, max: number) {
@@ -532,7 +530,7 @@ function traceTatami(region: Region, ppm: number, angleDeg: number, rowSpacingMm
         x: centerX + end * cos - v * sin + region.offsetX,
         y: centerY + end * sin + v * cos + region.offsetY,
       });
-      points.push(...rowPoints);
+      for (const point of rowPoints) points.push(point);
     }
   }
   return points;
@@ -913,12 +911,24 @@ export async function digitizeLogo(input: DigitizeInput): Promise<DigitizeResult
     throw new Error('No foreground regions were detected after background removal.');
   }
 
-  const angle = Number.isFinite(input.angle) ? Number(input.angle) : 45;
-  const rowSpacingMm = Number.isFinite(input.rowSpacingMm) ? Number(input.rowSpacingMm) : DEFAULT_ROW_SPACING_MM;
-  const fillStitchMm = Number.isFinite(input.fillStitchMm) ? Number(input.fillStitchMm) : DEFAULT_FILL_STITCH_MM;
-  const pullCompMm = Number.isFinite(input.pullCompMm) ? Number(input.pullCompMm) : DEFAULT_PULL_COMP_MM;
+  const settings = resolveStitchSettings(
+    {
+      fabric: input.fabric,
+      autoTune: input.autoTune,
+      precision: input.precision,
+      angle: input.angle,
+      rowSpacingMm: input.rowSpacingMm,
+      fillStitchMm: input.fillStitchMm,
+      pullCompMm: input.pullCompMm,
+    },
+    {
+      regionCount: rasterized.regions.length,
+      tinyRegionCount: rasterized.tinyRegionCount,
+      maxSideMm: Math.max(rasterized.actualWidthMm, rasterized.actualHeightMm),
+    },
+  );
 
-  const generated = generateStitches(rasterized, angle, rowSpacingMm, fillStitchMm, pullCompMm);
+  const generated = generateStitches(rasterized, settings.angle, settings.rowSpacingMm, settings.fillStitchMm, settings.pullCompMm);
   const normalizedStitches = splitLongCommands(generated.stitches);
   const qa = buildQa(
     normalizedStitches,
@@ -939,6 +949,7 @@ export async function digitizeLogo(input: DigitizeInput): Promise<DigitizeResult
     files,
     previewPng: preview.previewPng,
     previewSvg: preview.previewSvg,
+    settings,
   };
 }
 

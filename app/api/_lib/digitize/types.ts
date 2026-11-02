@@ -1,3 +1,5 @@
+import type { ResolvedStitchSettings } from './stitch-settings.ts';
+
 export type DigitizeInput = {
   image: Buffer;
   widthMm: number;
@@ -7,6 +9,9 @@ export type DigitizeInput = {
   rowSpacingMm?: number;
   fillStitchMm?: number;
   pullCompMm?: number;
+  fabric?: string;
+  autoTune?: boolean;
+  precision?: 'standard' | 'high';
   minSpecklePx?: number;
   maxLongestSidePx?: number;
   designName?: string;
@@ -66,4 +71,5 @@ export type DigitizeResult = {
   files: DigitizeFiles;
   previewPng: Buffer;
   previewSvg: string;
+  settings: ResolvedStitchSettings;
 };

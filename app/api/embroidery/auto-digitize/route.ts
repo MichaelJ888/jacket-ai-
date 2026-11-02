@@ -38,6 +38,13 @@ type RequestBody = {
   embroideryJobId?: unknown;
   orderId?: unknown;
   quantity?: unknown;
+  fabric?: unknown;
+  autoTune?: unknown;
+  precision?: unknown;
+  angle?: unknown;
+  rowSpacingMm?: unknown;
+  fillStitchMm?: unknown;
+  pullCompMm?: unknown;
 };
 
 // Admin editor session, admin bearer, or the scheduler/cron token. Fails closed when none are configured.
@@ -62,6 +69,16 @@ function toPositiveNumber(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
+
+function optionalNumber(value: unknown) {
+  if (typeof value !== 'number' && typeof value !== 'string') return undefined;
+  if (value === '') return undefined;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : undefined;
+}
+
+const MIN_WIDTH_MM = 12.7; // 0.5 in
+const MAX_WIDTH_MM = 304.8; // 12 in
 
 function mmFromBody(body: RequestBody) {
   const widthMm = toPositiveNumber(body.widthMm) || toPositiveNumber(body.widthInches) * 25.4;
@@ -204,7 +221,13 @@ export async function POST(req: Request) {
     }
 
     const { widthMm, heightMm } = mmFromBody(body);
-    if (!widthMm) return NextResponse.json({ error: 'widthMm or widthInches is required' }, { status: 400 });
+    if (!widthMm) return NextResponse.json({ error: 'widthInches or widthMm is required' }, { status: 400 });
+    if (widthMm < MIN_WIDTH_MM || widthMm > MAX_WIDTH_MM) {
+      return NextResponse.json({ error: 'Width must be between 0.5 and 12 inches.' }, { status: 400 });
+    }
+    if (heightMm && (heightMm < MIN_WIDTH_MM || heightMm > MAX_WIDTH_MM)) {
+      return NextResponse.json({ error: 'Height must be between 0.5 and 12 inches.' }, { status: 400 });
+    }
 
     const orderId = typeof body.orderId === 'string' && body.orderId.trim() ? body.orderId.trim() : undefined;
     if (orderId && !UUID_RE.test(orderId)) return NextResponse.json({ error: 'orderId must be a UUID' }, { status: 400 });
@@ -224,7 +247,14 @@ export async function POST(req: Request) {
       heightMm,
       maxColors: clamp(toPositiveNumber(body.maxColors) || 0, 0, 12) || undefined,
       designName: (projectName || clientName || 'mjic-logo').slice(0, 16),
-    });
+        fabric: typeof body.fabric === 'string' ? body.fabric : undefined,
+        autoTune: body.autoTune === undefined ? true : body.autoTune === true || body.autoTune === 'true',
+        precision: body.precision === 'high' ? 'high' : 'standard',
+        angle: optionalNumber(body.angle),
+        rowSpacingMm: optionalNumber(body.rowSpacingMm),
+        fillStitchMm: optionalNumber(body.fillStitchMm),
+        pullCompMm: optionalNumber(body.pullCompMm),
+      });
 
     const prefix = `digitize/${typeof body.embroideryJobId === 'string' ? body.embroideryJobId : randomUUID()}`;
     if (Math.min(digitized.qa.designWidthMm, digitized.qa.designHeightMm) < MIN_DESIGN_MM) {
@@ -288,6 +318,7 @@ export async function POST(req: Request) {
       requiresManualDigitizing: digitized.qa.needsHumanReview,
       job: result.data,
       qa: digitized.qa,
+      settings: digitized.settings,
       quote,
       files: uploads.signedUrls,
     });

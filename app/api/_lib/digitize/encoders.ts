@@ -36,6 +36,11 @@ function pushAscii(bytes: number[], value: string) {
   bytes.push(...Buffer.from(value, 'utf8'));
 }
 
+// Spreading a large buffer into push() overflows the call stack; append in a loop instead.
+function appendBytes(target: number[], source: ArrayLike<number>) {
+  for (let index = 0; index < source.length; index += 1) target.push(source[index]);
+}
+
 function roundUnit(value: number) {
   return Math.round(value);
 }
@@ -501,7 +506,7 @@ export function encodePes(stitches: Stitch[], colors: ThreadColor[]) {
   bytes[pecPointerOffset + 1] = pointerView.getUint8(1);
   bytes[pecPointerOffset + 2] = pointerView.getUint8(2);
   bytes[pecPointerOffset + 3] = pointerView.getUint8(3);
-  bytes.push(...encodePec(stitches, colors));
+  appendBytes(bytes, encodePec(stitches, colors));
   return Buffer.from(bytes);
 }
 
