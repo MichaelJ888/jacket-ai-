@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { NextResponse } from 'next/server';
 
 import { isCronAuthorized } from '../../_lib/auth';
+import { logClientActivity } from '../../_lib/client-activity';
 import { digitizeLogo } from '../../_lib/digitize/index.ts';
+import { editorOrAdminAuthorized } from '../../_lib/site-content';
 import {
   createDigitizeJob,
   estimateStitchCount,
@@ -19,6 +21,8 @@ export const maxDuration = 60;
 const MAX_INPUT_BYTES = 8 * 1024 * 1024;
 const SEVEN_DAYS_SECONDS = 60 * 60 * 24 * 7;
 const BUCKET = 'embroidery-files';
+const MIN_DESIGN_MM = 5;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type RequestBody = {
   image?: unknown;
@@ -31,7 +35,18 @@ type RequestBody = {
   placement?: unknown;
   maxColors?: unknown;
   embroideryJobId?: unknown;
+  orderId?: unknown;
 };
+
+// Admin editor session, admin bearer, or the scheduler/cron token. Fails closed when none are configured.
+function isDigitizerAuthorized(req: Request) {
+  return editorOrAdminAuthorized(req) || isCronAuthorized(req);
+}
+
+export async function GET(req: Request) {
+  if (!isDigitizerAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  return NextResponse.json({ ready: true });
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -178,7 +193,7 @@ async function handleExternalProvider(body: RequestBody, image: string, widthMm:
 }
 
 export async function POST(req: Request) {
-  if (!isCronAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!isDigitizerAuthorized(req)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await req.json() as RequestBody;
@@ -188,6 +203,9 @@ export async function POST(req: Request) {
 
     const { widthMm, heightMm } = mmFromBody(body);
     if (!widthMm) return NextResponse.json({ error: 'widthMm or widthInches is required' }, { status: 400 });
+
+    const orderId = typeof body.orderId === 'string' && body.orderId.trim() ? body.orderId.trim() : undefined;
+    if (orderId && !UUID_RE.test(orderId)) return NextResponse.json({ error: 'orderId must be a UUID' }, { status: 400 });
 
     const placement = typeof body.placement === 'string' ? body.placement.trim() : '';
     const projectName = typeof body.projectName === 'string' ? body.projectName.trim() : '';
@@ -207,6 +225,10 @@ export async function POST(req: Request) {
     });
 
     const prefix = `digitize/${typeof body.embroideryJobId === 'string' ? body.embroideryJobId : randomUUID()}`;
+    if (Math.min(digitized.qa.designWidthMm, digitized.qa.designHeightMm) < MIN_DESIGN_MM) {
+      digitized.qa.warnings.push(`Design is under ${MIN_DESIGN_MM} mm on one side; below the minimum safe embroidery size.`);
+      digitized.qa.needsHumanReview = true;
+    }
     const uploads = await uploadEmbroideryArtifacts(prefix, {
       'preview.png': { buffer: digitized.previewPng, contentType: 'image/png' },
       'logo.dst': { buffer: digitized.files.dst, contentType: 'application/octet-stream' },
@@ -218,6 +240,7 @@ export async function POST(req: Request) {
     const status = digitized.qa.needsHumanReview ? 'PENDING_MANUAL_DIGITIZING' : 'COMPLETED';
     const result = await createDigitizeJob({
       embroideryJobId: typeof body.embroideryJobId === 'string' ? body.embroideryJobId : undefined,
+      orderId,
       sourceImage: body.image,
       placement,
       widthInches: widthMm / 25.4,
@@ -236,6 +259,22 @@ export async function POST(req: Request) {
       }),
     });
     if (result.error) return NextResponse.json({ error: result.error }, { status: 502 });
+
+    if (orderId) {
+      await logClientActivity({
+        entityType: 'order',
+        entityId: orderId,
+        action: 'logo_digitized',
+        actor: 'auto-digitizer',
+        after: {
+          digitizeJobId: result.data?.id ?? null,
+          status,
+          stitchCount: digitized.qa.stitchCount,
+          colors: digitized.qa.threadList.length,
+          storagePaths: uploads.storagePaths,
+        },
+      });
+    }
 
     void sendTelegramPhoto(uploads.signedUrls['preview.png'], buildQaCaption(projectName, clientName, placement, digitized.qa));
 

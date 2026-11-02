@@ -1165,3 +1165,7 @@ alter table public.orders add column if not exists next_action_item text;
 alter table public.orders add column if not exists target_completion_date date;
 alter table public.orders add column if not exists stage_entered_at timestamptz;
 update public.orders set stage_entered_at = coalesce(updated_at, created_at, now()) where stage_entered_at is null;
+
+-- Auto-digitizer: each digitized logo links to the customer order it was made for.
+alter table public.digitize_jobs add column if not exists order_id uuid references public.orders(id);
+create index if not exists digitize_jobs_order_idx on public.digitize_jobs (order_id);

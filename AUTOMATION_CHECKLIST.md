@@ -87,7 +87,7 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 | `/api/payment-verify` | open | Now scores fraud risk (duplicate ref, recipient, date, tamper) |
 | `/api/cron/insights` | CRON_SECRET | Weekly reorder forecast + price advice (Mon 9am Manila) |
 | `/api/cron/repo-watch` | CRON_SECRET | Monthly repo metadata watch |
-| `/api/embroidery/auto-digitize` | CRON_SECRET | Built-in DST/EXP/PES/JEF digitizer + QA + preview (`embroidery-files` bucket) |
+| `/api/embroidery/auto-digitize` | Editor/admin session or CRON_SECRET (GET = auth probe) | Built-in DST/EXP/PES/JEF digitizer + QA + 5mm min-height check + preview (`embroidery-files` bucket); optional `orderId` links `digitize_jobs.order_id` and logs to `client_activity_logs`. UI: `/admin/digitizer` |
 | `/api/media/generate-ad` | CRON_SECRET | Now secured |
 
 Env: optional `ADMIN_PASSWORD` (separate admin login).

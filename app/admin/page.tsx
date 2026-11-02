@@ -206,9 +206,10 @@ export default function AdminPage() {
 
   return (
     <main className="mx-auto p-6 text-zinc-900" style={{ width: `${panelSize}%`, maxWidth: panelSize === 100 ? "64rem" : "100%", minWidth: "min(100%, 320px)" }}>
-      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-4">
+      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-5">
         <a href="/admin/editor" className="rounded-lg bg-white px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-zinc-100">🎨 Open Live Visual Site Editor</a>
         <a href="/admin/system-health" className="rounded-lg bg-emerald-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-emerald-300">🩺 Open System Health</a>
+        <a href="/admin/digitizer" className="rounded-lg bg-violet-300 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-violet-200">Open Embroidery Digitizer</a>
         <a href="/admin/studio" className="rounded-lg bg-amber-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-amber-300">📸 Open CEO AI Studio &amp; Enhancer</a>
         <a href="/admin/seo" className="rounded-lg bg-sky-300 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-sky-200">📈 Open SEO Rank Tracker</a>
       </nav>
@@ -223,6 +224,7 @@ export default function AdminPage() {
           </div>
           <a className="text-sm underline" href="/admin/editor">Visual editor</a>
           <a className="text-sm underline" href="/admin/system-health">System health</a>
+          <a className="text-sm underline" href="/admin/digitizer">Embroidery digitizer</a>
           <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
           <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); setHub("choose"); }}>Sign out</button>
         </div>

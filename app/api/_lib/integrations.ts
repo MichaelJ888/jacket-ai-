@@ -544,6 +544,7 @@ export async function releaseEmbroideryPickupAlert(jobId: string, claimedAt: str
 
 export async function createDigitizeJob(job: {
   embroideryJobId?: string;
+  orderId?: string;
   sourceImage: string;
   placement?: string;
   widthInches?: number;
@@ -559,6 +560,8 @@ export async function createDigitizeJob(job: {
   if (!supabase) return { data: null, error: 'Supabase is not configured' };
 
   const { data, error } = await supabase.from('digitize_jobs').insert({
+    // order_id is only sent when present so the insert still works before the schema migration is applied.
+    ...(job.orderId ? { order_id: job.orderId } : {}),
     embroidery_job_id: job.embroideryJobId || null,
     source_image: job.sourceImage,
     placement: job.placement || null,
