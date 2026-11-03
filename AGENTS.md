@@ -116,3 +116,10 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` = `degraded` only on `scheduledJobs` (last run `content-publisher` failed). Criticals 0, DB ok, storage ok. Not masked.
 - Not done: restyle of the other admin pages (command, digitizer, editor, seo, studio, system-health, video-mockups) and Telegram-based 2FA endpoint checks; these remain open.
 - Working tree note: ~60 tracked images under `public/images/jackets-all-design/` are deleted locally and several image folders are untracked; not part of this commit.
+
+## Completion log - content-publisher health fix (2026-11-03)
+- Root cause: Instagram image posts called `media_publish` before the container was FINISHED, so Meta returned "Media ID is not available" (8 posts FAILED). Heartbeat `degraded` was correct, not a false alarm.
+- Commit `fa758f6` on main: `publishInstagram` in `app/api/_lib/content.ts` polls `status_code` for images too (6 polls, 4s apart).
+- Verified: `tsc --noEmit` clean, eslint clean, `npm test` 350 pass / 0 fail / 1 skipped; prod deploy READY and aliased to https://jacket-ai.vercel.app; manual publisher run published 1, failed 0; `/api/health` = `ok`.
+- Not done: the 8 old FAILED Instagram rows (Nov 2-3) were not requeued; they are past the retry window.
+- Still open: restyle of the remaining admin pages (command, digitizer, editor, seo, studio, system-health, video-mockups).
