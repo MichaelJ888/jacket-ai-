@@ -30,6 +30,37 @@ const DOT: Record<string, string> = {
 
 const panel = "rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-md";
 
+function Gauge({ percent }: { percent: number }) {
+  const radius = 54;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - Math.min(Math.max(percent, 0), 100) / 100);
+  return (
+    <svg viewBox="0 0 128 128" className="h-32 w-32 drop-shadow-[0_0_12px_rgba(52,211,153,0.5)]" role="img" aria-label={`${percent}% of AI seats operational`}>
+      <circle cx="64" cy="64" r={radius} fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="10" />
+      <circle
+        cx="64"
+        cy="64"
+        r={radius}
+        fill="none"
+        stroke="url(#gauge-grad)"
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        transform="rotate(-90 64 64)"
+        className="transition-all duration-700"
+      />
+      <defs>
+        <linearGradient id="gauge-grad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#34d399" />
+          <stop offset="100%" stopColor="#22d3ee" />
+        </linearGradient>
+      </defs>
+      <text x="64" y="70" textAnchor="middle" className="fill-white text-2xl font-black">{percent}%</text>
+    </svg>
+  );
+}
+
 function Dot({ state }: { state: string }) {
   return <span className={`inline-block h-3 w-3 shrink-0 animate-pulse rounded-full ${DOT[state] || DOT.unknown}`} aria-label={state} title={state} />;
 }
@@ -75,13 +106,10 @@ export default function PublicStatusPage() {
             Live operational status of our Super-Intelligent AI COO and AI Swarm workforce — updated every minute.{" "}
             <span className={`font-bold ${overallColor}`}>{overall.toUpperCase()}</span>
           </p>
-          <div className="mx-auto mt-4 h-1.5 w-full max-w-md overflow-hidden rounded-full bg-white/10">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-700"
-              style={{ width: aiSeats.length ? `${Math.round((aiOperational / aiSeats.length) * 100)}%` : "0%" }}
-            />
+          <div className="mx-auto mt-5 flex flex-col items-center">
+            <Gauge percent={aiSeats.length ? Math.round((aiOperational / aiSeats.length) * 100) : 0} />
+            <p className="mt-2 text-xs text-zinc-400">{aiOperational}/{aiSeats.length} AI seats operational</p>
           </div>
-          <p className="mt-1 text-xs text-zinc-500">{aiOperational}/{aiSeats.length} AI seats operational</p>
         </header>
 
         <section className={panel}>

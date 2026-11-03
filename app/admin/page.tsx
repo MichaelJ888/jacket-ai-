@@ -238,13 +238,13 @@ export default function AdminPage() {
 
   return (
     <main className="mx-auto p-6 text-zinc-900" style={{ width: `${panelSize}%`, maxWidth: panelSize === 100 ? "64rem" : "100%", minWidth: "min(100%, 320px)" }}>
-      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-3 lg:grid-cols-6">
-        <a href="/admin/command" className="rounded-lg bg-fuchsia-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-fuchsia-300">🚀 Command Center</a>
-        <a href="/admin/editor" className="rounded-lg bg-white px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-zinc-100">🎨 Open Live Visual Site Editor</a>
-        <a href="/admin/system-health" className="rounded-lg bg-emerald-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-emerald-300">🩺 Open System Health</a>
-        <a href="/admin/digitizer" className="rounded-lg bg-violet-300 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-violet-200">Open Embroidery Digitizer</a>
-        <a href="/admin/studio" className="rounded-lg bg-amber-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-amber-300">📸 Open CEO AI Studio &amp; Enhancer</a>
-        <a href="/admin/seo" className="rounded-lg bg-sky-300 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-sky-200">📈 Open SEO Rank Tracker</a>
+      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-2xl border border-cyan-400/20 bg-zinc-950/90 p-3 shadow-[0_0_24px_-6px_rgba(34,211,238,0.35)] backdrop-blur-md sm:grid-cols-3 lg:grid-cols-6">
+        <a href="/admin/command" className="rounded-lg border border-fuchsia-400/50 bg-fuchsia-500/10 px-4 py-3 text-center text-base font-semibold text-fuchsia-200 transition hover:bg-fuchsia-500/25 hover:shadow-[0_0_16px_-2px_rgba(232,121,249,0.6)]">🚀 Command Center</a>
+        <a href="/admin/editor" className="rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-4 py-3 text-center text-base font-semibold text-cyan-200 transition hover:bg-cyan-500/25 hover:shadow-[0_0_16px_-2px_rgba(34,211,238,0.6)]">🎨 Live Visual Site Editor</a>
+        <a href="/admin/system-health" className="rounded-lg border border-emerald-400/50 bg-emerald-500/10 px-4 py-3 text-center text-base font-semibold text-emerald-200 transition hover:bg-emerald-500/25 hover:shadow-[0_0_16px_-2px_rgba(52,211,153,0.6)]">🩺 System Health</a>
+        <a href="/admin/digitizer" className="rounded-lg border border-violet-400/50 bg-violet-500/10 px-4 py-3 text-center text-base font-semibold text-violet-200 transition hover:bg-violet-500/25 hover:shadow-[0_0_16px_-2px_rgba(167,139,250,0.6)]">🧵 Embroidery Digitizer</a>
+        <a href="/admin/studio" className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-4 py-3 text-center text-base font-semibold text-amber-200 transition hover:bg-amber-500/25 hover:shadow-[0_0_16px_-2px_rgba(251,191,36,0.6)]">📸 CEO AI Studio &amp; Enhancer</a>
+        <a href="/admin/seo" className="rounded-lg border border-sky-400/50 bg-sky-500/10 px-4 py-3 text-center text-base font-semibold text-sky-200 transition hover:bg-sky-500/25 hover:shadow-[0_0_16px_-2px_rgba(56,189,248,0.6)]">📈 SEO Rank Tracker</a>
       </nav>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-xl font-bold">MJIC Admin</h1>
