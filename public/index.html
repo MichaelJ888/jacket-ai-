@@ -242,8 +242,8 @@
       <button @click="openAdminOrExplain()" class="hidden sm:flex items-center gap-1.5 text-xs text-navy-400 hover:text-navy border hairline rounded-full px-3 py-1.5 transition-colors">
         <i data-lucide="lock" class="w-3.5 h-3.5"></i> Admin
       </button>
-      <a href="/admin" target="_top" title="Full Admin Hub: visual editor, system health, studio, SEO" class="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-navy bg-gold/25 hover:bg-gold/50 border border-gold-600/50 rounded-full px-3 py-1.5 transition-colors">
-        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Admin Hub
+      <a href="/admin/command" target="_top" title="Unified Command Center: dashboard, visual editor, system health, studio, SEO" class="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-navy bg-gold/25 hover:bg-gold/50 border border-gold-600/50 rounded-full px-3 py-1.5 transition-colors">
+        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Command Center
       </a>
       <a href="/admin/digitizer" target="_top" title="Auto-digitize logos into DST / PES / EXP / JEF stitch files" class="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-navy bg-gold/25 hover:bg-gold/50 border border-gold-600/50 rounded-full px-3 py-1.5 transition-colors">
         <i data-lucide="scissors" class="w-3.5 h-3.5"></i> Embroidery Studio
@@ -288,7 +288,7 @@
     <a @click="mobileMenu=false" href="#testimonials">Clients</a>
     <a @click="mobileMenu=false" href="#contact">Contact</a>
     <button @click="openAdminOrExplain(); mobileMenu=false" class="flex items-center gap-1.5 text-navy-400 pt-2 border-t hairline"><i data-lucide="lock" class="w-3.5 h-3.5"></i> Admin Panel</button>
-    <a href="/admin" target="_top" class="flex items-center gap-1.5 font-semibold text-navy"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Admin Hub (all features)</a>
+    <a href="/admin/command" target="_top" class="flex items-center gap-1.5 font-semibold text-navy"><i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> Command Center (all features)</a>
     <a href="/admin/digitizer" target="_top" class="flex items-center gap-1.5 font-semibold text-navy"><i data-lucide="scissors" class="w-3.5 h-3.5"></i> Embroidery Studio (auto-digitize)</a>
   </div>
 </header>
@@ -1363,7 +1363,8 @@
         <button @click="legalTab='privacy'; showLegal=true" class="hover:text-navy">Privacy Policy</button>
         <button @click="legalTab='terms'; showLegal=true" class="hover:text-navy">Terms of Service</button>
         <button @click="openAdminOrExplain()" class="hover:text-navy">Admin Panel</button>
-        <a href="/admin" target="_top" class="hover:text-navy font-semibold">Admin Hub</a>
+        <a href="/admin/command" target="_top" class="hover:text-navy font-semibold">Command Center</a>
+        <a href="/status" target="_top" class="hover:text-navy">System Status</a>
       </div>
     </div>
     <p class="text-[11px] text-navy-400 border-t hairline pt-4">"Customized Jackets and More" is a trade name / brand of MICHAEL JEFFREY INTERNATIONAL CORPORATION. In business since 2004 — over 20 years serving corporate, government, and institutional clients nationwide and worldwide.</p>
@@ -1508,7 +1509,7 @@
     <div class="flex justify-between items-center mb-6">
       <h3 class="font-display font-bold text-navy text-lg">Admin Panel</h3>
       <div class="flex items-center gap-3">
-        <a href="/admin" target="_top" class="text-xs font-semibold text-gold-600 hover:text-navy underline" title="Visual editor, system health, studio, SEO tracker">Open full Admin Hub →</a>
+        <a href="/admin" target="_top" class="text-xs font-semibold text-gold-600 hover:text-navy underline" title="Prices, knowledge base, CRM, Telegram recipients">Open full Admin Panel →</a>
         <button @click="showAdmin=false" class="text-navy-400 hover:text-navy"><i data-lucide="x" class="w-5 h-5"></i></button>
       </div>
     </div>

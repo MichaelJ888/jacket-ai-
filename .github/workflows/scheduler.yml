@@ -29,6 +29,17 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  # Runs on EVERY trigger (any schedule line or manual dispatch): re-invokes any
+  # sub-daily cron route whose heartbeat went stale, so a delayed/dropped GitHub
+  # schedule can never starve sales-followups, retry-queue, content-publisher, etc.
+  auto-pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Catch up stale sub-daily jobs
+        run: |
+          curl -sf --max-time 90 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/auto-pilot" \
+            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
+
   studio-daily-ads:
     if: github.event.schedule == '0 1 * * *' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

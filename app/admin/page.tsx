@@ -23,7 +23,6 @@ const button = "rounded bg-zinc-900 px-3 py-1 text-sm font-medium text-white dis
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [hub, setHub] = useState<"choose" | "dashboard">("choose");
   const [tab, setTab] = useState<"dashboard" | "prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "coo" | "recipients" | "credits">("dashboard");
   const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
   const [oauthConfigured, setOauthConfigured] = useState(true);
@@ -43,6 +42,8 @@ export default function AdminPage() {
   const [knowledgeContent, setKnowledgeContent] = useState("");
   const [knowledgeFile, setKnowledgeFile] = useState<File | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [otpPending, setOtpPending] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
   const [panelSize, setPanelSize] = useState<25 | 50 | 75 | 100>(100);
 
   useEffect(() => {
@@ -132,7 +133,6 @@ export default function AdminPage() {
     if (params.get("meta")) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setTab("connect");
-      setHub("dashboard");
       setMessage(params.get("meta") === "connected"
         ? `Connected ${params.get("pages")} Page(s). ${params.get("failed") !== "0" ? `${params.get("failed")} could not auto-subscribe the webhook.` : "Webhooks subscribed automatically."}`
         : `Facebook connection failed: ${params.get("reason") || "unknown error"}`);
@@ -148,9 +148,28 @@ export default function AdminPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function completeLogin() {
+    sessionStorage.setItem("mjic_admin", token);
+    setAuthed(true);
+    setMessage("");
+    void loadPages(token);
+    void loadKnowledge(token);
+  }
+
   async function login() {
-    if (await refresh(token)) { sessionStorage.setItem("mjic_admin", token); setAuthed(true); setMessage(""); void loadPages(token); void loadKnowledge(token); }
-    else setMessage("Wrong password.");
+    if (!(await refresh(token))) return setMessage("Wrong password.");
+    const r = await fetch("/api/admin/auth/otp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ action: "request" }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.required) { setOtpPending(true); setMessage("Enter the 6-digit code sent to the CEO Telegram."); return; }
+    if (r.ok) return completeLogin();
+    setMessage(d.error || "Could not start verification.");
+  }
+
+  async function verifyOtp() {
+    const r = await fetch("/api/admin/auth/otp", { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", code: otpCode }) });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok) { setOtpPending(false); setOtpCode(""); completeLogin(); }
+    else setMessage(d.error || "Verification failed.");
   }
 
   async function savePrice(row: { name: string; key?: string; category: string; unit: string; unitCost: number; supplierName?: string | null }) {
@@ -192,11 +211,24 @@ export default function AdminPage() {
     return (
       <main className="mx-auto max-w-sm p-8">
         <h1 className="mb-4 text-xl font-bold">MJIC Admin</h1>
-        <div className="flex gap-2">
-          <input className={`${input} w-full`} type={showPassword ? "text" : "password"} placeholder="Admin password" autoComplete="current-password" value={token} onChange={(event) => setToken(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void login()} />
-          <button type="button" className="shrink-0 rounded border border-zinc-300 px-3 py-1 text-sm" aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Hide" : "Show"} password</button>
-        </div>
-        <button className={`${button} mt-3`} onClick={() => void login()}>Sign in</button>
+        {otpPending ? (
+          <>
+            <p className="mb-2 text-sm text-zinc-600">Telegram 2FA: a 6-digit code was sent to the CEO Telegram. It expires in 10 minutes.</p>
+            <input className={`${input} w-full`} inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6-digit code" value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ""))} onKeyDown={(event) => event.key === "Enter" && void verifyOtp()} />
+            <div className="mt-3 flex gap-2">
+              <button className={button} disabled={otpCode.length !== 6} onClick={() => void verifyOtp()}>Verify code</button>
+              <button className="rounded border border-zinc-300 px-3 py-1 text-sm" onClick={() => { setOtpPending(false); setOtpCode(""); setMessage(""); }}>Back</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <input className={`${input} w-full`} type={showPassword ? "text" : "password"} placeholder="Admin password" autoComplete="current-password" value={token} onChange={(event) => setToken(event.target.value)} onKeyDown={(event) => event.key === "Enter" && void login()} />
+              <button type="button" className="shrink-0 rounded border border-zinc-300 px-3 py-1 text-sm" aria-pressed={showPassword} onClick={() => setShowPassword((value) => !value)}>{showPassword ? "Hide" : "Show"} password</button>
+            </div>
+            <button className={`${button} mt-3`} onClick={() => void login()}>Sign in</button>
+          </>
+        )}
         {message && <p className="mt-3 text-sm text-red-600">{message}</p>}
       </main>
     );
@@ -206,7 +238,8 @@ export default function AdminPage() {
 
   return (
     <main className="mx-auto p-6 text-zinc-900" style={{ width: `${panelSize}%`, maxWidth: panelSize === 100 ? "64rem" : "100%", minWidth: "min(100%, 320px)" }}>
-      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-5">
+      <nav aria-label="Quick launch" className="sticky top-0 z-10 mb-4 grid gap-3 rounded-xl bg-zinc-900 p-3 shadow-md sm:grid-cols-3 lg:grid-cols-6">
+        <a href="/admin/command" className="rounded-lg bg-fuchsia-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-fuchsia-300">🚀 Command Center</a>
         <a href="/admin/editor" className="rounded-lg bg-white px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-zinc-100">🎨 Open Live Visual Site Editor</a>
         <a href="/admin/system-health" className="rounded-lg bg-emerald-400 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-emerald-300">🩺 Open System Health</a>
         <a href="/admin/digitizer" className="rounded-lg bg-violet-300 px-4 py-3 text-center text-base font-semibold text-zinc-900 hover:bg-violet-200">Open Embroidery Digitizer</a>
@@ -222,29 +255,11 @@ export default function AdminPage() {
               <button key={size} type="button" aria-pressed={panelSize === size} onClick={() => choosePanelSize(size)} className={`rounded border px-2 py-1 ${panelSize === size ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white"}`}>{size}%</button>
             ))}
           </div>
-          <a className="text-sm underline" href="/admin/editor">Visual editor</a>
-          <a className="text-sm underline" href="/admin/system-health">System health</a>
-          <a className="text-sm underline" href="/admin/digitizer">Embroidery digitizer</a>
           <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
-          <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); setHub("choose"); }}>Sign out</button>
+          <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
         </div>
       </div>
-      {hub === "choose" ? (
-        <section className="grid gap-4 md:grid-cols-2">
-          <button onClick={() => setHub("dashboard")} className="rounded-xl border border-zinc-200 bg-white p-6 text-left shadow-sm hover:border-zinc-900">
-            <h2 className="text-lg font-bold">System Dashboard &amp; AI Controls</h2>
-            <p className="mt-2 text-sm text-zinc-600">Analytics, AI swarm control, health checks, material and selling prices, knowledge base, CRM, Facebook and Telegram recipients.</p>
-          </button>
-          <a href="/admin/editor" className="rounded-xl border border-zinc-200 bg-white p-6 text-left shadow-sm hover:border-zinc-900">
-            <h2 className="text-lg font-bold">Live Visual Site Editor (Click-to-Edit)</h2>
-            <p className="mt-2 text-sm text-zinc-600">Full-screen live editing. Click any heading, text or image to edit, replace or restyle it on Home, Production workflow, Capabilities and Competitive advantage.</p>
-          </a>
-        </section>
-      ) : (
-        <>
-      <div className="mb-4">
-        <button className="text-sm underline" onClick={() => setHub("choose")}>← Back to hubs</button>
-      </div>
+      <>
       <nav className="mb-4 flex gap-2">
 
         {([["dashboard", "Dashboard"], ["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["knowledge", "Knowledge Base"], ["overview", "Overview"], ["connect", "Connect Facebook / Instagram"], ["coo", "COO & all customers"], ["recipients", "Telegram recipients"], ["credits", "AI credits"]] as const).map(([id, label]) => (
@@ -375,8 +390,7 @@ export default function AdminPage() {
           <List title="Payment receipts (fraud check)" rows={overview.receipts.map((r, i) => ({ id: String(i), text: `${r.reference || "no ref"} · ${peso(r.detected_amount || 0)} · ${r.verified ? "verified" : "NOT verified"} · risk ${r.fraud_score}${r.fraud_flags?.length ? ` · ${r.fraud_flags.join(", ")}` : ""}` }))} />
         </section>
       )}
-        </>
-      )}
+      </>
     </main>
   );
 }

@@ -1178,3 +1178,16 @@ create index if not exists digitize_jobs_order_idx on public.digitize_jobs (orde
 
 -- Stitch-based quote (machine time + 1.2x cost floor) written by the auto-digitizer for the linked order.
 alter table public.orders add column if not exists digitize_quote jsonb not null default '{}'::jsonb;
+
+-- Telegram 2FA for the admin panel: one-time codes, hashed at rest, 10-minute expiry, single-use.
+create table if not exists public.admin_otp_codes (
+  id uuid default gen_random_uuid() primary key,
+  code_hash text not null,
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  attempts int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists admin_otp_codes_created_idx on public.admin_otp_codes (created_at desc);
+alter table public.admin_otp_codes enable row level security;
+revoke all on public.admin_otp_codes from anon, authenticated;

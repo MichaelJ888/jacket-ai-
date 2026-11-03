@@ -5,6 +5,7 @@ const NAV_LINKS = [
   { href: "/production-workflow", label: "Production Workflow" },
   { href: "/capabilities", label: "Capabilities & Advantages" },
   { href: "/advantages", label: "Competitive Advantages" },
+  { href: "/status", label: "System Status" },
 ];
 
 export default function MjicPageShell({
@@ -27,7 +28,7 @@ export default function MjicPageShell({
           </Link>
           <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[#3C567F]">
             {NAV_LINKS.map((link) => (
-              <Link key={link.href} href={link.href} className="hover:text-[#0B1E3D]">
+              <Link key={link.href} href={link.href} className="transition-colors duration-200 hover:text-[#0B1E3D]">
                 {link.label}
               </Link>
             ))}

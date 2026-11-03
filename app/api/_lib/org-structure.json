@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "company": "Michael Jeffrey International Corporation",
+  "departments": [
+    { "id": "executive", "name": "Executive Leadership & Global Governance", "roles": ["CEO", "CLO", "CSO", "PR/IR"], "href": "/admin/command" },
+    { "id": "finance", "name": "Finance, Treasury & Accounting", "roles": ["CFO", "FP&A", "Controllers", "Audit"], "href": "/dashboard/financials" },
+    { "id": "operations", "name": "Global Operations & Supply Chain", "roles": ["COO", "Sourcing", "Logistics", "QA", "Facilities"], "href": "/dashboard/operations" },
+    { "id": "technology", "name": "Technology, Product & Innovation", "roles": ["CTO", "CIO", "CISO", "CPO", "R&D"], "href": "/admin/system-health" },
+    { "id": "gtm", "name": "Go-To-Market, Sales & Marketing", "roles": ["CMO", "CRO", "Regional Sales AMER/EMEA/APAC"], "href": "/admin" },
+    { "id": "people", "name": "Global People Operations & Culture", "roles": ["CHRO", "Global Mobility", "Total Rewards"], "href": "/admin" }
+  ],
+  "nodes": [
+    { "id": "board", "title": "Board of Directors", "department": "executive", "reportsTo": null, "aiJobs": [] },
+    { "id": "ceo", "title": "Chief Executive Officer", "department": "executive", "reportsTo": "board", "aiJobs": ["ceo-digest", "executive-briefing"] },
+    { "id": "clo", "title": "Chief Legal Officer", "department": "executive", "reportsTo": "ceo", "aiJobs": [] },
+    { "id": "cso", "title": "Chief Strategy Officer", "department": "executive", "reportsTo": "ceo", "aiJobs": ["consultant", "repo-watch"] },
+    { "id": "pr-ir", "title": "VP Public & Investor Relations", "department": "executive", "reportsTo": "ceo", "aiJobs": ["executive-briefing"] },
+
+    { "id": "cfo", "title": "Chief Financial Officer", "department": "finance", "reportsTo": "ceo", "aiJobs": ["payroll", "insights"] },
+    { "id": "fpa", "title": "VP FP&A", "department": "finance", "reportsTo": "cfo", "aiJobs": ["insights"] },
+    { "id": "controller", "title": "Global Controller", "department": "finance", "reportsTo": "cfo", "aiJobs": ["payroll"] },
+    { "id": "audit", "title": "VP Internal Audit", "department": "finance", "reportsTo": "cfo", "aiJobs": ["backup"] },
+
+    { "id": "coo", "title": "Chief Operating Officer (AI COO)", "department": "operations", "reportsTo": "ceo", "aiJobs": ["swarm-worker", "auto-pilot"] },
+    { "id": "sourcing", "title": "VP Sourcing & Procurement", "department": "operations", "reportsTo": "coo", "aiJobs": [] },
+    { "id": "logistics", "title": "VP Logistics", "department": "operations", "reportsTo": "coo", "aiJobs": ["embroidery-pickup-alerts"] },
+    { "id": "qa", "title": "VP Quality Assurance", "department": "operations", "reportsTo": "coo", "aiJobs": [] },
+    { "id": "facilities", "title": "VP Facilities", "department": "operations", "reportsTo": "coo", "aiJobs": ["system-health"] },
+
+    { "id": "cto", "title": "Chief Technology Officer", "department": "technology", "reportsTo": "ceo", "aiJobs": ["retry-queue", "memory-archive"] },
+    { "id": "cio", "title": "Chief Information Officer", "department": "technology", "reportsTo": "cto", "aiJobs": ["backup", "memory-archive"] },
+    { "id": "ciso", "title": "Chief Information Security Officer", "department": "technology", "reportsTo": "cto", "aiJobs": ["watchdog", "meta-health"] },
+    { "id": "cpo", "title": "Chief Product Officer", "department": "technology", "reportsTo": "cto", "aiJobs": ["improvement-scout"] },
+    { "id": "rnd", "title": "VP Research & Development", "department": "technology", "reportsTo": "cpo", "aiJobs": ["improvement-scout"] },
+
+    { "id": "cmo", "title": "Chief Marketing Officer", "department": "gtm", "reportsTo": "ceo", "aiJobs": ["content-plan", "content-publisher"] },
+    { "id": "cro", "title": "Chief Revenue Officer", "department": "gtm", "reportsTo": "ceo", "aiJobs": ["sales-followups", "client-pulse"] },
+    { "id": "sales-amer", "title": "Regional VP Sales — AMER", "department": "gtm", "reportsTo": "cro", "region": "AMER", "aiJobs": ["sales-followups"] },
+    { "id": "sales-emea", "title": "Regional VP Sales — EMEA", "department": "gtm", "reportsTo": "cro", "region": "EMEA", "aiJobs": ["sales-followups"] },
+    { "id": "sales-apac", "title": "Regional VP Sales — APAC", "department": "gtm", "reportsTo": "cro", "region": "APAC", "aiJobs": ["sales-followups", "anne-daily-updates"] },
+
+    { "id": "chro", "title": "Chief Human Resources Officer", "department": "people", "reportsTo": "ceo", "aiJobs": ["staff-reminders", "anne-daily-updates"] },
+    { "id": "mobility", "title": "VP Global Mobility", "department": "people", "reportsTo": "chro", "aiJobs": ["staff-reminders"] },
+    { "id": "rewards", "title": "VP Total Rewards", "department": "people", "reportsTo": "chro", "aiJobs": ["payroll"] }
+  ]
+}

@@ -9,6 +9,7 @@ export const JOBS: JobSpec[] = [
   { job: 'embroidery-pickup-alerts', department: 'Operations', label: 'Embroidery pickup alerts', everyHours: 1 },
   { job: 'staff-reminders', department: 'Operations', label: 'Staff task reminders', everyHours: 1 },
   { job: 'retry-queue', department: 'Platform', label: 'Outbound message retry queue', everyHours: 1 },
+  { job: 'auto-pilot', department: 'Platform', label: 'Auto-pilot catch-up (self-healing scheduler)', everyHours: 1 },
   { job: 'payroll', department: 'Finance', label: 'Payroll run', everyHours: 24 * 7 },
   { job: 'backup', department: 'Platform', label: 'Database backup', everyHours: 24 * 8 },
   { job: 'watchdog', department: 'Platform', label: 'Uptime watchdog', everyHours: 24 },

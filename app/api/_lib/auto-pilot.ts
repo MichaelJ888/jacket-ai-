@@ -1,0 +1,84 @@
+// Auto-pilot: self-healing catch-up for sub-daily cron jobs.
+// Vercel Hobby runs native crons only once/day, so GitHub Actions plays external
+// scheduler — but GitHub regularly delays or drops scheduled runs (observed: 7h+).
+// Whenever ANY scheduler run fires, /api/cron/auto-pilot re-invokes every route
+// whose heartbeat is older than its interval. Safe to call often: each underlying
+// route does its own due-work dedup, so a redundant kick finds nothing to do.
+
+export type CatchUpJob = { job: string; path: string; maxAgeMin: number };
+
+// Intervals match .github/workflows/scheduler.yml cadences, with jitter headroom.
+export const CATCH_UP_JOBS: CatchUpJob[] = [
+  { job: 'embroidery-pickup-alerts', path: '/api/cron/embroidery-pickup-alerts', maxAgeMin: 15 },
+  { job: 'swarm-worker', path: '/api/cron/swarm-worker', maxAgeMin: 15 },
+  { job: 'improvement-scout', path: '/api/cron/improvement-scout', maxAgeMin: 45 },
+  { job: 'staff-reminders', path: '/api/cron/staff-reminders?type=watch', maxAgeMin: 60 },
+  { job: 'retry-queue', path: '/api/cron/retry-queue', maxAgeMin: 60 },
+  { job: 'sales-followups', path: '/api/cron/sales-followups', maxAgeMin: 60 },
+  { job: 'content-publisher', path: '/api/cron/content-publisher', maxAgeMin: 60 },
+  { job: 'watchdog', path: '/api/cron/watchdog', maxAgeMin: 60 },
+];
+
+export type HeartbeatRow = { job: string; last_run_at: string | null; last_status: string | null };
+
+export function dueCatchUpJobs(beats: HeartbeatRow[], now = Date.now(), jobs: CatchUpJob[] = CATCH_UP_JOBS): CatchUpJob[] {
+  const seen = new Map(beats.map((row) => [row.job, row]));
+  return jobs.filter(({ job, maxAgeMin }) => {
+    const timestamp = seen.get(job)?.last_run_at;
+    const parsed = timestamp ? Date.parse(timestamp) : NaN;
+    if (!Number.isFinite(parsed)) return true; // never ran (or clock garbage) -> due
+    return now - parsed > maxAgeMin * 60_000;
+  });
+}
+
+export type KickResult = { job: string; path: string; status: number | 'error' };
+
+type HeartbeatSource = {
+  from: (table: string) => {
+    select: (columns: string) => PromiseLike<{ data: HeartbeatRow[] | null; error: { message: string } | null }>;
+  };
+};
+
+export type AutoPilotSummary = {
+  checked: number;
+  due: string[];
+  kicked: KickResult[];
+  skipped: string[];
+  heartbeatError?: string;
+};
+
+// Kicks at most `maxKicks` stale jobs per pass (sequential, 25s timeout each) so a
+// pass always fits inside the 60s Hobby function budget; the next pass handles the rest.
+export async function runAutoPilot(options: {
+  origin: string;
+  token: string;
+  supabase: HeartbeatSource;
+  fetchFn?: typeof fetch;
+  now?: number;
+  maxKicks?: number;
+}): Promise<AutoPilotSummary> {
+  const { origin, token, supabase, fetchFn = fetch, now = Date.now(), maxKicks = 2 } = options;
+  const { data, error } = await supabase.from('job_heartbeats').select('job,last_run_at,last_status');
+  if (error || !data) {
+    return { checked: 0, due: [], kicked: [], skipped: [], heartbeatError: error?.message || 'no data' };
+  }
+  const due = dueCatchUpJobs(data, now);
+  const kicked: KickResult[] = [];
+  for (const job of due.slice(0, Math.max(1, maxKicks))) {
+    try {
+      const response = await fetchFn(`${origin}${job.path}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(25_000),
+      });
+      kicked.push({ job: job.job, path: job.path, status: response.status });
+    } catch {
+      kicked.push({ job: job.job, path: job.path, status: 'error' });
+    }
+  }
+  return {
+    checked: data.length,
+    due: due.map((job) => job.job),
+    kicked,
+    skipped: due.slice(Math.max(1, maxKicks)).map((job) => job.job),
+  };
+}
