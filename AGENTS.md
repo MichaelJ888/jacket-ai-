@@ -138,3 +138,10 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Verified: `npx tsc --noEmit` exit 0; `npm test` 350 pass / 0 fail / 1 skipped; `verify:live` 11/11; new asset URLs and kept chat images HTTP 200.
 - Deploy: `npx vercel --prod --yes` produced Ready Production deployment `jacket-lezhsungn-michaeljeffreyy17-7593.vercel.app` (aliased to https://jacket-ai.vercel.app). The CLI printed help JSON after the deploy, so the status was confirmed with `vercel ls`.
 - Open: `/api/health` returns `degraded` (HTTP 200) with `scheduledJobs: stale or invalid heartbeat: sales-followups`. This is pre-existing and was not masked. `criticalErrors24h` 0, `retryQueueBacklog` 0, database and storage OK.
+
+## Completion log - asset consolidation verification pass (2026-11-04)
+- Commit `f4a035d` and telemetry `23ea3b0` confirmed on `origin/main`; working tree clean at start.
+- Legacy images: 44 `jackets-all-design` files deleted, 8 kept (still served by `SAMPLE_JACKET_IMAGES` in `app/api/_lib/mjic-prompt.ts`). The directive asked for all 52; deleting the 8 would break the live chat gallery.
+- Verified: `npx tsc --noEmit` exit 0; `npm run lint` 0 errors, 4 pre-existing warnings; `npm test` 350 pass / 0 fail / 1 skipped; `npm run verify:live` 11/11.
+- Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
+- No code or deploy change in this pass.
