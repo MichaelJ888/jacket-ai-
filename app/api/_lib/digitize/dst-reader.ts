@@ -9,7 +9,31 @@ export type DstStats = {
   maxStitchMm: number;
   maxJumpMm: number;
   minStitchMm: number;
+  overLimitStitches: number;
+  limitSplitSegments: number;
 };
+
+// Stitch length limit (mm) used for reporting over-limit stitches in decoded DST files. Jumps are not counted.
+export const STITCH_LIMIT_MM = 6.7;
+
+// Splits a DST move (0.1 mm units) into equal sub-moves that each stay within the limit.
+// The sub-moves always sum exactly to the original (dx, dy); the last sub-move absorbs rounding.
+export function splitMoveForLimit(dx: number, dy: number, limitMm: number = STITCH_LIMIT_MM): Array<{ dx: number; dy: number }> {
+  const lengthMm = Math.hypot(dx, dy) / 10;
+  const parts = Math.max(1, Math.ceil(lengthMm / limitMm));
+  const out: Array<{ dx: number; dy: number }> = [];
+  let accX = 0;
+  let accY = 0;
+  for (let i = 1; i < parts; i += 1) {
+    const sx = Math.round((dx * i) / parts);
+    const sy = Math.round((dy * i) / parts);
+    out.push({ dx: sx - accX, dy: sy - accY });
+    accX = sx;
+    accY = sy;
+  }
+  out.push({ dx: dx - accX, dy: dy - accY });
+  return out;
+}
 
 // Decodes Tajima DST records (3 bytes each, after a 512-byte header). Units are 0.1 mm.
 function decodeDelta(b0: number, b1: number, b2: number) {
@@ -53,6 +77,8 @@ export function readDstStats(buffer: Buffer): DstStats {
   let maxStitch = 0;
   let maxJump = 0;
   let minStitch = Number.POSITIVE_INFINITY;
+  let overLimitStitches = 0;
+  let limitSplitSegments = 0;
 
   for (let offset = 512; offset + 2 < buffer.length; offset += 3) {
     const b0 = buffer[offset];
@@ -79,6 +105,10 @@ export function readDstStats(buffer: Buffer): DstStats {
         maxStitch = Math.max(maxStitch, length);
         minStitch = Math.min(minStitch, length);
       }
+      if (length > STITCH_LIMIT_MM) {
+        overLimitStitches += 1;
+        limitSplitSegments += splitMoveForLimit(dx, dy).length - 1;
+      }
     }
     x += dx;
     y += dy;
@@ -99,5 +129,7 @@ export function readDstStats(buffer: Buffer): DstStats {
     maxStitchMm: maxStitch,
     maxJumpMm: maxJump,
     minStitchMm: Number.isFinite(minStitch) ? minStitch : 0,
+    overLimitStitches,
+    limitSplitSegments,
   };
 }

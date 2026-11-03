@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { readDstStats } from './dst-reader.ts';
-import { matchThreadColor, rgbToLab, type ThreadPaletteEntry } from './thread-match.ts';
+import { ISACORD_PALETTE, matchThreadColor, nearestIsacordThread, rgbToLab, type ThreadPaletteEntry } from './thread-match.ts';
 
 const palette: ThreadPaletteEntry[] = [
   { brand: 'Isacord', code: '0015', name: 'White', rgb: [255, 255, 255] },
@@ -25,6 +25,26 @@ test('matchThreadColor returns the nearest thread within tolerance', () => {
 test('matchThreadColor returns null when nothing is close enough or palette is empty', () => {
   assert.equal(matchThreadColor([255, 0, 0], palette, 5), null);
   assert.equal(matchThreadColor([255, 0, 0], []), null);
+});
+
+test('ISACORD_PALETTE has 398 entries with unique codes and valid RGB', () => {
+  assert.equal(ISACORD_PALETTE.length, 398);
+  assert.equal(new Set(ISACORD_PALETTE.map((e) => e.code)).size, 398);
+  for (const e of ISACORD_PALETTE) {
+    assert.equal(e.brand, 'Isacord');
+    for (const c of e.rgb) assert.ok(Number.isInteger(c) && c >= 0 && c <= 255);
+  }
+});
+
+test('nearestIsacordThread returns the closest Isacord thread for a hex colour', () => {
+  const match = nearestIsacordThread('#003893');
+  assert.ok(match);
+  assert.equal(match.entry.brand, 'Isacord');
+  assert.ok(match.deltaE < 5);
+});
+
+test('nearestIsacordThread returns null for invalid hex', () => {
+  assert.equal(nearestIsacordThread('not-a-colour'), null);
 });
 
 // Calibration against the DBHS 25yrs rev fixture. Set MJIC_DST_FIXTURE to the .DST path to run;
