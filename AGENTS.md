@@ -123,3 +123,11 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Verified: `tsc --noEmit` clean, eslint clean, `npm test` 350 pass / 0 fail / 1 skipped; prod deploy READY and aliased to https://jacket-ai.vercel.app; manual publisher run published 1, failed 0; `/api/health` = `ok`.
 - Not done: the 8 old FAILED Instagram rows (Nov 2-3) were not requeued; they are past the retry window.
 - Still open: restyle of the remaining admin pages (command, digitizer, editor, seo, studio, system-health, video-mockups).
+
+## Completion log - neon admin restyle, final telemetry (2026-11-03)
+- Commit `7225992` on main: scoped `.neon-admin` dark-glass theme in `app/globals.css` (remaps light utilities only under that root). Applied to the 7 remaining admin tools: `/admin/command`, `/admin/digitizer`, `/admin/editor`, `/admin/seo`, `/admin/studio`, `/admin/system-health`, `/admin/video-mockups`. No logic, pricing, SEO, or storefront changes. Editor live preview is an iframe, so it is unaffected.
+- Already present, not changed: `/admin` 1-click launcher bar (Visual Site Editor + CEO AI Studio, `4f2b2b8`); `/status` AI-seat SVG gauge, department performance bars, COO and swarm monitoring.
+- Verified: `tsc --noEmit` clean; eslint 0 errors on changed files (2 pre-existing warnings); `npm test` 350 pass / 0 fail / 1 skipped; prod deploy READY and aliased to https://jacket-ai.vercel.app; `verify:live` 11/11; `/`, `/status`, `/admin/system-health`, `/admin/studio` return 200; live HTML contains `neon-admin`.
+- Not verified visually: admin routes are token-gated, so the restyle was checked by build/type/lint and served-HTML inspection, not by a browser screenshot.
+- Deploy note: `npx vercel --prod --yes` was run twice; the first call printed CLI help rather than deploying. The one live build is `dpl_28UJ7CwSPvd9iqUMBbfzXJv2JHyj` (same commit).
+- Working tree note: tracked images under `public/images/jackets-all-design/` remain deleted locally and are intentionally not committed.
