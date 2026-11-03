@@ -21,14 +21,17 @@ export const CATCH_UP_JOBS: CatchUpJob[] = [
 
 export type HeartbeatRow = { job: string; last_run_at: string | null; last_status: string | null };
 
+// Returns due jobs most-stale first, so the per-pass kick cap can never starve a job.
 export function dueCatchUpJobs(beats: HeartbeatRow[], now = Date.now(), jobs: CatchUpJob[] = CATCH_UP_JOBS): CatchUpJob[] {
   const seen = new Map(beats.map((row) => [row.job, row]));
-  return jobs.filter(({ job, maxAgeMin }) => {
-    const timestamp = seen.get(job)?.last_run_at;
-    const parsed = timestamp ? Date.parse(timestamp) : NaN;
-    if (!Number.isFinite(parsed)) return true; // never ran (or clock garbage) -> due
-    return now - parsed > maxAgeMin * 60_000;
-  });
+  // Never ran (or clock garbage) maps to epoch 0, i.e. due and first in line.
+  const lastRunMs = (job: string) => {
+    const parsed = Date.parse(seen.get(job)?.last_run_at ?? '');
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+  return jobs
+    .filter(({ job, maxAgeMin }) => now - lastRunMs(job) > maxAgeMin * 60_000)
+    .sort((a, b) => lastRunMs(a.job) - lastRunMs(b.job));
 }
 
 export type KickResult = { job: string; path: string; status: number | 'error' };

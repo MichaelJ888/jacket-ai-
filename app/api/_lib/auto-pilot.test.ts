@@ -19,6 +19,15 @@ test('dueCatchUpJobs: fresh jobs are not due, stale and never-ran jobs are due',
   assert.ok(due.includes('watchdog'), 'never-ran job must be due');
 });
 
+test('dueCatchUpJobs: most-stale job comes first so kick caps cannot starve it', () => {
+  const beats: HeartbeatRow[] = CATCH_UP_JOBS.map((job) => ({ job: job.job, last_run_at: ago(5), last_status: 'ok' }));
+  beats.find((row) => row.job === 'sales-followups')!.last_run_at = ago(9_000);
+  beats.find((row) => row.job === 'retry-queue')!.last_run_at = ago(300);
+  const due = dueCatchUpJobs(beats, now).map((job) => job.job);
+  assert.equal(due[0], 'sales-followups');
+  assert.equal(due[1], 'retry-queue');
+});
+
 test('dueCatchUpJobs: invalid timestamps count as due', () => {
   const due = dueCatchUpJobs([{ job: 'retry-queue', last_run_at: 'not-a-date', last_status: 'ok' }], now);
   assert.ok(due.some((job) => job.job === 'retry-queue'));

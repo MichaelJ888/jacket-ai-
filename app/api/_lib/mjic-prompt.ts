@@ -2,14 +2,14 @@
 // Do NOT paraphrase or compress: it holds exact business numbers (phone, prices, GCash).
 
 export const SAMPLE_JACKET_IMAGES = [
-  '/images/jackets-all-design/FINAL%2014.png',
-  '/images/jackets-all-design/FINAL%2017.jpg',
-  '/images/jackets-all-design/final%2020.jpg',
-  '/images/jackets-all-design/FINAL%2024.jpg',
-  '/images/jackets-all-design/FINAL%2027.jpg',
-  '/images/jackets-all-design/FINAL%2030.jpg',
-  '/images/jackets-all-design/final%2033.jpg',
-  '/images/jackets-all-design/FINAL%206.jpg',
+  '/images/company-uniforms/6.jpg',
+  '/images/company-uniforms/1.jpg',
+  '/images/company-uniforms/10.jpg',
+  '/images/company-uniforms/11.jpg',
+  '/images/school-uniforms/d77c14f353da74ca05ddab683607210d.jpg',
+  '/images/school-uniforms/3946cc224506cbe2cffd18ddad7155ba.jpg',
+  '/images/school-uniforms/an-education-volunteer-with-his-high-school-students-in-the-philippines-41a86c-1024.jpg',
+  '/images/polo%20shirts/71-g0Bj8qnL._AC_UY1000_.jpg',
 ];
 
 const SAMPLE_PHOTO_GALLERY_BLOCK = SAMPLE_JACKET_IMAGES
