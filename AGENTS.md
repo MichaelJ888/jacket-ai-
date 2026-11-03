@@ -131,3 +131,10 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Not verified visually: admin routes are token-gated, so the restyle was checked by build/type/lint and served-HTML inspection, not by a browser screenshot.
 - Deploy note: `npx vercel --prod --yes` was run twice; the first call printed CLI help rather than deploying. The one live build is `dpl_28UJ7CwSPvd9iqUMBbfzXJv2JHyj` (same commit).
 - Working tree note: tracked images under `public/images/jackets-all-design/` remain deleted locally and are intentionally not committed.
+
+## Completion log - asset consolidation + final live deploy (2026-11-03)
+- Commit `f4a035d` on main: "feat(assets): clean legacy images & register 27 new product asset folders". 167 files: 27 new product folders (Mugs, Backpacks, Lanyards, T-Shirts, Mouse Pads, sports fest, QC area) and 44 legacy `public/images/jackets-all-design/` deletions. `public/image-library.json` regenerated (496 assets).
+- Kept (not deleted): 8 `jackets-all-design` images still referenced by `SAMPLE_JACKET_IMAGES` in `app/api/_lib/mjic-prompt.ts` (chat first-message gallery). Deleting them would have broken the live chat. To delete them later, repoint that list first.
+- Verified: `npx tsc --noEmit` exit 0; `npm test` 350 pass / 0 fail / 1 skipped; `verify:live` 11/11; new asset URLs and kept chat images HTTP 200.
+- Deploy: `npx vercel --prod --yes` produced Ready Production deployment `jacket-lezhsungn-michaeljeffreyy17-7593.vercel.app` (aliased to https://jacket-ai.vercel.app). The CLI printed help JSON after the deploy, so the status was confirmed with `vercel ls`.
+- Open: `/api/health` returns `degraded` (HTTP 200) with `scheduledJobs: stale or invalid heartbeat: sales-followups`. This is pre-existing and was not masked. `criticalErrors24h` 0, `retryQueueBacklog` 0, database and storage OK.
