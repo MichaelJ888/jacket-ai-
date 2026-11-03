@@ -109,3 +109,10 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Isacord palette confirmed loaded: 398 entries, unique codes, valid RGB. No CSV chart error reported. Digitizer tests pass.
 - Publisher heartbeat left unchanged: `content-publisher` last run failed (2 failed posts, 2026-11-03 03:22 UTC). Not masked.
 - Git: branch `main`, HEAD `135a4c9` before this change.
+
+## Completion log - Admin launcher neon + status gauge (2026-11-03)
+- Commit `4f2b2b8` on main: `/admin` quick-launch bar restyled dark-neon (same links, sticky; panel-width control unchanged); `/status` gained an SVG AI-seat gauge.
+- Verified: `tsc --noEmit` clean, eslint clean on changed files, `npm test` 350 pass / 0 fail / 1 skipped; prod deploy READY and aliased to https://jacket-ai.vercel.app; `verify:live` 11/11.
+- Health: `/api/health` = `degraded` only on `scheduledJobs` (last run `content-publisher` failed). Criticals 0, DB ok, storage ok. Not masked.
+- Not done: restyle of the other admin pages (command, digitizer, editor, seo, studio, system-health, video-mockups) and Telegram-based 2FA endpoint checks; these remain open.
+- Working tree note: ~60 tracked images under `public/images/jackets-all-design/` are deleted locally and several image folders are untracked; not part of this commit.
