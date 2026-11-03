@@ -143,3 +143,13 @@ test('digitizeLogo names threads from a supplied palette', async () => {
   assert.ok(result.colors.some((color) => color.name.startsWith('Thread ')));
 });
 
+test('digitizeLogo defaults to Isacord thread colors and a 6.7 mm stitch limit', async () => {
+  const image = await makeSyntheticLogo();
+  const result = await digitizeLogo({ image, widthMm: 60, maxColors: 4 });
+  assert.ok(result.colors.length > 0);
+  for (const color of result.colors) {
+    assert.match(color.name, /^Isacord \d{4} /);
+  }
+  assert.ok(result.qa.maxStitchLengthMm <= 6.7, `max stitch ${result.qa.maxStitchLengthMm} mm exceeds 6.7 mm`);
+});
+

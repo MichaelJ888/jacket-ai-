@@ -1,7 +1,8 @@
 import sharp from 'sharp';
 
 import { encodeAllFormats } from './encoders.ts';
-import { matchThreadColor, rgbToLab, type Lab } from './thread-match.ts';
+import { STITCH_LIMIT_MM } from './dst-reader.ts';
+import { matchThreadColor, nearestIsacordThread, rgbToLab, type Lab } from './thread-match.ts';
 import { resolveStitchSettings } from './stitch-settings.ts';
 import type { DigitizeInput, DigitizeQa, DigitizeResult, QaThreadSummary, Stitch, ThreadColor } from './types.ts';
 
@@ -641,6 +642,9 @@ function generateStitches(rasterized: Rasterized, angle: number, rowSpacingMm: n
   return { stitches, colorChanges, jumps, trims, warnings };
 }
 
+// Stitch limit in 0.1 mm units; 1 unit of margin absorbs integer rounding so no stitch exceeds 6.7 mm.
+const MAX_STITCH_UNITS = Math.floor(STITCH_LIMIT_MM * 10) - 1;
+
 function splitLongCommands(stitches: Stitch[]) {
   const normalized: Stitch[] = [];
   let current = { x: 0, y: 0 };
@@ -649,7 +653,7 @@ function splitLongCommands(stitches: Stitch[]) {
       normalized.push(stitch);
       continue;
     }
-    const maxDistance = stitch.command === 'jump' ? 121 : 70;
+    const maxDistance = stitch.command === 'jump' ? 121 : MAX_STITCH_UNITS;
     const distance = pointDistance(current, stitch);
     if (distance <= maxDistance || distance === 0) {
       normalized.push(stitch);
@@ -851,11 +855,14 @@ async function rasterize(input: DigitizeInput): Promise<Rasterized> {
     const rgb = paletteLabs[index].rgb;
     const colorIndex = colors.length;
     labelToColor.set(index, colorIndex);
-    const match = matchThreadColor(rgb, input.threadPalette ?? []);
+    // Default: every color snaps to its nearest Isacord thread. A caller-supplied palette keeps the threshold match.
+    const useIsacord = !input.threadPalette;
+    const match = useIsacord ? nearestIsacordThread(rgb) : matchThreadColor(rgb, input.threadPalette ?? []);
+    const colorRgb = useIsacord && match ? match.entry.rgb : rgb;
     colors.push({
       index: colorIndex,
-      rgb,
-      hex: rgbToHex(rgb),
+      rgb: colorRgb,
+      hex: rgbToHex(colorRgb),
       name: match
         ? `${match.entry.brand} ${match.entry.code} ${match.entry.name}`
         : `Thread ${colorIndex + 1} ${rgbToHex(rgb).toUpperCase()}`,
