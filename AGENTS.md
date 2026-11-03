@@ -92,3 +92,10 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Commit `17ca7e6` on main: auto-digitized logos snap each color to the nearest Isacord thread when no palette is supplied; stitches split at the 6.7 mm limit before encoding.
 - Verified: npm test 341 pass / 0 fail / 1 skipped (342 total).
 - Health at this entry: `/api/health` degraded from pre-fix `embroidery:auto-digitize` "Maximum call stack size exceeded" critical logs (2026-11-02 14:41-15:49 UTC, inside the 24h window) and a `content-publisher` run (2026-11-03 03:22 UTC) with 2 failed posts. Video generation is blocked by Vercel AI Gateway billing (credit card required), which needs an account owner action.
+
+## Completion log - Health resolution and final telemetry (2026-11-03)
+- Schema: `system_logs` gained `resolved_at` and `resolution_note` (applied via `npm run db:push`). `/api/health` `criticalErrors24h` now counts only unresolved critical rows.
+- Resolved the 3 legacy `embroidery:auto-digitize` "Maximum call stack size exceeded" rows (2026-11-02 14:41-15:49 UTC; fix `f52e546` landed 2026-11-02 16:11 UTC). Added an info-level `system:resolution` note row.
+- Isacord palette confirmed loaded: 398 entries, unique codes, valid RGB. No CSV chart error reported. Digitizer tests pass.
+- Publisher heartbeat left unchanged: `content-publisher` last run failed (2 failed posts, 2026-11-03 03:22 UTC). Not masked.
+- Git: branch `main`, HEAD `135a4c9` before this change.

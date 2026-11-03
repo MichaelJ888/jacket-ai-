@@ -384,6 +384,9 @@ create table if not exists public.system_logs (
   created_at timestamptz not null default now()
 );
 
+alter table public.system_logs add column if not exists resolved_at timestamptz;
+alter table public.system_logs add column if not exists resolution_note text;
+
 create index if not exists system_logs_created_idx on public.system_logs (created_at desc);
 alter table public.system_logs enable row level security;
 revoke all on public.system_logs from anon, authenticated;

@@ -50,7 +50,7 @@ export async function GET() {
     try {
       const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const [critical, queue, heartbeats] = await Promise.all([
-        supabase.from('system_logs').select('id', { count: 'exact', head: true }).eq('severity', 'critical').gte('created_at', since),
+        supabase.from('system_logs').select('id', { count: 'exact', head: true }).eq('severity', 'critical').is('resolved_at', null).gte('created_at', since),
         supabase.from('outbound_request_queue').select('id', { count: 'exact', head: true }).eq('status', 'PENDING'),
         supabase.from('job_heartbeats').select('job, last_run_at, last_status'),
       ]);
