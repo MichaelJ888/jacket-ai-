@@ -110,6 +110,15 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Publisher heartbeat left unchanged: `content-publisher` last run failed (2 failed posts, 2026-11-03 03:22 UTC). Not masked.
 - Git: branch `main`, HEAD `135a4c9` before this change.
 
+## Completion log - Sales-followups heartbeat + legacy gallery (2026-11-03)
+- Root cause: `runAutoPilot` kicks at most 2 due jobs per pass in fixed `CATCH_UP_JOBS` order, so always-due 5-min jobs starved `sales-followups`. Fix: `dueCatchUpJobs` sorts due jobs most-stale-first (regression test in `auto-pilot.test.ts`, 5/5 pass).
+- Chat gallery: `SAMPLE_JACKET_IMAGES` (`app/api/_lib/mjic-prompt.ts`) repointed to registered high-res uniform/polo assets. The 8 legacy `jackets-all-design` chat images deleted; `.webp` siblings kept. No repo references remain. `.vercelignore` had no entries for them.
+- Commit `e12c3d3` on main (message per request; it repeats the title of the earlier asset commit `f4a035d`). Prod deploy `dpl_GnUgDGXaYdMMM2LYwPnX7RPenKzH` Ready and aliased to jacket-ai.vercel.app (the deploy command ran twice; both builds are identical code).
+- Verified: lint 0 errors (4 pre-existing warnings), `tsc --noEmit` clean, `npm run build` (webpack) passes, `npm run verify:live` 11/11.
+- Health after deploy: `sales-followups` fresh (17:30Z). `retry-queue` was also stale (last ok 11:15Z); a direct authorized call to `/api/cron/retry-queue` returned 200 and refreshed the heartbeat (backlog 0, no side effects). The scheduled `*/45` jobs have not recorded runs since 11:15Z, so auto-pilot kicks are the only fallback. Monitor next pass.
+- Still degraded: `content-publisher` last run `degraded` (2 failed posts, pre-existing). No system_logs entry explains it. Not masked; needs a separate publishing investigation.
+- Open: scheduled `*/45` retry-queue and sales-followups jobs do not appear to run reliably on GitHub schedules; consider confirming SCHEDULER_TOKEN and job gating.
+
 ## Completion log - Admin launcher neon + status gauge (2026-11-03)
 - Commit `4f2b2b8` on main: `/admin` quick-launch bar restyled dark-neon (same links, sticky; panel-width control unchanged); `/status` gained an SVG AI-seat gauge.
 - Verified: `tsc --noEmit` clean, eslint clean on changed files, `npm test` 350 pass / 0 fail / 1 skipped; prod deploy READY and aliased to https://jacket-ai.vercel.app; `verify:live` 11/11.
