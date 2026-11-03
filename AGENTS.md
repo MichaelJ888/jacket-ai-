@@ -93,6 +93,16 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Verified: npm test 341 pass / 0 fail / 1 skipped (342 total).
 - Health at this entry: `/api/health` degraded from pre-fix `embroidery:auto-digitize` "Maximum call stack size exceeded" critical logs (2026-11-02 14:41-15:49 UTC, inside the 24h window) and a `content-publisher` run (2026-11-03 03:22 UTC) with 2 failed posts. Video generation is blocked by Vercel AI Gateway billing (credit card required), which needs an account owner action.
 
+## Completion log - Command center, auto-pilot, 2FA, org matrix, public status (2026-11-03)
+- Commit `d1a4439` on main; prod deploy Ready (jacket-5exf4snrk); verify:live 11/11; npm test 350 pass / 0 fail / 1 skipped; tsc --noEmit and eslint clean.
+- Auto-pilot self-healing: `/api/cron/auto-pilot` + `app/api/_lib/auto-pilot.ts` re-invoke stale sub-daily cron routes; scheduler.yml `auto-pilot` job runs on EVERY trigger. Root cause of stale sales-followups/retry-queue heartbeats: GitHub delayed a 01:30 UTC scheduled run to 08:23 UTC (7h). Verified live: pass 1 kicked embroidery-pickup-alerts + swarm-worker (200), pass 2 improvement-scout; staleness cleared.
+- Admin merge: hub chooser removed from `/admin` (single unified dashboard); sticky launcher gains 🚀 Command Center; duplicate editor/health/digitizer text links removed; storefront "Admin"/"Admin Hub" duplication merged to one Command Center entry (header, mobile menu, footer) + public "System Status" footer link.
+- Telegram 2FA: `/api/admin/auth/otp` gates `/admin` login (6-digit, sha256 in `admin_otp_codes`, 10-min, single-use, 5 attempts, FAIL-OPEN when Telegram unconfigured). Editor keeps its own stricter OTP. Other /admin/* pages still accept the raw admin token (documented; full middleware coverage deferred).
+- New pages: `/admin/command` (spaceship command center: live swarm stream via /api/telemetry, diagnostics, department matrix, org chart, 1-push Auto-Pilot → POST /api/admin/coo) and public `/status` (Master AI Status & Feature Checklist, polls /api/status/public every 60s).
+- Org: `app/api/_lib/org-structure.json` = Board → CEO → C-Suite → VPs → Regional AMER/EMEA/APAC, 27 nodes, 6 departments; seat status rolls up from job heartbeats (`org-structure.ts`).
+- Catalog: CG Canvas Eco Tote Bag + CG Ceramic Corporate Mug images committed; image-library.json regenerated (396 items, 0 missing).
+- Open (account owner action): `/api/health` stays degraded on `content-publisher` — Vercel AI Gateway needs a credit card for video generation. Not masked, by design.
+
 ## Completion log - Health resolution and final telemetry (2026-11-03)
 - Schema: `system_logs` gained `resolved_at` and `resolution_note` (applied via `npm run db:push`). `/api/health` `criticalErrors24h` now counts only unresolved critical rows.
 - Resolved the 3 legacy `embroidery:auto-digitize` "Maximum call stack size exceeded" rows (2026-11-02 14:41-15:49 UTC; fix `f52e546` landed 2026-11-02 16:11 UTC). Added an info-level `system:resolution` note row.
