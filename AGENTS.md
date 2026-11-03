@@ -110,6 +110,14 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Publisher heartbeat left unchanged: `content-publisher` last run failed (2 failed posts, 2026-11-03 03:22 UTC). Not masked.
 - Git: branch `main`, HEAD `135a4c9` before this change.
 
+## Completion log - Meta anti-ban posting cap (2026-11-04)
+- Hard cap: at most 4 successful posts per platform in any rolling 24h window (`CONTENT_MAX_POSTS_PER_DAY` can lower it, never raise it). Enforced in `runContentPipeline` and `publishApprovedStudioImage` via `app/api/_lib/content-policy.ts`.
+- Posting slots are now 4 PHT peaks (09:30, 13:30, 16:00, 20:30) with +/-12 min jitter; the old 9-slot table is removed. `content-plan` uses the same slots.
+- Instagram "still processing" is a `MediaProcessingPending` error: the claim is reverted and no attempt is consumed (previously it counted as a failure).
+- Stale READY row `49c1c09b` (missing file, slot passed) is left to the existing 36h missed-slot sweep.
+- Not done: CGVenezuela page automation (no page ID/token configured), multi-page Sales Closer, and wiring the 23 local videos (video generation blocked by AI Gateway billing).
+- Verified: tsc --noEmit clean; lint 0 errors; npm test 357 pass / 0 fail / 1 skipped.
+
 ## Completion log - Sales-followups heartbeat + legacy gallery (2026-11-03)
 - Root cause: `runAutoPilot` kicks at most 2 due jobs per pass in fixed `CATCH_UP_JOBS` order, so always-due 5-min jobs starved `sales-followups`. Fix: `dueCatchUpJobs` sorts due jobs most-stale-first (regression test in `auto-pilot.test.ts`, 5/5 pass).
 - Chat gallery: `SAMPLE_JACKET_IMAGES` (`app/api/_lib/mjic-prompt.ts`) repointed to registered high-res uniform/polo assets. The 8 legacy `jackets-all-design` chat images deleted; `.webp` siblings kept. No repo references remain. `.vercelignore` had no entries for them.

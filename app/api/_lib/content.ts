@@ -14,6 +14,14 @@ import { getPageToken } from './meta-pages';
 import { checkMetaPublishing, metaPublishFailure, type MetaPlatform } from './meta-publishing';
 import { recordMetaPublishingHealth } from './meta-publishing-alerts';
 import { SAMPLE_JACKET_IMAGES } from './mjic-prompt';
+import {
+  DAY_MS,
+  MediaProcessingPending,
+  POSTING_SLOTS_PHT,
+  jitterMinutes,
+  maxPostsPerDay,
+  selectWithinQuota,
+} from './content-policy';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const VIDEO_MODEL = 'google/veo-3.1-fast-generate-001';
@@ -41,12 +49,6 @@ const FALLBACK_IDEAS: IdeaPost[] = [
   { theme: 'sample', caption: 'Gusto mong makita muna ang quality? 1-pc sample available, at fully deductible sa final order. Zero risk! Message us today.', hashtags: ['#MJIC', '#UniformSupplier', '#MadeInPH'], video: false, videoPrompt: '' },
   { theme: 'factory', caption: 'Behind the scenes sa MJIC: cutting, embroidery, at precision stitching. 25+ years ng experience sa bawat tahi.', hashtags: ['#MJIC', '#FactoryStyle', '#CustomApparel'], video: true, videoPrompt: 'Cinematic vertical video inside a Philippine garment factory: cutting table, embroidery machine stitching a logo, seamstresses assembling navy corporate jackets, close-up of zipper and stitching, premium lighting, no text overlays.' },
   { theme: 'team', caption: 'Ang suot ng team ninyo ang mukha ng inyong brand. Custom company jackets at uniforms, delivered nationwide. Request a quote!', hashtags: ['#MJIC', '#CompanyUniform', '#BrandWear'], video: false, videoPrompt: '' },
-];
-
-// Daily posting times in Manila (UTC+8). Scheduled by GitHub Actions (scheduler.yml), since Vercel Hobby crons run once a day.
-export const POSTING_SLOTS_MANILA: ReadonlyArray<{ hour: number; minute: number }> = [
-  { hour: 9, minute: 0 }, { hour: 11, minute: 0 }, { hour: 13, minute: 30 }, { hour: 15, minute: 0 }, { hour: 18, minute: 0 },
-  { hour: 21, minute: 0 }, { hour: 1, minute: 0 }, { hour: 3, minute: 0 }, { hour: 6, minute: 0 },
 ];
 
 // Manila is UTC+8 with no DST.
@@ -87,24 +89,25 @@ export async function planContent(days = 7) {
   const last = await supabase.from('content_calendar').select('scheduled_at').order('scheduled_at', { ascending: false }).limit(1).maybeSingle();
   const startOffset = last.data ? Math.max(1, Math.ceil((new Date(last.data.scheduled_at).getTime() - Date.now()) / 86400000) + 1) : 1;
 
-  const slotCount = POSTING_SLOTS_MANILA.length;
+  const slotCount = POSTING_SLOTS_PHT.length;
   let ideas = await generateIdeas(days * slotCount);
   if (!ideas.length) ideas = FALLBACK_IDEAS;
   const maxVideosPerWeek = Number(process.env.CONTENT_VIDEOS_PER_WEEK || 2);
   let videosLeft = maxVideosPerWeek;
 
   // One idea per posting slot; each idea fans out to every platform at that slot's time.
+  // Each slot gets a small random offset so posts do not land on a fixed, bot-like minute.
   const rows: Array<Record<string, unknown>> = [];
   for (let day = 0; day < days; day += 1) {
     for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
-      const slot = POSTING_SLOTS_MANILA[slotIndex];
+      const slot = POSTING_SLOTS_PHT[slotIndex];
       const ideaIndex = day * slotCount + slotIndex;
       const idea = ideas[ideaIndex % ideas.length];
       const isVideo = idea.video && videosLeft > 0;
       if (isVideo) videosLeft -= 1;
       const imageUrl = `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + ideaIndex) % SAMPLE_JACKET_IMAGES.length]}`;
-      const videoPrompt = isVideo ? `${idea.videoPrompt} [${manilaSlot(startOffset + day, 0).toISOString().slice(0, 10)}]` : null;
-      const scheduledAt = manilaSlot(startOffset + day, slot.hour, slot.minute).toISOString();
+      const videoPrompt = isVideo ? idea.videoPrompt : null;
+      const scheduledAt = manilaSlot(startOffset + day, slot.hour, slot.minute + jitterMinutes(12)).toISOString();
 
       const platforms: Platform[] = isVideo ? ['facebook', 'instagram', 'youtube', 'tiktok'] : ['facebook', 'instagram'];
       for (const platform of platforms) {
@@ -293,7 +296,7 @@ async function publishInstagram(row: CalendarRow, mediaUrl: string | null, valid
       if (status.status_code === 'FINISHED') finished = true;
       if (status.status_code === 'ERROR') throw new Error('Instagram rejected the media');
     }
-    if (!finished) throw new Error('Instagram is still processing the media; will retry');
+    if (!finished) throw new MediaProcessingPending('Instagram is still processing the media; will retry');
   }
   const published = await graphPost(`/${igId}/media_publish`, { creation_id: creationId }, token);
   await requireMetaPostSuccess('instagram', published);
@@ -355,6 +358,18 @@ async function publishTiktok(row: CalendarRow, mediaUrl: string | null) {
 
 type PublishSummary = { published: number; failed: number; needsCredentials: string[]; credentialIssues: Record<string, string> };
 
+// Successful posts per platform in the rolling 24h window. Returns null when the count cannot be read, so callers fail closed.
+async function publishedLast24hByPlatform(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<Record<string, number> | null> {
+  const { data, error } = await supabase.from('content_calendar').select('platform').eq('status', 'PUBLISHED').gte('published_at', new Date(Date.now() - DAY_MS).toISOString());
+  if (error) {
+    console.error('Content publisher could not count recent posts:', error.message);
+    return null;
+  }
+  const counts: Record<string, number> = {};
+  for (const row of data || []) counts[row.platform] = (counts[row.platform] || 0) + 1;
+  return counts;
+}
+
 // Claims one READY row and publishes it. Shared by the slot publisher and approved studio posts.
 async function publishCalendarRow(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>, row: CalendarRow, validateMeta: ReturnType<typeof createMetaPublishingPreflight>, summary: PublishSummary) {
   // Atomic claim: overlapping publisher runs (slot crons + */45 job) must not post the same row twice.
@@ -377,7 +392,10 @@ async function publishCalendarRow(supabase: NonNullable<ReturnType<typeof getSup
     void sendTelegramMessage(`<b>POSTED on ${row.platform.toUpperCase()}</b>\n${escapeTelegramHtml(row.caption.slice(0, 200))}${result.url ? `\n${escapeTelegramHtml(result.url)}` : ''}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (error instanceof MissingCredentials) {
+    if (error instanceof MediaProcessingPending) {
+      // Not a failure: undo the claim so the row is retried on a later run without using up an attempt.
+      await supabase.from('content_calendar').update({ status: 'READY', attempts: row.attempts, error: message.slice(0, 500) }).eq('id', row.id);
+    } else if (error instanceof MissingCredentials) {
       await supabase.from('content_calendar').update({ status: 'NEEDS_CREDENTIALS', error: message, attempts: row.attempts }).eq('id', row.id);
       if (!summary.needsCredentials.includes(row.platform)) summary.needsCredentials.push(row.platform);
       summary.credentialIssues[row.platform] = message;
@@ -433,7 +451,11 @@ export async function publishApprovedStudioImage(imageUrl: string) {
 
   const validateMeta = createMetaPublishingPreflight();
   const summary: PublishSummary = { published: 0, failed: 0, needsCredentials: [], credentialIssues: {} };
-  for (const row of data as CalendarRow[]) await publishCalendarRow(supabase, row, validateMeta, summary);
+  // Over-quota rows stay READY and go out on a later pipeline run, inside the same 24h cap.
+  const used = await publishedLast24hByPlatform(supabase);
+  if (!used) throw new Error('Could not count recent posts; studio post queued but not published');
+  const due = selectWithinQuota(data as CalendarRow[], used, maxPostsPerDay(process.env.CONTENT_MAX_POSTS_PER_DAY));
+  for (const row of due) await publishCalendarRow(supabase, row, validateMeta, summary);
   return summary;
 }
 
@@ -456,10 +478,15 @@ export async function runContentPipeline(origin: string, validateMeta = createMe
     .lte('scheduled_at', new Date().toISOString())
     .lt('attempts', 3)
     .order('scheduled_at')
-    .limit(4);
+    .limit(20);
+
+  // Anti-ban cap: never more than maxPostsPerDay() successful posts per platform in any rolling 24h window.
+  const used = await publishedLast24hByPlatform(supabase);
+  if (!used) return { error: 'Could not count recent posts; publishing paused for this run' };
+  const due = selectWithinQuota((data || []) as CalendarRow[], used, maxPostsPerDay(process.env.CONTENT_MAX_POSTS_PER_DAY));
 
   const summary: PublishSummary & { videosStarted: unknown; videoErrors: string[] } = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [], credentialIssues: {} };
-  for (const row of (data || []) as CalendarRow[]) await publishCalendarRow(supabase, row, validateMeta, summary);
+  for (const row of due) await publishCalendarRow(supabase, row, validateMeta, summary);
 
   for (const platform of summary.needsCredentials) {
     if (platform !== 'facebook' && platform !== 'instagram') {
