@@ -87,3 +87,8 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Open: Isacord palette NOT loaded (deferred; needs official Amann chart export). Attached reference chart was DMC, not Isacord.
 - Open: DBHS max regular stitch measures 8.73 mm vs 6.7 mm worksheet; reader matches file bytes, so the discrepancy is in the source/worksheet, not the parser. Digitizer cap unchanged at 7.0 mm.
 - Verified: npm test 333/333 (MJIC_DST_FIXTURE set), tsc --noEmit and eslint clean; Vercel prod Ready; verify:live 11/11.
+
+## Completion log - Isacord default + 6.7 mm stitch limit (2026-11-03)
+- Commit `17ca7e6` on main: auto-digitized logos snap each color to the nearest Isacord thread when no palette is supplied; stitches split at the 6.7 mm limit before encoding.
+- Verified: npm test 341 pass / 0 fail / 1 skipped (342 total).
+- Health at this entry: `/api/health` degraded from pre-fix `embroidery:auto-digitize` "Maximum call stack size exceeded" critical logs (2026-11-02 14:41-15:49 UTC, inside the 24h window) and a `content-publisher` run (2026-11-03 03:22 UTC) with 2 failed posts. Video generation is blocked by Vercel AI Gateway billing (credit card required), which needs an account owner action.
