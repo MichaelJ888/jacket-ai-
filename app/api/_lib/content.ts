@@ -284,15 +284,16 @@ async function publishInstagram(row: CalendarRow, mediaUrl: string | null, valid
   await requireMetaPostSuccess('instagram', container);
   const creationId = String(container.data.id);
 
-  if (row.media_type === 'video') {
+  // Meta rejects media_publish ("Media ID is not available") until the container is FINISHED, so images are polled too.
+  {
     let finished = false;
-    for (let attempt = 0; attempt < 12 && !finished; attempt += 1) {
+    for (let attempt = 0; attempt < (row.media_type === 'video' ? 12 : 6) && !finished; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 4000));
       const status = await fetch(`${GRAPH}/${creationId}?fields=status_code`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) }).then((response) => response.json()).catch(() => ({}));
       if (status.status_code === 'FINISHED') finished = true;
-      if (status.status_code === 'ERROR') throw new Error('Instagram rejected the video');
+      if (status.status_code === 'ERROR') throw new Error('Instagram rejected the media');
     }
-    if (!finished) throw new Error('Instagram is still processing the video; will retry');
+    if (!finished) throw new Error('Instagram is still processing the media; will retry');
   }
   const published = await graphPost(`/${igId}/media_publish`, { creation_id: creationId }, token);
   await requireMetaPostSuccess('instagram', published);
