@@ -65,7 +65,7 @@ export default function SeoRankTrackerPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl p-6 text-zinc-900">
+    <main className="neon-admin mx-auto max-w-5xl p-6 text-zinc-900">
       <nav aria-label="Admin" className="mb-6 flex items-center justify-between">
         <Link href="/admin" className="text-sm underline">← Back to admin</Link>
         <h1 className="text-xl font-bold">SEO Rank Tracker</h1>

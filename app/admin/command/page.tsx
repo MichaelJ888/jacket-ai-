@@ -148,7 +148,7 @@ export default function CommandCenterPage() {
 
   if (!authed) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-zinc-950 p-6 text-zinc-100">
+      <main className="neon-admin flex min-h-screen items-center justify-center bg-zinc-950 p-6 text-zinc-100">
         <form
           className={`${panel} flex w-full max-w-sm flex-col gap-3`}
           onSubmit={(event) => {
@@ -178,7 +178,7 @@ export default function CommandCenterPage() {
   const jobs = telemetry?.jobs || [];
 
   return (
-    <main className="min-h-screen bg-zinc-950 p-4 text-zinc-100 sm:p-6">
+    <main className="neon-admin min-h-screen bg-zinc-950 p-4 text-zinc-100 sm:p-6">
       <div className="mx-auto max-w-6xl space-y-4">
         <header className={`${panel} flex flex-wrap items-center justify-between gap-3`}>
           <div>

@@ -138,7 +138,7 @@ export default function CeoAiStudioPage() {
 
   if (signedIn === false) {
     return (
-      <main className="mx-auto max-w-xl p-6 text-zinc-900">
+      <main className="neon-admin mx-auto max-w-xl p-6 text-zinc-900">
         <h1 className="mb-3 text-xl font-bold">CEO AI Studio</h1>
         <p className="mb-4 text-sm text-zinc-600">Sign in through the Visual Site Editor first, then come back here.</p>
         <Link href="/admin/editor" className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-semibold text-white">Sign in</Link>
@@ -147,7 +147,7 @@ export default function CeoAiStudioPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl p-6 text-zinc-900">
+    <main className="neon-admin mx-auto max-w-5xl p-6 text-zinc-900">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold">CEO AI Studio &amp; Enhancer</h1>
         <Link href="/admin" className="text-sm underline">← MJIC Admin</Link>

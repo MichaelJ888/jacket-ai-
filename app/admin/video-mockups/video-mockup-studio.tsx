@@ -328,7 +328,7 @@ export default function VideoMockupStudio() {
 
   if (!authed) {
     return (
-      <main className="mx-auto max-w-sm p-8 text-zinc-900">
+      <main className="neon-admin mx-auto max-w-sm p-8 text-zinc-900">
         <a className="text-sm underline" href="/admin">← MJIC Admin</a>
         <h1 className="mb-2 mt-6 text-2xl font-bold">Local jacket video mockups</h1>
         <p className="mb-4 text-sm text-zinc-600">Sign in with your MJIC admin password. Artwork stays in this browser.</p>
@@ -343,7 +343,7 @@ export default function VideoMockupStudio() {
   }
 
   return (
-    <main className="min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-8">
+    <main className="neon-admin min-h-screen bg-zinc-50 px-4 py-6 text-zinc-900 sm:px-8">
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>

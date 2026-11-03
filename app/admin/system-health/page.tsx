@@ -97,7 +97,7 @@ export default function SystemHealthPage() {
 
   if (!authed) {
     return (
-      <main className="mx-auto max-w-md p-6">
+      <main className="neon-admin mx-auto max-w-md p-6">
         <h1 className="mb-4 text-xl font-semibold">AI COO System Health</h1>
         <form
           className="flex flex-col gap-3"
@@ -132,7 +132,7 @@ export default function SystemHealthPage() {
   const overall = data?.overall || "ok";
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <main className="neon-admin mx-auto max-w-3xl p-6">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">AI COO System Health</h1>

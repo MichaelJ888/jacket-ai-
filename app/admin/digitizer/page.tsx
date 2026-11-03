@@ -139,7 +139,7 @@ export default function EmbroideryDigitizerPage() {
 
   if (!signedIn) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-6 text-slate-900">
+      <main className="neon-admin min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-6 text-slate-900">
         <div className={`mx-auto mt-16 max-w-xl ${card}`}>
           <h1 className="mb-3 text-2xl font-extrabold tracking-tight">Embroidery Auto-Digitizer</h1>
           <p className="mb-6 text-sm text-slate-600">Sign in through the Visual Site Editor first, then come back here.</p>
@@ -152,7 +152,7 @@ export default function EmbroideryDigitizerPage() {
   const qa = result?.qa;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 text-slate-900">
+    <main className="neon-admin min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 text-slate-900">
       <header className="bg-gradient-to-r from-slate-900 via-indigo-900 to-sky-800 px-6 py-10 text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap items-end justify-between gap-4">
           <div>

@@ -272,7 +272,7 @@ export default function EditorPage() {
 
   if (stage !== 'editing') {
     return (
-      <main className="min-h-screen grid place-items-center bg-zinc-100 p-6">
+      <main className="neon-admin min-h-screen grid place-items-center bg-zinc-100 p-6">
         <div className="w-full max-w-sm rounded-xl bg-white p-8 shadow-lg">
           <h1 className="text-xl font-bold text-zinc-900">MJIC Visual Editor</h1>
           <p className="mt-1 text-sm text-zinc-500">Restricted to the CEO and Ms. Anne Manalo.</p>
@@ -310,7 +310,7 @@ export default function EditorPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col bg-zinc-100">
+    <main className="neon-admin flex min-h-screen flex-col bg-zinc-100">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-zinc-200 bg-white px-4 py-3">
         <h1 className="mr-2 text-base font-bold text-zinc-900">Visual Editor</h1>
         <nav className="flex flex-wrap gap-1">

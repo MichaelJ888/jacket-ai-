@@ -24,3 +24,52 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Futuristic dark-glass theme for admin tools. Scoped to .neon-admin so the public storefront is untouched. */
+.neon-admin {
+  background: radial-gradient(circle at 15% 0%, rgba(34, 211, 238, 0.12), transparent 40%), radial-gradient(circle at 90% 10%, rgba(232, 121, 249, 0.1), transparent 45%), #05060b !important;
+  color: #e4e4e7;
+  min-height: 100vh;
+}
+.neon-admin h1 { text-shadow: 0 0 18px rgba(34, 211, 238, 0.35); }
+.neon-admin .bg-white,
+.neon-admin .bg-zinc-50,
+.neon-admin .bg-zinc-100,
+.neon-admin .bg-slate-50,
+.neon-admin .bg-gray-50,
+.neon-admin .bg-indigo-50,
+.neon-admin .bg-sky-50 {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12), 0 0 24px -10px rgba(34, 211, 238, 0.35);
+}
+.neon-admin .bg-amber-50 { background-color: rgba(251, 191, 36, 0.1) !important; }
+.neon-admin .bg-emerald-50 { background-color: rgba(52, 211, 153, 0.1) !important; }
+.neon-admin .bg-red-50 { background-color: rgba(248, 113, 113, 0.1) !important; }
+.neon-admin .text-slate-900,
+.neon-admin .text-zinc-900,
+.neon-admin .text-gray-900 { color: #f4f4f5 !important; }
+.neon-admin .text-slate-800,
+.neon-admin .text-slate-700,
+.neon-admin .text-zinc-800,
+.neon-admin .text-gray-700 { color: #d4d4d8 !important; }
+.neon-admin .text-slate-600,
+.neon-admin .text-slate-500,
+.neon-admin .text-zinc-600,
+.neon-admin .text-gray-600,
+.neon-admin .text-gray-500 { color: #a1a1aa !important; }
+.neon-admin .border-zinc-200,
+.neon-admin .border-zinc-300,
+.neon-admin .border-slate-200,
+.neon-admin .border-slate-300,
+.neon-admin .border-gray-200,
+.neon-admin .border-gray-300 { border-color: rgba(255, 255, 255, 0.14) !important; }
+.neon-admin input,
+.neon-admin textarea,
+.neon-admin select {
+  background-color: rgba(0, 0, 0, 0.4);
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+.neon-admin input::placeholder,
+.neon-admin textarea::placeholder { color: #71717a; }
