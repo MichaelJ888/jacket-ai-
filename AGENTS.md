@@ -163,6 +163,15 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - hotlines on every post + publisher check (2026-11-04)
+- Commit `148181f` on main: `withContactFooter` (`app/api/_lib/content-policy.ts`) appends Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61 to every published caption (Facebook, Instagram, YouTube). Applied in `fullCaption` at publish time, idempotent, so existing calendar rows get it too. The planner prompt tells the LLM not to write numbers itself.
+- Deploy: `npx vercel --prod --yes`; build `jacket-lfu2kgf99` Ready, Production.
+- Verified: `tsc --noEmit` exit 0; eslint clean on changed files; `npm test` 358 pass / 0 fail / 1 skipped; `verify:live` 11/11; `/api/health` `ok`.
+- Schedule: NOT changed. The calendar has 577 READY rows (289 Facebook, 288 Instagram), not 36, and the earliest is already due (2026-11-03 17:00 UTC). Nothing is set for December 9, so no shift was needed.
+- Live publish: `content-publisher` returned 200 twice with `published: 0, failed: 0`. The anti-ban cap held: 24h published were 5 Facebook/MJIC and 4 Instagram/MJIC. 7 READY rows are due and will post as the rolling window clears.
+- Not done: first video ad. No video row is READY; all `AWAITING_VIDEO` rows are blocked by Vercel AI Gateway billing (credit card needed).
+- Not done: CGVenezuela binding. `META_CGV_PAGE_ID` and `META_CGV_PAGE_ACCESS_TOKEN` are not configured (not in `.env.local` or the repo). Set them in Vercel env, then the existing `cgv` rows unpark automatically.
+
 ## Completion log - video pipeline + CGV page binding (2026-11-04)
 - Commit `76f6ec6` on main: page-keyed Meta publisher (`page_key` mjic/cgv in `content.ts`, `quotaKey` in `content-policy.ts`), direct `media_url` video publishing, `scripts/upload-videos-to-supabase.mjs`, `page_key` schema column + index. Videos git- and vercel-ignored.
 - Live data: bucket `mjic-video-ads` (public) holds 18 unique MJIC MP4s; `content_calendar` gained 36 READY rows (facebook + instagram, 4 PHT slots/day with ±12 min jitter, starting 2026-12-09 PHT). Script dedupes per page group, so the byte-identical CGVE reel is not lost; it is held until `META_CGV_PAGE_ID` is set.
