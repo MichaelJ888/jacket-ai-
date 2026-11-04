@@ -230,3 +230,15 @@ pm test 404 pass / 0 fail / 1 skipped; prod deploy Ready (jacket-attqxof3d); /ap
 - Deploy note: 
 px vercel --prod --yes printed CLI help JSON again; deployment confirmed with 
 px vercel ls.
+
+## Completion log - quote dispatch, deposit placeholder, quote analytics, HTML export (2026-11-04)
+- Commit `9f5b424` on main (pushed to origin). Prod deployment `jacket-pf6fytiwt-michaeljeffreyy17-7593.vercel.app` Ready; `npm run verify:live` run against https://jacket-ai.vercel.app.
+- Quote dispatch: `POST /api/quote/dispatch` (admin). `/api/quote` queues a customer email as a CEO approval (`send_quote_email`) and sends the PDF preview to CEO Telegram. Nothing goes to a customer without approval. Pure mapping lives in `quote-dispatch-logic.ts`.
+- Deposit: `/quote` shows the 50% deposit and the real BPI/GCash details. GCash/PayMaya online checkout is a labeled placeholder (no merchant credentials, so no links or QR codes).
+- Analytics: quotes per day/week, pending revenue, stage breakdown in `/admin` analytics.
+- Export: `GET /api/admin/export/html` (admin-only) downloads the rendered `/`, `/quote`, `/status` with secrets redacted. Button added to `/admin`.
+- Alerts: paused-contact, NEEDS YOU, and payment-proof CEO alerts are awaited (`sales-closer.ts`). Other `void notifyCeo` calls are unchanged.
+- Pricelist: t-shirt and company-uniform matrices were already editable via `/admin/pricelist`. No code change.
+- Verified: `npx tsc --noEmit` clean; `npm run lint` 0 errors, 5 warnings; `npm test` 416 total, 415 pass, 0 fail, 1 skipped; `npm run build` (webpack) passes; `verify:live` 11/11; unauthenticated `/api/quote/dispatch` and `/api/admin/export/html` return 401.
+- Health: `/api/health` = `degraded` (HTTP 200). Only `scheduledJobs` fails: last run `content-publisher` unsuccessful. Not masked.
+- Open: `RESEND_API_KEY` is not set in Vercel production, so quote email send returns not-configured until it is added. Viber skipped (no credentials). GCash/PayMaya merchant APIs not integrated (no credentials).
