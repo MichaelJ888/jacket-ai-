@@ -443,12 +443,12 @@
         <p class="font-display font-bold text-navy text-sm">Mock Up Design Creator</p>
         <p class="text-[11px] text-navy-400 mt-1">Preview your logo on the jacket instantly</p>
       </a>
-      <a href="#mockup" class="group border-2 border-navy/10 hover:border-gold-400 rounded-lg p-5 text-center transition-colors">
+      <a href="/quote" class="group border-2 border-navy/10 hover:border-gold-400 rounded-lg p-5 text-center transition-colors">
         <i data-lucide="calculator" class="w-6 h-6 mx-auto text-gold-600 mb-2"></i>
         <p class="font-display font-bold text-navy text-sm">Price Quotation Creator</p>
         <p class="text-[11px] text-navy-400 mt-1">Real, itemized pricing in seconds</p>
       </a>
-      <a href="#quote" class="group border-2 border-navy/10 hover:border-gold-400 rounded-lg p-5 text-center transition-colors">
+      <a href="/quote" class="group border-2 border-navy/10 hover:border-gold-400 rounded-lg p-5 text-center transition-colors">
         <i data-lucide="file-signature" class="w-6 h-6 mx-auto text-gold-600 mb-2"></i>
         <p class="font-display font-bold text-navy text-sm">Formal Quotation Creator</p>
         <p class="text-[11px] text-navy-400 mt-1">Signed, printable, 50% DP computed</p>
@@ -3294,8 +3294,7 @@ coverall1:'/images/site/coverall.jpg'
     },
 
     openFormalQuote(){
-      if(this.quoteItems.length===0){ this.guideToEmptyCart(); return; }
-      this.formalQuoteOpen = true;
+      window.location.href = '/quote';
     },
 
     isQuotationResponse(text){

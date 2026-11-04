@@ -1,7 +1,7 @@
-import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../../_lib/auth';
 import { computeFormalQuote, SIGNATORIES, type FormalQuoteInput, type SignatoryKey } from '../../_lib/formal-quote.ts';
+import { getQuoteByAccessToken, isFormalToken, saveFormalQuote, type SavedFormalQuote } from '../../_lib/formal-quote-store.ts';
 import { getSupabaseAdmin } from '../../_lib/integrations';
 
 export const dynamic = 'force-dynamic';
@@ -42,60 +42,39 @@ export async function POST(req: Request) {
   }
 
   const productName = body.productName ? String(body.productName).trim().slice(0, 200) : null;
-  const accessToken = randomBytes(16).toString('hex');
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
 
-  const { data, error } = await supabase
-    .from('formal_quotes')
-    .insert({
-      access_token: accessToken,
-      customer_name: customerName,
-      customer_contact: customerContact,
-      product_name: productName,
-      product_class: quote.productClass,
-      quantity: quote.quantity,
-      inputs: body,
-      breakdown: quote,
-      discount: quote.discount,
-      total: quote.total,
-      deposit: quote.deposit,
-    })
-    .select('id, access_token, created_at')
-    .single();
-  if (error || !data) return NextResponse.json({ error: error?.message || 'Save failed' }, { status: 500 });
+  let saved: SavedFormalQuote;
+  try {
+    saved = await saveFormalQuote(supabase, { customerName, customerContact, productName, quote, inputs: body, channel: 'formal-quote' });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Save failed' }, { status: 500 });
+  }
 
-  // CRM upsert is best effort: a failure must not lose the saved quote.
-  const isEmail = customerContact?.includes('@') ?? false;
-  const { error: crmError } = await supabase.from('crm_contacts').upsert(
-    {
-      channel: 'formal-quote',
-      external_id: (customerContact || customerName).toLowerCase(),
-      name: customerName,
-      phone: customerContact && !isEmail ? customerContact : null,
-      email: isEmail ? customerContact : null,
-      stage: 'quoted',
-      notes: `Formal quote ${data.id}: total PHP ${quote.total}, deposit PHP ${quote.deposit}`,
-    },
-    { onConflict: 'channel,external_id' },
-  );
-  if (crmError) console.error('Formal quote CRM upsert failed:', crmError.message);
-
-  return NextResponse.json({ ok: true, quoteId: data.id, accessToken: data.access_token, createdAt: data.created_at, quote });
+  return NextResponse.json({
+    ok: true,
+    quoteId: saved.id,
+    quoteNumber: saved.quoteNumber,
+    accessToken: saved.accessToken,
+    clientToken: saved.clientToken,
+    createdAt: saved.createdAt,
+    quote,
+  });
 }
 
 // Customer history: returns one saved quote by its unguessable access token.
 export async function GET(req: Request) {
   const token = new URL(req.url).searchParams.get('token') || '';
-  if (!/^[a-f0-9]{32}$/.test(token)) return NextResponse.json({ error: 'Invalid token' }, { status: 400 });
+  if (!isFormalToken(token)) return NextResponse.json({ error: 'Invalid token' }, { status: 400 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
-  const { data, error } = await supabase
-    .from('formal_quotes')
-    .select('id, customer_name, product_name, product_class, quantity, breakdown, total, deposit, created_at')
-    .eq('access_token', token)
-    .maybeSingle();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  let data: Awaited<ReturnType<typeof getQuoteByAccessToken>>;
+  try {
+    data = await getQuoteByAccessToken(supabase, token);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Lookup failed' }, { status: 500 });
+  }
   if (!data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json({ ok: true, quote: data });
 }

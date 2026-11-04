@@ -736,6 +736,20 @@ alter table public.formal_quotes enable row level security;
 revoke all on public.formal_quotes from anon, authenticated;
 create index if not exists formal_quotes_customer_idx on public.formal_quotes (customer_name);
 
+-- Unique, sequential quote numbers (MJIC-YYYY-NNNN) and returning-client history token.
+create sequence if not exists public.formal_quote_seq start 1;
+alter table public.formal_quotes add column if not exists quote_number text unique;
+alter table public.formal_quotes add column if not exists client_token text;
+alter table public.formal_quotes add column if not exists crm_contact_id uuid;
+create index if not exists formal_quotes_client_token_idx on public.formal_quotes (client_token);
+update public.formal_quotes set client_token = access_token where client_token is null;
+create or replace function public.next_formal_quote_number() returns text
+language sql security definer set search_path = public as $$
+  select 'MJIC-' || to_char(now() at time zone 'Asia/Manila', 'YYYY') || '-' || lpad(nextval('public.formal_quote_seq')::text, 4, '0')
+$$;
+revoke all on function public.next_formal_quote_number() from public, anon, authenticated;
+grant execute on function public.next_formal_quote_number() to service_role;
+
 alter table public.payment_verifications add column if not exists fraud_score numeric not null default 0;
 alter table public.payment_verifications add column if not exists fraud_flags jsonb not null default '[]'::jsonb;
 create index if not exists payment_verification_reference_idx on public.payment_verifications (reference);

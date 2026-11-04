@@ -1,4 +1,4 @@
-import { MOQ_PIECES, tierUnitPrice, volumeDiscountPct } from './pricing-logic.ts';
+import { MOQ_PIECES, costFloorPrice, tierUnitPrice, volumeDiscountPct } from './pricing-logic.ts';
 
 // Formal quotation rules (peso amounts, per piece unless noted).
 export const CLASS_A_SURCHARGE = 300;
@@ -39,6 +39,8 @@ export type ProductClass = 'A' | 'B';
 export type FormalQuoteInput = {
   quantity: number;
   marketUnitPrice: number; // MOQ-rate garment price per piece, from the price list
+  // true: marketUnitPrice is already the official tier price for this quantity, so no volume discount is applied again.
+  officialTierPrice?: boolean;
   productClass: ProductClass;
   costPerPiece?: number;
   frontLogos: number;
@@ -65,7 +67,10 @@ export function computeFormalQuote(input: FormalQuoteInput) {
 
   const frontLogos = whole(input.frontLogos);
   const backLogos = whole(input.backLogos);
-  const garmentUnit = tierUnitPrice(market, quantity, Number(input.costPerPiece) || 0);
+  const cost = Number(input.costPerPiece) || 0;
+  const garmentUnit = input.officialTierPrice
+    ? Math.max(Math.ceil(market), costFloorPrice(cost))
+    : tierUnitPrice(market, quantity, cost);
 
   const surcharge = input.productClass === 'A' && !input.isFullSublimation ? CLASS_A_SURCHARGE : 0;
   const extraFront = Math.max(0, frontLogos - 1) * EXTRA_FRONT_LOGO;
@@ -96,7 +101,7 @@ export function computeFormalQuote(input: FormalQuoteInput) {
   return {
     quantity,
     productClass: input.productClass,
-    volumeDiscountPct: volumeDiscountPct(quantity),
+    volumeDiscountPct: input.officialTierPrice ? 0 : volumeDiscountPct(quantity),
     garmentUnit,
     addOns: {
       classASurcharge: surcharge,

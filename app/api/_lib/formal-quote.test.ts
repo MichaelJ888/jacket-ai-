@@ -26,6 +26,19 @@ test('rejects orders below MOQ', () => {
   assert.throws(() => computeFormalQuote({ ...base, quantity: 19 }), /Minimum order is 20/);
 });
 
+test('official tier price is used as-is, with no second volume discount', () => {
+  const q = computeFormalQuote({ ...base, quantity: 50, marketUnitPrice: 920, officialTierPrice: true });
+  assert.equal(q.garmentUnit, 920);
+  assert.equal(q.volumeDiscountPct, 0);
+  assert.equal(q.garmentSubtotal, 46000);
+});
+
+test('official tier price still respects the cost floor', () => {
+  const q = computeFormalQuote({ ...base, quantity: 20, marketUnitPrice: 800, costPerPiece: 900, officialTierPrice: true });
+  assert.equal(q.garmentUnit, 1080); // ceil(900 × 1.2)
+});
+
+
 test('Class A adds 300 per piece; Class B does not', () => {
   const a = computeFormalQuote({ ...base, productClass: 'A' });
   const b = computeFormalQuote(base);
