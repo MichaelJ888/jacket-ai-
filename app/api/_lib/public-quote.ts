@@ -1,5 +1,6 @@
 import { computeFormalQuote, type FormalQuote, type ProductClass } from './formal-quote.ts';
-import { FABRIC_OPTIONS, isQuoteCategory, officialUnitPrice, QUOTE_CATEGORIES, type QuoteCategoryKey } from './mjic-pricelist.ts';
+import { resolveFabricClass } from './fabric-class.ts';
+import { isQuoteCategory, officialUnitPrice, QUOTE_CATEGORIES, type QuoteCategoryKey } from './mjic-pricelist.ts';
 import { MOQ_PIECES } from './pricing-logic.ts';
 
 export const MAX_PUBLIC_QUANTITY = 100000;
@@ -47,13 +48,8 @@ export function buildPublicQuote(body: Record<string, unknown>): PublicQuoteResu
 
   const fabric = text(body.fabric, 120);
   if (!fabric) throw new PublicQuoteError('Please choose or type a fabric.');
-  const catalogFabric = FABRIC_OPTIONS.find((f) => f.name.toLowerCase() === fabric.toLowerCase());
-  let productClass: ProductClass | null = catalogFabric?.productClass ?? null;
-  if (!productClass) {
-    // Fabric class is not on file (custom or unclassified fabric): the customer must state it.
-    if (body.productClass === 'A' || body.productClass === 'B') productClass = body.productClass;
-    else throw new PublicQuoteError('Please select the fabric class (Class A or Class B) for this fabric.');
-  }
+  // Class is derived from the fabric by the strict rule; the customer cannot override it.
+  const productClass = resolveFabricClass(fabric);
 
   const request: PublicQuoteRequest = {
     customerName,
@@ -84,7 +80,7 @@ export function buildPublicQuote(body: Record<string, unknown>): PublicQuoteResu
     quantity,
     marketUnitPrice: unit,
     officialTierPrice: true,
-    productClass,
+    fabric,
     frontLogos: request.frontLogos,
     backLogos: request.backLogos,
     reversible: request.reversible,

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { computeFormalQuote, PAYMENT_TERMS, TERMS } from '../api/_lib/formal-quote';
+import { resolveFabricClass } from '../api/_lib/fabric-class';
 import { FABRIC_OPTIONS, QUOTE_CATEGORIES, officialUnitPrice, type QuoteCategoryKey } from '../api/_lib/mjic-pricelist';
 import { MOQ_PIECES } from '../api/_lib/pricing-logic';
 
@@ -22,7 +23,6 @@ export default function QuotePage() {
   const [quantity, setQuantity] = useState(MOQ_PIECES);
   const [fabricChoice, setFabricChoice] = useState(FABRIC_OPTIONS[0].name);
   const [customFabric, setCustomFabric] = useState('');
-  const [fabricClass, setFabricClass] = useState<'A' | 'B' | ''>('');
   const [frontLogos, setFrontLogos] = useState(1);
   const [backLogos, setBackLogos] = useState(0);
   const [reversible, setReversible] = useState(false);
@@ -38,9 +38,8 @@ export default function QuotePage() {
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
 
   const fabricName = fabricChoice === OTHER ? customFabric.trim() : fabricChoice;
-  const catalogFabric = FABRIC_OPTIONS.find((f) => f.name === fabricChoice);
-  const needsClass = fabricChoice === OTHER || !catalogFabric?.productClass;
-  const productClass = needsClass ? fabricClass : catalogFabric?.productClass ?? '';
+  // Class follows the strict fabric rule (same helper the server uses); the customer does not choose it.
+  const productClass = resolveFabricClass(fabricName);
 
   const unitPrice = useMemo(() => {
     const qty = Math.floor(Number(quantity));
@@ -48,12 +47,12 @@ export default function QuotePage() {
   }, [category, quantity]);
 
   const preview = useMemo(() => {
-    if (unitPrice === null || (productClass !== 'A' && productClass !== 'B')) return null;
+    if (unitPrice === null || !fabricName) return null;
     return computeFormalQuote({
       quantity: Math.floor(Number(quantity)),
       marketUnitPrice: unitPrice,
       officialTierPrice: true,
-      productClass,
+      fabric: fabricName,
       frontLogos,
       backLogos,
       reversible,
@@ -62,7 +61,7 @@ export default function QuotePage() {
       isTshirt: category === 't-shirt',
       isFullSublimation: fullSublimation,
     });
-  }, [unitPrice, productClass, quantity, frontLogos, backLogos, reversible, hood, threeTone, category, fullSublimation]);
+  }, [unitPrice, fabricName, quantity, frontLogos, backLogos, reversible, hood, threeTone, category, fullSublimation]);
 
   // Returning client: ?client=<token> shows every quote previously issued to them.
   useEffect(() => {
@@ -90,7 +89,6 @@ export default function QuotePage() {
           category,
           quantity: Math.floor(Number(quantity)),
           fabric: fabricName,
-          productClass: needsClass ? fabricClass : undefined,
           frontLogos,
           backLogos,
           reversible,
@@ -121,6 +119,10 @@ export default function QuotePage() {
         <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700">CG Venezuela Enterprises · Michael Jeffrey International</p>
         <h1 className="mt-1 text-3xl font-bold text-slate-900">Price Quotation &amp; Formal Quote</h1>
         <p className="mt-2 text-slate-600">Get official MJIC pricing as you type. Your formal quote gets a reference number and a link to your quote history.</p>
+        <div className="mt-4 flex flex-wrap gap-3" data-testid="quote-cta">
+          <a href="viber://chat?number=%2B639292271761" className="rounded-lg bg-purple-700 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-800">Chat on Viber</a>
+          <a href="https://t.me/VERCELAI_MJIC_BOT" target="_blank" rel="noopener noreferrer" className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">Chat on Telegram</a>
+        </div>
       </header>
 
       {history && (
@@ -162,28 +164,21 @@ export default function QuotePage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className={label} htmlFor="fabric">Garment class / fabric</label>
+              <label className={label} htmlFor="fabric">Fabric</label>
               <select id="fabric" className={field} value={fabricChoice} onChange={(e) => setFabricChoice(e.target.value)}>
                 {FABRIC_OPTIONS.map((f) => (
                   <option key={f.name} value={f.name}>{f.name}</option>
                 ))}
                 <option value={OTHER}>Other — type custom fabric</option>
               </select>
+              <p className="mt-1 text-xs text-slate-500" data-testid="fabric-class-note">
+                {!fabricName ? 'Enter a fabric to see pricing.' : productClass === 'B' ? 'Class B: no surcharge.' : 'Class A: +₱300 per piece (fabrics other than Microfiber, Michael Angelo, and Diamond Ripstop).'}
+              </p>
             </div>
             {fabricChoice === OTHER && (
               <div>
                 <label className={label} htmlFor="custom-fabric">Custom fabric</label>
                 <input id="custom-fabric" className={field} value={customFabric} onChange={(e) => setCustomFabric(e.target.value)} placeholder="Type your fabric" required />
-              </div>
-            )}
-            {needsClass && (
-              <div>
-                <label className={label} htmlFor="fabric-class">Fabric class</label>
-                <select id="fabric-class" className={field} value={fabricClass} onChange={(e) => setFabricClass(e.target.value as 'A' | 'B' | '')} required>
-                  <option value="">Select class</option>
-                  <option value="A">Class A (premium)</option>
-                  <option value="B">Class B (standard)</option>
-                </select>
               </div>
             )}
           </div>

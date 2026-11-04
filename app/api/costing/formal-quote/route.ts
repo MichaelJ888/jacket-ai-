@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     quote = computeFormalQuote({
       quantity: Number(body.quantity),
       marketUnitPrice: Number(body.marketUnitPrice),
-      productClass: body.productClass === 'A' ? 'A' : 'B',
+      fabric: typeof body.fabric === 'string' ? body.fabric.trim().slice(0, 120) : '',
       costPerPiece: Number(body.costPerPiece) || 0,
       frontLogos: Number(body.frontLogos) || 0,
       backLogos: Number(body.backLogos) || 0,

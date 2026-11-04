@@ -7,7 +7,7 @@ export type QuoteForm = {
   quantity: string;
   marketUnitPrice: string;
   costPerPiece: string;
-  productClass: 'A' | 'B';
+  fabric: string;
   frontLogos: string;
   backLogos: string;
   reversible: boolean;
@@ -37,7 +37,7 @@ export const EMPTY_FORM: QuoteForm = {
   quantity: '20',
   marketUnitPrice: '',
   costPerPiece: '',
-  productClass: 'B',
+  fabric: 'Microfiber',
   frontLogos: '1',
   backLogos: '0',
   reversible: false,
@@ -58,7 +58,7 @@ export function toRequestBody(form: QuoteForm) {
     quantity: Number(form.quantity),
     marketUnitPrice: Number(form.marketUnitPrice),
     costPerPiece: Number(form.costPerPiece) || 0,
-    productClass: form.productClass,
+    fabric: form.fabric.trim(),
     frontLogos: Number(form.frontLogos) || 0,
     backLogos: Number(form.backLogos) || 0,
     reversible: form.reversible,

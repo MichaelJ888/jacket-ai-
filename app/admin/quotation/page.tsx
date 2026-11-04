@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useState, type DragEvent, type FormEvent } from 'react';
 import { SIGNATORIES, TERMS, VALID_DAYS, PAYMENT_DETAILS, type SignatoryKey } from '../../api/_lib/formal-quote';
+import { resolveFabricClass } from '../../api/_lib/fabric-class';
+import { FABRIC_OPTIONS } from '../../api/_lib/mjic-pricelist';
 import { EMPTY_FORM, applyDesignScan, formatPeso, toRequestBody, type DesignScan, type QuoteForm } from './quotation-logic';
 
 type Quote = {
@@ -107,11 +109,14 @@ export default function QuotationPage() {
         <div><label className={LABEL}>Market unit price (PHP) *</label><input className={FIELD} type="number" min={1} step="0.01" required value={form.marketUnitPrice} onChange={(e) => set('marketUnitPrice', e.target.value)} /></div>
         <div><label className={LABEL}>Cost per piece (optional)</label><input className={FIELD} type="number" min={0} step="0.01" value={form.costPerPiece} onChange={(e) => set('costPerPiece', e.target.value)} /></div>
         <div>
-          <label className={LABEL}>Garment class</label>
-          <select className={FIELD} value={form.productClass} onChange={(e) => set('productClass', e.target.value as 'A' | 'B')}>
-            <option value="B">Class B</option>
-            <option value="A">Class A (+₱300/pc)</option>
-          </select>
+          <label className={LABEL}>Fabric (class is set automatically)</label>
+          <input className={FIELD} list="fabric-options" required value={form.fabric} onChange={(e) => set('fabric', e.target.value)} />
+          <datalist id="fabric-options">
+            {FABRIC_OPTIONS.map((f) => <option key={f.name} value={f.name} />)}
+          </datalist>
+          <p className="mt-1 text-xs text-zinc-500">
+            {resolveFabricClass(form.fabric) === 'B' ? 'Class B: no surcharge' : 'Class A: +₱300/pc'}
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div><label className={LABEL}>Front logos</label><input className={FIELD} type="number" min={0} value={form.frontLogos} onChange={(e) => set('frontLogos', e.target.value)} /></div>
@@ -164,7 +169,7 @@ export default function QuotationPage() {
               <tr><th className="py-1">Description</th><th className="py-1 text-right">Qty</th><th className="py-1 text-right">Unit</th><th className="py-1 text-right">Total</th></tr>
             </thead>
             <tbody>
-              <tr className="border-b"><td className="py-1">{form.productName || 'Customized garment'} ({form.productClass === 'A' ? 'Class A' : 'Class B'})</td><td className="text-right">{q.quantity}</td><td className="text-right">{formatPeso(q.unitPrice)}</td><td className="text-right">{formatPeso(q.unitPrice * q.quantity)}</td></tr>
+              <tr className="border-b"><td className="py-1">{form.productName || 'Customized garment'} ({resolveFabricClass(form.fabric) === 'A' ? 'Class A' : 'Class B'})</td><td className="text-right">{q.quantity}</td><td className="text-right">{formatPeso(q.unitPrice)}</td><td className="text-right">{formatPeso(q.unitPrice * q.quantity)}</td></tr>
               {q.programFee > 0 && <tr className="border-b"><td className="py-1">1-Time Embroidery Digitizing / Program Fee</td><td className="text-right">1 lot</td><td /><td className="text-right">{formatPeso(q.programFee)}</td></tr>}
             </tbody>
           </table>

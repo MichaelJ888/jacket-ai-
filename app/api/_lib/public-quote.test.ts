@@ -35,22 +35,26 @@ test('T-Shirt and Company Uniform return a sales-confirmation result, not a pric
   }
 });
 
-test('unclassified fabric requires the customer to choose a class', () => {
-  assert.throws(() => buildPublicQuote({ ...base, fabric: 'Stellini' }), PublicQuoteError);
-  const result = buildPublicQuote({ ...base, fabric: 'Stellini', productClass: 'A' });
-  assert.equal(result.kind, 'quote');
+test('strict rule: listed Class B fabrics carry no surcharge', () => {
+  for (const fabric of ['Microfiber', 'Michael Angelo', 'Diamond Ripstop']) {
+    const result = buildPublicQuote({ ...base, fabric });
+    assert.equal(result.kind, 'quote');
+    if (result.kind === 'quote') assert.equal(result.quote.addOns.classASurcharge, 0);
+  }
 });
 
-test('custom fabric text requires a class', () => {
-  assert.throws(() => buildPublicQuote({ ...base, fabric: 'Some Custom Blend' }), PublicQuoteError);
-  const result = buildPublicQuote({ ...base, fabric: 'Some Custom Blend', productClass: 'B' });
-  assert.equal(result.kind, 'quote');
+test('strict rule: every other fabric, listed or custom, is Class A', () => {
+  for (const fabric of ['Twill', 'Brush Cotton', 'Marks & Spencer', 'Stellini', 'Vellini', 'Dri-Fit', 'Some Custom Blend']) {
+    const result = buildPublicQuote({ ...base, fabric });
+    assert.equal(result.kind, 'quote');
+    if (result.kind === 'quote') assert.equal(result.quote.addOns.classASurcharge, 300);
+  }
 });
 
-test('catalog fabric class overrides any client-sent class', () => {
-  const result = buildPublicQuote({ ...base, fabric: 'Microfiber', productClass: 'A' });
+test('client-sent productClass is ignored; class comes from fabric only', () => {
+  const result = buildPublicQuote({ ...base, fabric: 'Twill', productClass: 'B' });
   assert.equal(result.kind, 'quote');
-  if (result.kind === 'quote') assert.equal(result.request.productClass, 'B');
+  if (result.kind === 'quote') assert.equal(result.quote.addOns.classASurcharge, 300);
 });
 
 test('official unit price returns null outside tiers and for categories without a table', () => {

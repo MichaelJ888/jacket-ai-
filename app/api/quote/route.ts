@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { saveFormalQuote, listQuotesByClientToken, isFormalToken } from '../_lib/formal-quote-store.ts';
 import { getSupabaseAdmin } from '../_lib/integrations';
+import { rateLimitResponse } from '../_lib/rate-limit';
 import { buildPublicQuote, PublicQuoteError } from '../_lib/public-quote.ts';
 
 export const dynamic = 'force-dynamic';
 
 // Public unified quotation: prices from the official pricelist only, saves a numbered formal quote.
 export async function POST(req: Request) {
+  const limited = await rateLimitResponse(req, 'public-quote', 10, 60);
+  if (limited) return limited;
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();

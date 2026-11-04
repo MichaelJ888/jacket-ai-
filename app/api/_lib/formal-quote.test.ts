@@ -5,7 +5,7 @@ import { computeFormalQuote, type FormalQuoteInput } from './formal-quote.ts';
 const base: FormalQuoteInput = {
   quantity: 100,
   marketUnitPrice: 1250,
-  productClass: 'B',
+  fabric: 'Microfiber',
   frontLogos: 1,
   backLogos: 0,
   reversible: false,
@@ -40,14 +40,14 @@ test('official tier price still respects the cost floor', () => {
 
 
 test('Class A adds 300 per piece; Class B does not', () => {
-  const a = computeFormalQuote({ ...base, productClass: 'A' });
+  const a = computeFormalQuote({ ...base, fabric: 'Twill' });
   const b = computeFormalQuote(base);
   assert.equal(a.addOns.classASurcharge, 300);
   assert.equal(a.unitPrice - b.unitPrice, 300);
 });
 
 test('full-sublimation bombers are exempt from the Class A surcharge', () => {
-  const q = computeFormalQuote({ ...base, productClass: 'A', isFullSublimation: true });
+  const q = computeFormalQuote({ ...base, fabric: 'Twill', isFullSublimation: true });
   assert.equal(q.addOns.classASurcharge, 0);
 });
 
@@ -110,7 +110,7 @@ test('quote carries verbatim terms, 30-day validity, and payment terms', () => {
 });
 
 test('discount and deposit combine: 50% of the discounted total rounded up', () => {
-  const q = computeFormalQuote({ ...base, productClass: 'A', frontLogos: 2, backLogos: 1, discountPesos: 2500 });
+  const q = computeFormalQuote({ ...base, fabric: 'Twill', frontLogos: 2, backLogos: 1, discountPesos: 2500 });
   // unit = 850 + 300 (Class A) + 65 (extra front) + 150 (back); subtotal = 100 * 1365 + program fee 2 * 1000
   assert.equal(q.subtotal, 138500);
   assert.equal(q.total, 136000);

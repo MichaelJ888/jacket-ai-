@@ -21,26 +21,25 @@ export const QUOTE_CATEGORIES = {
 
 export type QuoteCategoryKey = keyof typeof QUOTE_CATEGORIES;
 
-// Official fabric list (classes from public/index.html). A null class means the fabric is not classified yet:
-// the customer picks it, and the quote is not priced until one is chosen.
-export const FABRIC_OPTIONS: ReadonlyArray<{ name: string; productClass: 'A' | 'B' | null }> = [
-  { name: 'Microfiber', productClass: 'B' },
-  { name: 'Michael Angelo', productClass: 'B' },
-  { name: 'Diamond Ripstop', productClass: 'B' },
-  { name: 'Twill', productClass: null },
-  { name: 'Canvas / Twill', productClass: 'A' },
-  { name: 'Brush Cotton', productClass: null },
-  { name: 'Marks & Spencer', productClass: null },
-  { name: 'Stellini', productClass: null },
-  { name: 'Vellini', productClass: null },
-  { name: 'Honeycomb / Pique', productClass: 'B' },
-  { name: 'Dri-Fit / Performance Knit', productClass: 'B' },
-  { name: 'Oxford / Broadcloth', productClass: 'A' },
-  { name: 'Softshell', productClass: 'A' },
-  { name: 'Scrub Suit Poly-Cotton', productClass: 'B' },
-  { name: 'Cotton Fleece', productClass: 'B' },
-  { name: 'Taslan', productClass: 'A' },
-  { name: 'Varsity Satin', productClass: 'A' },
+// Official fabric list. Class is never stored here: resolveFabricClass (fabric-class.ts) derives it from the name.
+export const FABRIC_OPTIONS: ReadonlyArray<{ name: string }> = [
+  { name: 'Microfiber' },
+  { name: 'Michael Angelo' },
+  { name: 'Diamond Ripstop' },
+  { name: 'Twill' },
+  { name: 'Canvas / Twill' },
+  { name: 'Brush Cotton' },
+  { name: 'Marks & Spencer' },
+  { name: 'Stellini' },
+  { name: 'Vellini' },
+  { name: 'Honeycomb / Pique' },
+  { name: 'Dri-Fit / Performance Knit' },
+  { name: 'Oxford / Broadcloth' },
+  { name: 'Softshell' },
+  { name: 'Scrub Suit Poly-Cotton' },
+  { name: 'Cotton Fleece' },
+  { name: 'Taslan' },
+  { name: 'Varsity Satin' },
 ];
 
 

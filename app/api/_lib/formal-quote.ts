@@ -1,3 +1,4 @@
+import { resolveFabricClass, type FabricClass } from './fabric-class.ts';
 import { MOQ_PIECES, costFloorPrice, tierUnitPrice, volumeDiscountPct } from './pricing-logic.ts';
 
 // Formal quotation rules (peso amounts, per piece unless noted).
@@ -34,14 +35,15 @@ export const TERMS = [
 
 export const PAYMENT_TERMS = '50% downpayment & 50% upon delivery';
 
-export type ProductClass = 'A' | 'B';
+export type ProductClass = FabricClass;
 
 export type FormalQuoteInput = {
   quantity: number;
   marketUnitPrice: number; // MOQ-rate garment price per piece, from the price list
   // true: marketUnitPrice is already the official tier price for this quantity, so no volume discount is applied again.
   officialTierPrice?: boolean;
-  productClass: ProductClass;
+  // Class is derived from the fabric (see fabric-class.ts); it is never supplied directly.
+  fabric: string;
   costPerPiece?: number;
   frontLogos: number;
   backLogos: number;
@@ -72,7 +74,8 @@ export function computeFormalQuote(input: FormalQuoteInput) {
     ? Math.max(Math.ceil(market), costFloorPrice(cost))
     : tierUnitPrice(market, quantity, cost);
 
-  const surcharge = input.productClass === 'A' && !input.isFullSublimation ? CLASS_A_SURCHARGE : 0;
+  const productClass = resolveFabricClass(input.fabric);
+  const surcharge = productClass === 'A' && !input.isFullSublimation ? CLASS_A_SURCHARGE : 0;
   const extraFront = Math.max(0, frontLogos - 1) * EXTRA_FRONT_LOGO;
   const backCharge = backLogos * EXTRA_BACK_LOGO;
   const reversible = input.reversible ? REVERSIBLE_FEE : 0;
@@ -100,7 +103,8 @@ export function computeFormalQuote(input: FormalQuoteInput) {
 
   return {
     quantity,
-    productClass: input.productClass,
+    fabric: String(input.fabric ?? '').trim(),
+    productClass,
     volumeDiscountPct: input.officialTierPrice ? 0 : volumeDiscountPct(quantity),
     garmentUnit,
     addOns: {
