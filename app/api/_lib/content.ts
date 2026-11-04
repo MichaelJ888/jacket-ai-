@@ -13,6 +13,7 @@ import {
 import { getPageToken } from './meta-pages';
 import { checkMetaPublishing, metaPublishFailure, type MetaPlatform } from './meta-publishing';
 import { recordMetaPublishingHealth } from './meta-publishing-alerts';
+import { seoHashtags } from './coo-seo.ts';
 import { SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 import {
   DAY_MS,
@@ -203,7 +204,7 @@ async function advanceVideos(origin: string) {
 }
 
 function fullCaption(row: CalendarRow) {
-  return `${withContactFooter(row.caption)}\n\n${(row.hashtags || []).join(' ')}`.trim();
+  return `${withContactFooter(row.caption)}\n\n${seoHashtags(row.hashtags || []).join(' ')}`.trim();
 }
 
 class MissingCredentials extends Error {}

@@ -4,6 +4,8 @@ import { isCronAuthorized } from '../../_lib/auth';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
 import { getPageToken } from '../../_lib/meta-pages';
+import { checkMetaPublishing } from '../../_lib/meta-publishing';
+import { keywordCoverage, seoHashtags } from '../../_lib/coo-seo.ts';
 import { manilaWeekday, preferredCategory, rankBoostCandidates, type BoostCandidate } from '../boost-advisor-logic.ts';
 
 export const dynamic = 'force-dynamic';
@@ -129,6 +131,7 @@ export async function GET(request: Request) {
   }));
   const weekday = manilaWeekday(now);
   const best = rankBoostCandidates(withMetrics, weekday)[0];
+  const readiness = await checkMetaPublishing(process.env.META_PAGE_ID, pageToken || undefined, 'facebook');
   const engagementAvailable = best.reach !== null || best.shares !== null;
   const fallbackTheme = preferredCategory(weekday);
   const when = new Date(best.published_at || best.scheduled_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
@@ -147,8 +150,10 @@ export async function GET(request: Request) {
     escapeTelegramHtml(strategy),
     organicCaveat,
     '',
-    `<b>Rekomendasyon:</b> I-boost ng <b>P${BOOST_BUDGET_PESOS}/araw</b> sa Meta Ads Manager.`,
-    `Ang boost ay manual pa rin; wala pang configured Meta Ads API one-click campaign. Walang automatic spend.`,
+    `<b>Rekomendasyon:</b> I-boost ng <b>P${BOOST_BUDGET_PESOS}/araw</b> x 2 araw = <b>P${BOOST_BUDGET_PESOS * 2}</b> total sa Meta Ads Manager.`,
+    `Meta readiness: <b>${readiness.ok ? 'READY' : 'PAUSED'}</b> (${escapeTelegramHtml(readiness.reason)})`,
+    `SEO focus: ${escapeTelegramHtml(seoHashtags([]).slice(0, 4).join(' '))} (keyword coverage ${Math.round(keywordCoverage(best.caption) * 100)}%)`,
+    `Ang boost ay manual pa rin; walang automatic spend hangga't hindi ini-approve ng CEO.`,
   ].filter(Boolean);
 
   const sent = await sendTelegramMessage(lines.join('\n'));

@@ -71,8 +71,9 @@ COMPANY INFORMATION:
 - Address: #22 Bayabas St., Elmar's Subdivision, Brgy. Cupang, Antipolo City (Just behind SM Masinag, boundary of Antipolo & Marikina).
 - Reach: Direct Factory / Patahian catering NATIONWIDE and GLOBALLY ("Made in PH, Worn Worldwide").
 - Official Hotline Numbers:
-  * Viber / Smart: 0920-695-9167
-  * Globe: 0917-320-8842
+  * Smart: 0920 695 91 67
+  * Globe: 0997 411 45 94
+  * Viber/Telegram: 0929 227 17 61
   * DITO: 0934-768-7987
   * Landline: (02) 7795-1368 / (02) 7971-9822
 

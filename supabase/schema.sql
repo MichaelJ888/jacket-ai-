@@ -1196,3 +1196,17 @@ create table if not exists public.admin_otp_codes (
 create index if not exists admin_otp_codes_created_idx on public.admin_otp_codes (created_at desc);
 alter table public.admin_otp_codes enable row level security;
 revoke all on public.admin_otp_codes from anon, authenticated;
+
+-- CEO-toned Q&A pairs from the website. Only 'approved' rows reach the Sales Closer prompt.
+create table if not exists public.mjic_qa_pairs (
+  id uuid default gen_random_uuid() primary key,
+  question text not null check (char_length(question) between 3 and 500),
+  answer text not null check (char_length(answer) between 3 and 2000),
+  status text not null default 'pending' check (status in ('pending', 'approved', 'retired')),
+  source text not null default 'website' check (char_length(source) between 1 and 60),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists mjic_qa_pairs_status_idx on public.mjic_qa_pairs (status, created_at desc);
+alter table public.mjic_qa_pairs enable row level security;
+revoke all on public.mjic_qa_pairs from anon, authenticated;
