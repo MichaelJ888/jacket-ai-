@@ -1257,3 +1257,16 @@ create table if not exists public.boost_decisions (
 );
 alter table public.boost_decisions enable row level security;
 revoke all on public.boost_decisions from anon, authenticated;
+
+-- Admin-editable official price tiers. One row per category; tiers are a JSON array of {min,max,price}.
+-- Empty table means the built-in seed tables in mjic-pricelist.ts are used.
+create table if not exists public.quote_pricelist (
+  category_key text primary key,
+  label text not null,
+  active boolean not null default true,
+  tiers jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now(),
+  updated_by text
+);
+alter table public.quote_pricelist enable row level security;
+revoke all on public.quote_pricelist from anon, authenticated;

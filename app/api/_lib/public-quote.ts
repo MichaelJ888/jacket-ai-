@@ -1,6 +1,6 @@
 import { computeFormalQuote, type FormalQuote, type ProductClass } from './formal-quote.ts';
 import { resolveFabricClass } from './fabric-class.ts';
-import { isQuoteCategory, officialUnitPrice, QUOTE_CATEGORIES, type QuoteCategoryKey } from './mjic-pricelist.ts';
+import { seedPricelist, tierPrice, type Pricelist } from './pricelist-logic.ts';
 import { MOQ_PIECES } from './pricing-logic.ts';
 
 export const MAX_PUBLIC_QUANTITY = 100000;
@@ -9,7 +9,7 @@ export type PublicQuoteRequest = {
   customerName: string;
   customerContact: string | null;
   productName: string | null;
-  category: QuoteCategoryKey;
+  category: string;
   quantity: number;
   fabric: string;
   productClass: ProductClass;
@@ -31,16 +31,17 @@ const text = (value: unknown, max: number) => String(value ?? '').trim().slice(0
 const flag = (value: unknown) => value === true;
 const count = (value: unknown, max: number) => Math.min(max, Math.max(0, Math.floor(Number(value) || 0)));
 
-// Validates a public quote request and prices it strictly from the official pricelist and fabric catalog.
+// Validates a public quote request and prices it strictly from the pricelist catalog and fabric rule.
 // Any client-sent price or discount is ignored by design.
-export function buildPublicQuote(body: Record<string, unknown>): PublicQuoteResult {
+export function buildPublicQuote(body: Record<string, unknown>, catalog: Pricelist = seedPricelist()): PublicQuoteResult {
   const customerName = text(body.customerName, 120);
   if (customerName.length < 2) throw new PublicQuoteError('Please enter your name or company name.');
   const customerContact = text(body.customerContact, 120) || null;
   const productName = text(body.productName, 200) || null;
 
-  if (!isQuoteCategory(body.category)) throw new PublicQuoteError('Please choose a product category.');
-  const category = body.category;
+  const cat = catalog.categories.find((c) => c.active && c.key === String(body.category ?? ''));
+  if (!cat) throw new PublicQuoteError('Please choose a product category.');
+  const category = cat.key;
 
   const quantity = Math.floor(Number(body.quantity));
   if (!Number.isFinite(quantity) || quantity < MOQ_PIECES) throw new PublicQuoteError(`Minimum order is ${MOQ_PIECES} pieces.`);
@@ -67,12 +68,11 @@ export function buildPublicQuote(body: Record<string, unknown>): PublicQuoteResu
     isFullSublimation: flag(body.isFullSublimation),
   };
 
-  const unit = officialUnitPrice(category, quantity);
+  const unit = tierPrice(cat.tiers, quantity);
   if (unit === null) {
-    const label = QUOTE_CATEGORIES[category].label;
     return {
       kind: 'sales',
-      message: `${label} pricing is confirmed by our sales team for this quantity. Send us your request and we will reply with a formal quote.`,
+      message: `${cat.label} pricing is confirmed by our sales team for this quantity. Send us your request and we will reply with a formal quote.`,
     };
   }
 

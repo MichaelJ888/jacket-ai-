@@ -3,12 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { computeFormalQuote, PAYMENT_TERMS, TERMS } from '../api/_lib/formal-quote';
 import { resolveFabricClass } from '../api/_lib/fabric-class';
-import { FABRIC_OPTIONS, QUOTE_CATEGORIES, officialUnitPrice, type QuoteCategoryKey } from '../api/_lib/mjic-pricelist';
+import { FABRIC_OPTIONS } from '../api/_lib/mjic-pricelist';
+import { seedPricelist, tierPrice, type PricelistCategory } from '../api/_lib/pricelist-logic';
 import { MOQ_PIECES } from '../api/_lib/pricing-logic';
 
 const OTHER = '__other__';
 const peso = (n: number) => `₱${Math.round(n).toLocaleString('en-US')}`;
-const CATEGORY_KEYS = Object.keys(QUOTE_CATEGORIES) as QuoteCategoryKey[];
 
 type Saved = {
   quoteNumber: string;
@@ -19,7 +19,9 @@ type Saved = {
 type HistoryRow = { quote_number: string | null; product_name: string | null; quantity: number; total: number; created_at: string };
 
 export default function QuotePage() {
-  const [category, setCategory] = useState<QuoteCategoryKey>('jacket');
+  const [category, setCategory] = useState('jacket');
+  // Starts from the built-in tiers so the form is usable immediately; the live catalog replaces it on load.
+  const [catalog, setCatalog] = useState<PricelistCategory[]>(() => seedPricelist().categories.filter((c) => c.active));
   const [quantity, setQuantity] = useState(MOQ_PIECES);
   const [fabricChoice, setFabricChoice] = useState(FABRIC_OPTIONS[0].name);
   const [customFabric, setCustomFabric] = useState('');
@@ -43,8 +45,22 @@ export default function QuotePage() {
 
   const unitPrice = useMemo(() => {
     const qty = Math.floor(Number(quantity));
-    return qty >= MOQ_PIECES ? officialUnitPrice(category, qty) : null;
-  }, [category, quantity]);
+    const cat = catalog.find((c) => c.key === category);
+    return qty >= MOQ_PIECES && cat ? tierPrice(cat.tiers, qty) : null;
+  }, [catalog, category, quantity]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/quote/pricelist', { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.ok && Array.isArray(data.categories) && data.categories.length > 0) setCatalog(data.categories);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const preview = useMemo(() => {
     if (unitPrice === null || !fabricName) return null;
@@ -150,9 +166,9 @@ export default function QuotePage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={label} htmlFor="category">Product category</label>
-              <select id="category" className={field} value={category} onChange={(e) => setCategory(e.target.value as QuoteCategoryKey)}>
-                {CATEGORY_KEYS.map((k) => (
-                  <option key={k} value={k}>{QUOTE_CATEGORIES[k].label}</option>
+              <select id="category" className={field} value={category} onChange={(e) => setCategory(e.target.value)}>
+                {catalog.map((c) => (
+                  <option key={c.key} value={c.key}>{c.label}</option>
                 ))}
               </select>
             </div>
@@ -226,7 +242,7 @@ export default function QuotePage() {
             <h2 className="font-bold text-slate-900">Live estimate</h2>
             {unitPrice === null && (
               <p className="mt-2 text-sm text-slate-600">
-                {quantity < MOQ_PIECES ? `Enter at least ${MOQ_PIECES} pieces.` : `${QUOTE_CATEGORIES[category].label} pricing is confirmed by our sales team. Submit to request a quote.`}
+                {quantity < MOQ_PIECES ? `Enter at least ${MOQ_PIECES} pieces.` : `${catalog.find((c) => c.key === category)?.label ?? 'This product'} pricing is confirmed by our sales team. Submit to request a quote.`}
               </p>
             )}
             {unitPrice !== null && (

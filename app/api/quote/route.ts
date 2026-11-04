@@ -3,6 +3,7 @@ import { saveFormalQuote, listQuotesByClientToken, isFormalToken } from '../_lib
 import { getSupabaseAdmin } from '../_lib/integrations';
 import { rateLimitResponse } from '../_lib/rate-limit';
 import { buildPublicQuote, PublicQuoteError } from '../_lib/public-quote.ts';
+import { loadPricelist } from '../_lib/pricelist.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
 
   let result: ReturnType<typeof buildPublicQuote>;
   try {
-    result = buildPublicQuote(body);
+    result = buildPublicQuote(body, await loadPricelist());
   } catch (error) {
     if (error instanceof PublicQuoteError) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ error: 'Invalid quote input' }, { status: 400 });
