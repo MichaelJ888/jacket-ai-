@@ -163,6 +163,13 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - Q&A auto-approve + Telegram boost approval (2026-11-04)
+- Commit `0b40478` on main; prod deploy Ready (`jacket-78hwsh8oj`, aliased to jacket-ai.vercel.app).
+- Q&A ingest (`qa-logic.ts`) defaults to `approved`; explicit `pending`/`retired` still accepted.
+- Boost advisor sends the ₱700 (₱350 x 2 days) recommendation with `APPROVE BOOST ₱700` / `CANCEL` inline buttons (`boost-approval-logic.ts`). The `boost_go` callback in `telegram-webhook` records the decision in `boost_decisions` (schema applied via `db:push`). Approval does NOT spend money; payment stays manual in Meta Ads Manager.
+- Not implemented, by decision: (a) `pass_thread_control` / Meta AI silencing (no verified public endpoint; needs a live-page test first); (b) Facebook Marketplace Playwright automation (violates Meta terms, conflicts with anti-ban requirement). Alternative: manual listing kit.
+- Verified: `tsc --noEmit` exit 0; ESLint clean on changed files; targeted node tests 7/7 pass; `npm run verify:live` 11/11; `/api/health` `ok`.
+
 ## Completion log - Master OmniForge pillars 3, 5, 6 (2026-11-04)
 - Commit `ad0eeb6` on main, pushed. Prod deploy `jacket-irtxflmo5` Ready, aliased to https://jacket-ai.vercel.app.
 - Pillar 6 (grounding): Sales Closer `CLOSER_ADDENDUM` requires price, MOQ, lead time, DP/FP, sample fee, and proof-of-payment facts to come only from the system prompt, quote tool, approved Q&A, or CEO reference. Hotlines: Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61 (`mjic-prompt.ts` Globe fixed from 0917-320-8842).
