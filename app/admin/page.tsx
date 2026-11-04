@@ -63,6 +63,20 @@ export default function AdminPage() {
     return { ok: response.ok, status: response.status, data };
   }, [token]);
 
+  const exportHtml = useCallback(async () => {
+    const response = await fetch("/api/admin/export/html", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    if (!response.ok) { alert(`Export failed (HTTP ${response.status}).`); return; }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const name = /filename="([^"]+)"/.exec(disposition)?.[1] || "mjic-html-export.html";
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.click();
+    URL.revokeObjectURL(url);
+  }, [token]);
+
   const refresh = useCallback(async (auth = token) => {
     const [p, o] = await Promise.all([call("/api/admin/prices", {}, auth), call("/api/admin/overview", {}, auth)]);
     if (p.ok) setPrices(p.data.prices);
@@ -256,6 +270,7 @@ export default function AdminPage() {
             ))}
           </div>
           <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
+          <button type="button" className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm" onClick={() => void exportHtml()}>Export HTML source</button>
           <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
         </div>
       </div>

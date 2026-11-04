@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { computeFormalQuote, PAYMENT_TERMS, TERMS } from '../api/_lib/formal-quote';
+import { computeFormalQuote, PAYMENT_DETAILS, PAYMENT_TERMS, TERMS } from '../api/_lib/formal-quote';
 import { resolveFabricClass } from '../api/_lib/fabric-class';
 import { FABRIC_OPTIONS } from '../api/_lib/mjic-pricelist';
 import { seedPricelist, tierPrice, type PricelistCategory } from '../api/_lib/pricelist-logic';
@@ -269,6 +269,20 @@ export default function QuotePage() {
               <p className="mt-1 font-mono text-lg font-bold">{saved.quoteNumber}</p>
               <p className="mt-2 text-sm">Total {peso(saved.quote.total)} · Deposit {peso(saved.quote.deposit)}</p>
               <p className="mt-2 text-xs text-slate-600">{PAYMENT_TERMS}. Valid {saved.quote.validDays} days.</p>
+              <section aria-labelledby="deposit-heading" className="mt-4 rounded-lg border border-slate-200 bg-white p-3 text-xs">
+                <h3 id="deposit-heading" className="font-semibold text-slate-900">Deposit (50%): {peso(saved.quote.deposit)}</h3>
+                <p className="mt-1 text-slate-600">Pay the deposit by bank transfer or GCash using the details below, then send your payment slip for verification.</p>
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-slate-700">
+                  {PAYMENT_DETAILS.map((line) => (
+                    <li key={line}>{line}</li>
+                  ))}
+                </ul>
+                <div className="mt-3 rounded border border-dashed border-amber-400 bg-amber-50 p-2 text-amber-900">
+                  <p className="font-semibold">GCash / PayMaya online checkout: placeholder</p>
+                  <p>Online merchant checkout is not connected yet. No payment link or QR code is shown here. Use the account details above.</p>
+                  <button type="button" disabled className="mt-2 rounded bg-slate-300 px-3 py-1 font-semibold text-slate-600">Pay online (not available yet)</button>
+                </div>
+              </section>
               <p className="mt-3 break-all text-xs">
                 Your quote history link:{' '}
                 <a className="font-semibold text-indigo-700 underline" href={`/quote?client=${saved.clientToken}`}>

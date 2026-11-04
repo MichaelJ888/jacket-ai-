@@ -206,7 +206,8 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   }
 
   if (contact.ai_paused) {
-    void notifyCeo([`<b>Customer replied (AI paused) — ${label}</b>`, escapeTelegramHtml(text.slice(0, 300))]);
+    // Awaited: a fire-and-forget alert can be dropped once the serverless response ends.
+    await notifyCeo([`<b>Customer replied (AI paused) — ${label}</b>`, escapeTelegramHtml(text.slice(0, 300))]);
     return { ...empty, handled: true };
   }
 
@@ -215,7 +216,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
   let escalate = false;
   if (input.imageUrls?.length) {
     holding = handoff || 'Received po ang inyong proof of payment. I-verify lang po namin saglit at ico-confirm po namin agad. Salamat po!';
-    void notifyCeo([`<b>PAYMENT PROOF / IMAGE — ${label}</b>`, input.imageUrls.map(escapeTelegramHtml).join('\n'), 'Please verify (use payment-verify).']);
+    await notifyCeo([`<b>PAYMENT PROOF / IMAGE — ${label}</b>`, input.imageUrls.map(escapeTelegramHtml).join('\n'), 'Please verify (use payment-verify).']);
   } else if (ESCALATION_PATTERN.test(text)) {
     holding = handoff || 'Pasensya na po sa abala. Ipapasa ko po agad ito sa aming boss para personal po kayong matulungan. Babalikan po namin kayo sa lalong madaling panahon.';
     escalate = true;
@@ -226,7 +227,7 @@ export async function handleInboundMessage(input: InboundInput): Promise<Inbound
 
   if (escalate) {
     await updateContact(contact.id, { ai_paused: true });
-    void notifyCeo([`🚨 <b>NEEDS YOU — ${label}</b>`, escapeTelegramHtml(text.slice(0, 400)), 'AI is paused on this contact. Reply via POST /api/crm {id, reply}, or set ai_paused:false to resume.']);
+    await notifyCeo([`🚨 <b>NEEDS YOU — ${label}</b>`, escapeTelegramHtml(text.slice(0, 400)), 'AI is paused on this contact. Reply via POST /api/crm {id, reply}, or set ai_paused:false to resume.']);
   }
 
   let reply = holding;

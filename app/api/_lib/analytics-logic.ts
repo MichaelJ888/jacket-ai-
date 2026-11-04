@@ -48,6 +48,54 @@ export function summarizeSamples(rows: SampleRow[], today: string): SampleSummar
   return summary;
 }
 
+// Monday (YYYY-MM-DD) of the Manila calendar week containing `day`.
+export function weekStart(day: string): string {
+  const noon = Date.parse(`${day}T12:00:00Z`);
+  const offset = (new Date(noon).getUTCDay() + 6) % 7;
+  return new Date(noon - offset * DAY_MS).toISOString().slice(0, 10);
+}
+
+// Monday keys for the weeks covering the last `weeks` weeks, oldest first.
+export function weekRange(now: Date, weeks: number): string[] {
+  const starts = [...new Set(dayRange(now, weeks * 7).map(weekStart))];
+  return starts.slice(-weeks);
+}
+
+export function countByWeek(timestamps: string[], weeks: string[]): number[] {
+  const index = new Map(weeks.map((week, i) => [week, i]));
+  const counts = new Array<number>(weeks.length).fill(0);
+  for (const ts of timestamps) {
+    const i = index.get(weekStart(manilaDay(ts)));
+    if (i !== undefined) counts[i] += 1;
+  }
+  return counts;
+}
+
+export const QUOTE_STAGES = ['quoted', 'negotiating', 'won', 'lost', 'new', 'engaged', 'dormant', 'unlinked'] as const;
+export type QuoteStage = (typeof QUOTE_STAGES)[number];
+export type QuoteRow = { total: number | string; created_at: string; stage: string | null };
+export type QuoteSummary = {
+  pendingCount: number;
+  pendingRevenue: number;
+  stages: Record<QuoteStage, number>;
+};
+
+// A quote is pending until its linked CRM contact is won or lost. Quotes with no linked contact count as pending.
+export function summarizeQuotes(rows: QuoteRow[]): QuoteSummary {
+  const stages = Object.fromEntries(QUOTE_STAGES.map((s) => [s, 0])) as Record<QuoteStage, number>;
+  let pendingCount = 0;
+  let pendingRevenue = 0;
+  for (const row of rows) {
+    const stage = row.stage && (QUOTE_STAGES as readonly string[]).includes(row.stage) ? (row.stage as QuoteStage) : 'unlinked';
+    stages[stage] += 1;
+    if (stage !== 'won' && stage !== 'lost') {
+      pendingCount += 1;
+      pendingRevenue += Number(row.total) || 0;
+    }
+  }
+  return { pendingCount, pendingRevenue: Math.round(pendingRevenue * 100) / 100, stages };
+}
+
 export type LogRow = { severity: string; created_at: string };
 export function severityByDay(logs: LogRow[], days: string[]): Record<Severity, number[]> {
   const out = Object.fromEntries(SEVERITIES.map((s) => [s, new Array<number>(days.length).fill(0)])) as Record<Severity, number[]>;

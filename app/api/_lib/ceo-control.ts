@@ -42,6 +42,7 @@ export type ApprovalAction =
   | { type: 'retry_dispatch'; dispatchId: string }
   | { type: 'run_cron'; job: CronJob }
   | { type: 'code_change'; title: string; body: string }
+  | { type: 'send_quote_email'; quoteNumber: string; to: string }
   | { type: 'note' };
 
 export async function createApproval(input: { kind: string; summary: string; action: ApprovalAction; amount?: number }) {
@@ -94,6 +95,14 @@ export async function resolveApproval(id: string, approve: boolean): Promise<str
   if (action.type === 'code_change') {
     const result = await createCodeChangeIssue(action.title, action.body);
     return result.ok ? `Approved. Code-change request opened: ${result.url}. A PR will follow; CI runs and you merge.` : `Approved, but could not open the request: ${result.reason}`;
+  }
+  if (action.type === 'send_quote_email') {
+    const { loadQuoteRow, renderStoredQuotePdf, sendQuoteEmail } = await import('./quote-dispatch.ts');
+    const supabase = getSupabaseAdmin();
+    const row = supabase ? await loadQuoteRow(supabase, action.quoteNumber) : null;
+    if (!row) return `Approved, but quote ${action.quoteNumber} was not found.`;
+    const result = await sendQuoteEmail(action.to, action.quoteNumber, row.customer_name, await renderStoredQuotePdf(row));
+    return result.ok ? `Approved. Quotation ${action.quoteNumber} emailed.` : `Approved, but emailing failed: ${result.reason}`;
   }
   return `Approved (${data.kind}).`;
 }

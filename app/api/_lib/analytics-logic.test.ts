@@ -3,12 +3,50 @@ import assert from 'node:assert/strict';
 import {
   alertMetrics,
   countByDay,
+  countByWeek,
   dayRange,
   heartbeatViews,
   manilaDay,
   severityByDay,
+  summarizeQuotes,
   summarizeSamples,
+  weekRange,
+  weekStart,
 } from './analytics-logic.ts';
+
+test('weekStart returns the Monday of the Manila week', () => {
+  assert.equal(weekStart('2025-03-10'), '2025-03-10'); // Monday
+  assert.equal(weekStart('2025-03-16'), '2025-03-10'); // Sunday
+  assert.equal(weekStart('2025-03-17'), '2025-03-17');
+});
+
+test('weekRange and countByWeek bucket quotes by Monday-start week', () => {
+  const weeks = weekRange(new Date('2025-03-12T04:00:00Z'), 2);
+  assert.deepEqual(weeks, ['2025-03-03', '2025-03-10']);
+  const counts = countByWeek(['2025-03-03T01:00:00+08:00', '2025-03-16T10:00:00+08:00', '2025-03-17T00:00:00+08:00', '2025-02-01T00:00:00Z'], weeks);
+  assert.deepEqual(counts, [1, 1]);
+});
+
+test('summarizeQuotes treats unlinked and open-stage quotes as pending', () => {
+  const summary = summarizeQuotes([
+    { total: 1000, created_at: '2025-03-11T00:00:00Z', stage: 'quoted' },
+    { total: '2500.5', created_at: '2025-03-11T00:00:00Z', stage: 'negotiating' },
+    { total: 700, created_at: '2025-03-11T00:00:00Z', stage: 'won' },
+    { total: 300, created_at: '2025-03-11T00:00:00Z', stage: 'lost' },
+    { total: 400, created_at: '2025-03-11T00:00:00Z', stage: null },
+  ]);
+  assert.equal(summary.pendingCount, 3);
+  assert.equal(summary.pendingRevenue, 3900.5);
+  assert.equal(summary.stages.won, 1);
+  assert.equal(summary.stages.unlinked, 1);
+  assert.equal(summary.stages.quoted, 1);
+});
+
+test('summarizeQuotes maps unknown stages to unlinked', () => {
+  const summary = summarizeQuotes([{ total: 10, created_at: '2025-03-11T00:00:00Z', stage: 'mystery' }]);
+  assert.equal(summary.stages.unlinked, 1);
+  assert.equal(summary.pendingRevenue, 10);
+});
 
 test('manilaDay buckets by Manila calendar day, not UTC', () => {
   // 2025-03-10T18:00Z is 2025-03-11 02:00 in Manila.

@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from '../_lib/integrations';
 import { rateLimitResponse } from '../_lib/rate-limit';
 import { buildPublicQuote, PublicQuoteError } from '../_lib/public-quote.ts';
 import { loadPricelist } from '../_lib/pricelist.ts';
+import { queueQuoteEmail } from '../_lib/quote-dispatch.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +42,8 @@ export async function POST(req: Request) {
       inputs: { ...request, source: 'quote-web' },
       channel: 'quote-web',
     });
+    // Best effort: a failed queue must never fail the customer's quote. The email itself waits for CEO approval.
+    const dispatch = await queueQuoteEmail(saved.quoteNumber).catch((error) => ({ queued: false, reason: error instanceof Error ? error.message : 'failed' }));
     return NextResponse.json({
       ok: true,
       quoteNumber: saved.quoteNumber,
@@ -48,6 +51,7 @@ export async function POST(req: Request) {
       clientToken: saved.clientToken,
       createdAt: saved.createdAt,
       quote,
+      emailDispatch: dispatch.queued ? 'pending-approval' : 'not-queued',
     });
   } catch (error) {
     console.error('Public quote save failed:', error instanceof Error ? error.message : error);

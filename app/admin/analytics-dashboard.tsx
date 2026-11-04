@@ -9,13 +9,14 @@ type Analytics = {
   days: string[];
   enquiries: number[];
   orders: number[];
+  quotes: { daily: number[]; weeks: string[]; weekly: number[]; pendingCount: number; pendingRevenue: number; stages: Record<string, number> };
   samples: { pending: number; overdue: number; returned: number; lost: number; damaged: number };
   severity: Record<Severity, number[]>;
   heartbeats: Array<{ job: string; lastRunAt: string; ageHours: number; status: string; stale: boolean }>;
   alerts: { critical24h: number; warning24h: number; error24h: number; alertsSent24h: number; staleJobs: number; queuePending: number; queueFailed: number };
 };
 
-const COLORS = { enquiries: "#0B1E3D", orders: "#B8912F", pending: "#f59e0b", returned: "#10b981", lost: "#ef4444", damaged: "#a1a1aa", overdue: "#dc2626", info: "#60a5fa", warning: "#f59e0b", error: "#f97316", critical: "#dc2626" };
+const COLORS = { enquiries: "#0B1E3D", orders: "#B8912F", quotes: "#6366f1", pending: "#f59e0b", returned: "#10b981", lost: "#ef4444", damaged: "#a1a1aa", overdue: "#dc2626", info: "#60a5fa", warning: "#f59e0b", error: "#f97316", critical: "#dc2626" };
 
 function Card({ title, children, className = "" }: { title: string; children: React.ReactNode; className?: string }) {
   return (
@@ -107,13 +108,30 @@ export default function AnalyticsDashboard({ token }: { token: string }) {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Kpi label="Enquiries (14d)" value={data.enquiries.reduce((s, n) => s + n, 0)} />
         <Kpi label="Orders (14d)" value={data.orders.reduce((s, n) => s + n, 0)} />
-        <Kpi label="Samples out" value={data.samples.pending} tone={data.samples.overdue ? "text-red-600" : undefined} />
+        <Kpi label="Quotes (14d)" value={data.quotes.daily.reduce((s, n) => s + n, 0)} />
+        <Kpi label="Pending quote value (PHP)" value={Math.round(data.quotes.pendingRevenue)} />
         <Kpi label="Critical alerts (24h)" value={a.critical24h} tone={a.critical24h ? "text-red-600" : undefined} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card title="Daily client enquiries & order volume">
           <GroupedBars labels={labels} series={volumeSeries} />
+        </Card>
+        <Card title="Quotes per day (14d) and per week (12w)">
+          <GroupedBars labels={labels} series={[{ label: "Quotes", color: COLORS.quotes, values: data.quotes.daily }]} />
+          <div className="mt-4">
+            <GroupedBars labels={data.quotes.weeks.map(shortDay)} series={[{ label: "Quotes per week", color: COLORS.quotes, values: data.quotes.weekly }]} />
+          </div>
+        </Card>
+        <Card title="Quote conversion stages (last 12 weeks)">
+          <HBar rows={[
+            { label: `Pending (${data.quotes.pendingCount}, PHP ${Math.round(data.quotes.pendingRevenue).toLocaleString("en-PH")})`, value: data.quotes.pendingCount, color: COLORS.pending },
+            { label: "Quoted", value: data.quotes.stages.quoted ?? 0, color: COLORS.quotes },
+            { label: "Negotiating", value: data.quotes.stages.negotiating ?? 0, color: COLORS.orders },
+            { label: "Won", value: data.quotes.stages.won ?? 0, color: COLORS.returned },
+            { label: "Lost", value: data.quotes.stages.lost ?? 0, color: COLORS.lost },
+            { label: "No linked contact", value: data.quotes.stages.unlinked ?? 0, color: COLORS.damaged },
+          ]} />
         </Card>
         <Card title="Sample jacket retrieval status">
           <Donut segments={sampleSegments} centerLabel="samples" />
