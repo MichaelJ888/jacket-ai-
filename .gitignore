@@ -42,6 +42,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# local ad videos: uploaded to Supabase Storage by scripts/upload-videos-to-supabase.mjs, never committed
+/public/images/MJIC Facebook Video Ads/
+
 .vercel
 .env*
 

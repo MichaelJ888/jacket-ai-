@@ -597,6 +597,11 @@ create table if not exists public.content_calendar (
   published_at timestamptz
 );
 create index if not exists content_calendar_due_idx on public.content_calendar (status, scheduled_at);
+-- Which Meta Page a row publishes to: 'mjic' (Michael Jeffrey International) or 'cgv' (CGVenezuela Enterprises).
+alter table public.content_calendar add column if not exists page_key text not null default 'mjic';
+alter table public.content_calendar drop constraint if exists content_calendar_page_key_check;
+alter table public.content_calendar add constraint content_calendar_page_key_check check (page_key in ('mjic', 'cgv'));
+create index if not exists content_calendar_page_idx on public.content_calendar (page_key, platform, status);
 alter table public.content_calendar enable row level security;
 revoke all on public.content_calendar from anon, authenticated;
 

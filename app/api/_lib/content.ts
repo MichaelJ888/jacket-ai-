@@ -20,17 +20,21 @@ import {
   POSTING_SLOTS_PHT,
   jitterMinutes,
   maxPostsPerDay,
+  quotaKey,
   selectWithinQuota,
 } from './content-policy';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const VIDEO_MODEL = 'google/veo-3.1-fast-generate-001';
 type Platform = 'facebook' | 'instagram' | 'youtube' | 'tiktok';
+// 'mjic' = Michael Jeffrey International Corporation Page; 'cgv' = CGVenezuela Enterprises Page (env-bound).
+export type PageKey = 'mjic' | 'cgv';
 const MISSED_SLOT_MS = 36 * 3600 * 1000;
 
 type CalendarRow = {
   id: string;
   platform: Platform;
+  page_key: PageKey | null;
   media_type: 'video' | 'image' | 'text';
   caption: string;
   hashtags: string[];
@@ -204,39 +208,45 @@ function fullCaption(row: CalendarRow) {
 class MissingCredentials extends Error {}
 
 export function createMetaPublishingPreflight() {
-  const pending = new Map<MetaPlatform, ReturnType<typeof mjicMetaAccount>>();
-  return (platform: MetaPlatform) => {
-    let task = pending.get(platform);
+  const pending = new Map<string, ReturnType<typeof metaAccountFor>>();
+  return (platform: MetaPlatform, pageKey: PageKey = 'mjic') => {
+    const cacheKey = `${pageKey}:${platform}`;
+    let task = pending.get(cacheKey);
     if (!task) {
+      // Health alerts track the MJIC Page only; CGVenezuela failures surface through NEEDS_CREDENTIALS rows and the cron summary.
+      const recordHealth = (result: Parameters<typeof recordMetaPublishingHealth>[1]) => (pageKey === 'mjic' ? recordMetaPublishingHealth(platform, result) : Promise.resolve());
       task = (async () => {
-        let account: Awaited<ReturnType<typeof mjicMetaAccount>>;
+        let account: Awaited<ReturnType<typeof metaAccountFor>>;
         try {
-          account = await mjicMetaAccount(platform === 'instagram');
+          account = await metaAccountFor(platform === 'instagram', pageKey);
         } catch (error) {
           const reason = error instanceof MissingCredentials ? error.message : 'Meta account resolution failed. Check saved connections and provider access.';
-          await recordMetaPublishingHealth(platform, { ok: false, code: 'missing_account', reason });
+          await recordHealth({ ok: false, code: 'missing_account', reason });
           throw new MissingCredentials(reason);
         }
         const result = await checkMetaPublishing(account.pageId, account.token, platform);
-        await recordMetaPublishingHealth(platform, result);
+        await recordHealth(result);
         if (!result.ok) throw new MissingCredentials(result.reason);
         return account;
       })();
-      pending.set(platform, task);
+      pending.set(cacheKey, task);
     }
     return task;
   };
 }
 
-// MJIC's own Page/IG account. The token comes from the same resolver the inbox bot uses (DB OAuth token, System User
-// discovery, then legacy env), so a rotated or logged-out env token no longer breaks posting.
-async function mjicMetaAccount(needInstagram: boolean) {
-  const pageId = process.env.META_PAGE_ID;
-  if (!pageId) throw new MissingCredentials('META_PAGE_ID');
-  const token = (await getPageToken(pageId)) || process.env.META_PAGE_ACCESS_TOKEN;
-  if (!token) throw new MissingCredentials('a Page access token (connect the Page in Admin > Connect Facebook / Instagram)');
+// Resolves a Page + token + (optional) Instagram account. MJIC uses the inbox-bot resolver (DB OAuth token, System User
+// discovery, then legacy env). CGVenezuela uses its own env-bound Page ID and Page token, with the DB resolver as fallback.
+async function metaAccountFor(needInstagram: boolean, pageKey: PageKey) {
+  const cgv = pageKey === 'cgv';
+  const pageId = cgv ? process.env.META_CGV_PAGE_ID : process.env.META_PAGE_ID;
+  if (!pageId) throw new MissingCredentials(cgv ? 'META_CGV_PAGE_ID (CGVenezuela Enterprises Page ID)' : 'META_PAGE_ID');
+  const token = cgv
+    ? process.env.META_CGV_PAGE_ACCESS_TOKEN || (await getPageToken(pageId))
+    : (await getPageToken(pageId)) || process.env.META_PAGE_ACCESS_TOKEN;
+  if (!token) throw new MissingCredentials(cgv ? 'META_CGV_PAGE_ACCESS_TOKEN (CGVenezuela Enterprises Page token)' : 'a Page access token (connect the Page in Admin > Connect Facebook / Instagram)');
   if (!needInstagram) return { pageId, token, igId: null as string | null };
-  let igId: string | null | undefined = process.env.META_IG_USER_ID;
+  let igId: string | null | undefined = cgv ? process.env.META_CGV_IG_USER_ID : process.env.META_IG_USER_ID;
   if (!igId) {
     const info = await fetch(`${GRAPH}/${pageId}?fields=instagram_business_account`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) }).then((response) => response.json()).catch(() => ({}));
     igId = (info as { instagram_business_account?: { id?: string } }).instagram_business_account?.id;
@@ -246,7 +256,9 @@ async function mjicMetaAccount(needInstagram: boolean) {
 }
 
 async function resolveMedia(row: CalendarRow): Promise<{ url: string | null; storagePath: string | null }> {
-  if (row.media_type !== 'video') return { url: row.media_url, storagePath: null };
+  // Directly registered videos (Supabase Storage uploads) carry a public media_url and need no generation row.
+  if (row.media_url) return { url: row.media_url, storagePath: null };
+  if (row.media_type !== 'video') return { url: null, storagePath: null };
   if (!row.media_generation_id) return { url: null, storagePath: null };
   const generation = await getMediaAdGeneration(row.media_generation_id);
   const path = (generation.data as { video_storage_path?: string } | null)?.video_storage_path || null;
@@ -266,7 +278,7 @@ async function requireMetaPostSuccess(platform: MetaPlatform, result: Awaited<Re
 }
 
 async function publishFacebook(row: CalendarRow, mediaUrl: string | null, validateMeta: ReturnType<typeof createMetaPublishingPreflight>) {
-  const { token, pageId } = await validateMeta('facebook');
+  const { token, pageId } = await validateMeta('facebook', row.page_key || 'mjic');
   const caption = fullCaption(row);
   const result = row.media_type === 'video' && mediaUrl
     ? await graphPost(`/${pageId}/videos`, { file_url: mediaUrl, description: caption }, token)
@@ -279,7 +291,7 @@ async function publishFacebook(row: CalendarRow, mediaUrl: string | null, valida
 }
 
 async function publishInstagram(row: CalendarRow, mediaUrl: string | null, validateMeta: ReturnType<typeof createMetaPublishingPreflight>) {
-  const { token, igId } = await validateMeta('instagram');
+  const { token, igId } = await validateMeta('instagram', row.page_key || 'mjic');
   if (!mediaUrl) throw new Error('Instagram needs an image or video URL');
   const container = await graphPost(`/${igId}/media`, row.media_type === 'video'
     ? { media_type: 'REELS', video_url: mediaUrl, caption: fullCaption(row) }
@@ -359,14 +371,18 @@ async function publishTiktok(row: CalendarRow, mediaUrl: string | null) {
 type PublishSummary = { published: number; failed: number; needsCredentials: string[]; credentialIssues: Record<string, string> };
 
 // Successful posts per platform in the rolling 24h window. Returns null when the count cannot be read, so callers fail closed.
+// Keyed by page:platform (see quotaKey) so MJIC and CGVenezuela each get their own anti-ban cap.
 async function publishedLast24hByPlatform(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<Record<string, number> | null> {
-  const { data, error } = await supabase.from('content_calendar').select('platform').eq('status', 'PUBLISHED').gte('published_at', new Date(Date.now() - DAY_MS).toISOString());
+  const { data, error } = await supabase.from('content_calendar').select('platform, page_key').eq('status', 'PUBLISHED').gte('published_at', new Date(Date.now() - DAY_MS).toISOString());
   if (error) {
     console.error('Content publisher could not count recent posts:', error.message);
     return null;
   }
   const counts: Record<string, number> = {};
-  for (const row of data || []) counts[row.platform] = (counts[row.platform] || 0) + 1;
+  for (const row of data || []) {
+    const key = quotaKey(row);
+    counts[key] = (counts[key] || 0) + 1;
+  }
   return counts;
 }
 
@@ -454,7 +470,7 @@ export async function publishApprovedStudioImage(imageUrl: string) {
   // Over-quota rows stay READY and go out on a later pipeline run, inside the same 24h cap.
   const used = await publishedLast24hByPlatform(supabase);
   if (!used) throw new Error('Could not count recent posts; studio post queued but not published');
-  const due = selectWithinQuota(data as CalendarRow[], used, maxPostsPerDay(process.env.CONTENT_MAX_POSTS_PER_DAY));
+  const due = selectWithinQuota(data as CalendarRow[], used, maxPostsPerDay(process.env.CONTENT_MAX_POSTS_PER_DAY), quotaKey);
   for (const row of due) await publishCalendarRow(supabase, row, validateMeta, summary);
   return summary;
 }
@@ -483,7 +499,7 @@ export async function runContentPipeline(origin: string, validateMeta = createMe
   // Anti-ban cap: never more than maxPostsPerDay() successful posts per platform in any rolling 24h window.
   const used = await publishedLast24hByPlatform(supabase);
   if (!used) return { error: 'Could not count recent posts; publishing paused for this run' };
-  const due = selectWithinQuota((data || []) as CalendarRow[], used, maxPostsPerDay(process.env.CONTENT_MAX_POSTS_PER_DAY));
+  const due = selectWithinQuota((data || []) as CalendarRow[], used, maxPostsPerDay(process.env.CONTENT_MAX_POSTS_PER_DAY), quotaKey);
 
   const summary: PublishSummary & { videosStarted: unknown; videoErrors: string[] } = { videosStarted, videoErrors, published: 0, failed: 0, needsCredentials: [], credentialIssues: {} };
   for (const row of due) await publishCalendarRow(supabase, row, validateMeta, summary);
@@ -500,28 +516,38 @@ export async function runContentPipeline(origin: string, validateMeta = createMe
 export async function requeueCredentialBlocked(validateMeta = createMetaPublishingPreflight()) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return 0;
-  const available: Platform[] = [];
-  const { data: blocked, error } = await supabase.from('content_calendar').select('platform').in('status', ['NEEDS_CREDENTIALS', 'FAILED']).gte('scheduled_at', new Date(Date.now() - MISSED_SLOT_MS).toISOString());
+  // Each (page, platform) pair is checked and re-queued on its own, so a restored CGVenezuela token never releases MJIC rows.
+  const recent = new Date(Date.now() - MISSED_SLOT_MS).toISOString();
+  const { data: blocked, error } = await supabase.from('content_calendar').select('platform, page_key').in('status', ['NEEDS_CREDENTIALS', 'FAILED']).gte('scheduled_at', recent);
   if (error) {
     console.error('Credential-blocked content lookup failed:', error.message);
     throw new Error('Could not inspect credential-blocked content.');
   }
-  for (const platform of ['facebook', 'instagram'] as const) {
-    if (!blocked?.some((row) => row.platform === platform)) continue;
+  const pairs = new Map<string, { platform: MetaPlatform; pageKey: PageKey }>();
+  for (const row of blocked || []) {
+    if (row.platform !== 'facebook' && row.platform !== 'instagram') continue;
+    const pageKey: PageKey = row.page_key === 'cgv' ? 'cgv' : 'mjic';
+    pairs.set(`${pageKey}:${row.platform}`, { platform: row.platform, pageKey });
+  }
+  let restored = 0;
+  for (const { platform, pageKey } of pairs.values()) {
     try {
-      await validateMeta(platform);
-      available.push(platform);
+      await validateMeta(platform, pageKey);
     } catch (error) {
       if (!(error instanceof MissingCredentials)) throw error;
       // The preflight logs and alerts with a cooldown; blocked rows stay parked.
+      continue;
     }
+    // Posts parked or failed because of a dead credential come back, but only if their slot is still recent.
+    const parked = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'NEEDS_CREDENTIALS').eq('platform', platform).eq('page_key', pageKey).gte('scheduled_at', recent).select('id');
+    const tokenFailed = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'FAILED').eq('platform', platform).eq('page_key', pageKey).ilike('error', '%access token%').gte('scheduled_at', recent).select('id');
+    restored += (parked.data?.length || 0) + (tokenFailed.data?.length || 0);
   }
-  if (process.env.YOUTUBE_REFRESH_TOKEN) available.push('youtube');
-  if (process.env.TIKTOK_ACCESS_TOKEN) available.push('tiktok');
-  if (!available.length) return 0;
-  // Posts parked or failed because of a dead credential come back, but only if their slot is still recent.
-  const recent = new Date(Date.now() - MISSED_SLOT_MS).toISOString();
-  const parked = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'NEEDS_CREDENTIALS').in('platform', available).gte('scheduled_at', recent).select('id');
-  const tokenFailed = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'FAILED').in('platform', available).ilike('error', '%access token%').gte('scheduled_at', recent).select('id');
-  return (parked.data?.length || 0) + (tokenFailed.data?.length || 0);
+  for (const platform of ['youtube', 'tiktok'] as const) {
+    const envSet = platform === 'youtube' ? process.env.YOUTUBE_REFRESH_TOKEN : process.env.TIKTOK_ACCESS_TOKEN;
+    if (!envSet) continue;
+    const parked = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'NEEDS_CREDENTIALS').eq('platform', platform).gte('scheduled_at', recent).select('id');
+    restored += parked.data?.length || 0;
+  }
+  return restored;
 }

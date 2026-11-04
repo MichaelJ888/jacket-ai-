@@ -28,13 +28,19 @@ export function remainingDailyQuota(publishedLast24h: number, cap = HARD_MAX_POS
   return Math.max(0, cap - publishedLast24h);
 }
 
-// Keeps rows in order while respecting each platform's remaining quota.
-export function selectWithinQuota<T extends { platform: string }>(rows: T[], usedByPlatform: Record<string, number>, cap = HARD_MAX_POSTS_PER_DAY): T[] {
+// Each Meta Page is its own account, so its quota is tracked separately (MJIC and CGVenezuela).
+export function quotaKey(row: { platform: string; page_key?: string | null }): string {
+  return `${row.page_key || 'mjic'}:${row.platform}`;
+}
+
+// Keeps rows in order while respecting each account's remaining quota.
+export function selectWithinQuota<T extends { platform: string }>(rows: T[], usedByKey: Record<string, number>, cap = HARD_MAX_POSTS_PER_DAY, keyOf: (row: T) => string = (row) => row.platform): T[] {
   const taken: Record<string, number> = {};
   return rows.filter((row) => {
-    const used = (usedByPlatform[row.platform] || 0) + (taken[row.platform] || 0);
+    const key = keyOf(row);
+    const used = (usedByKey[key] || 0) + (taken[key] || 0);
     if (used >= cap) return false;
-    taken[row.platform] = (taken[row.platform] || 0) + 1;
+    taken[key] = (taken[key] || 0) + 1;
     return true;
   });
 }
