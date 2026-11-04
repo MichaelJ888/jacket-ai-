@@ -163,6 +163,16 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - unified formal quotation page (2026-11-04)
+- Commit `0212a6b` on main: `/quote` merges the price and formal quotation builders. Official tiers (jacket, polo, school uniform) priced server-side in `app/api/_lib/public-quote.ts` and `mjic-pricelist.ts`; client-sent prices and discounts ignored. T-Shirt and Company Uniform return a sales-confirmation response (422), since no official table exists.
+- Fabric: catalog dropdown plus "Other" custom input. Fabrics without a class on file (Twill, Brush Cotton, Marks & Spencer, Stellini, Vellini) require the customer to pick Class A or B.
+- Quote numbers: `next_formal_quote_number()` (`formal_quote_seq`) gives MJIC-YYYY-NNNN, unique per row. Schema applied with `npm run db:push`. Existing rows keep a null number (not backfilled).
+- Client history: each CRM contact gets a reusable `client_token`; `GET /api/quote?client=<token>` lists its quotes. Treat the token as a secret.
+- `public/index.html`: both quotation cards and `openFormalQuote` now go to `/quote`. The legacy cart-based modal is no longer reachable.
+- Declined: Meta Graph API "anti-ban bypass" items (not implemented).
+- Open: the public POST has no rate limiting. Telegram/Viber CTAs, and T-Shirt/Company Uniform price tables, still need owner input.
+- Verified: `tsc --noEmit` clean; lint 0 errors (1 new `<img>` warning, same pattern as elsewhere); `npm test` 394 pass / 0 fail / 1 skipped; `npm run build` (webpack) passes; `db:push` applied; prod deploy `jacket-mpxt8vuyx` Ready; `/api/health` ok; `verify:live` 11/11; `/quote` 200; negative API checks return 422 and 400.
+
 ## Completion log - formal quotation page + signatories (2026-11-04)
 - Commit `abe61cb` on main (pushed): `/admin/quotation` form with AI design-scan dropzone (`/api/costing/scan-design`), save to CRM via `/api/costing/formal-quote`, printable quote sheet.
 - `formal-quote.ts`: selectable signatory (May Anne E. Manalo, Marketing Manager / Richard Venezuela, CEO; default CEO), signature images in `public/images/signatures/`, 30-day validity, payment terms and details, verbatim terms from the reference quote.
