@@ -163,6 +163,14 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - formal quotation page + signatories (2026-11-04)
+- Commit `abe61cb` on main (pushed): `/admin/quotation` form with AI design-scan dropzone (`/api/costing/scan-design`), save to CRM via `/api/costing/formal-quote`, printable quote sheet.
+- `formal-quote.ts`: selectable signatory (May Anne E. Manalo, Marketing Manager / Richard Venezuela, CEO; default CEO), signature images in `public/images/signatures/`, 30-day validity, payment terms and details, verbatim terms from the reference quote.
+- Discrepancies for the owner: reference PDF names the issuer "CG Venezuela Enterprises" and titles Richard Venezuela "General Manager"; the app brand is MJIC. Signature image reads "RICHARD DG. VENEZUELA" while code prints "Richard Venezuela". Left as-is.
+- Verified: `npx tsc --noEmit` exit 0; eslint clean on changed files; `node --test` 16/16 pass (quotation-logic + formal-quote); `npm run build` (webpack) passes and lists `/admin/quotation`.
+- Deploy: `npx vercel --prod --yes` produced Ready production `jacket-a2dqt2g2a` (CLI printed help JSON, status confirmed via `vercel ls`). `verify:live` 11/11; `/api/health` `ok`, criticalErrors24h 0; `/admin/quotation` HTTP 200.
+- Not done / refused: Meta anti-ban limits were not bypassed (4 posts/platform/24h cap kept). `costing.test.ts` does not exist; tests live in `formal-quote.test.ts`. `public/image-library.json` build regen left unstaged.
+
 ## Completion log - Q&A auto-approve + Telegram boost approval (2026-11-04)
 - Commit `0b40478` on main; prod deploy Ready (`jacket-78hwsh8oj`, aliased to jacket-ai.vercel.app).
 - Q&A ingest (`qa-logic.ts`) defaults to `approved`; explicit `pending`/`retired` still accepted.
