@@ -162,3 +162,12 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Verified: `npx tsc --noEmit` exit 0; `npm run lint` 0 errors, 4 pre-existing warnings; `npm test` 350 pass / 0 fail / 1 skipped; `npm run verify:live` 11/11.
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
+
+## Completion log - video pipeline + CGV page binding (2026-11-04)
+- Commit `76f6ec6` on main: page-keyed Meta publisher (`page_key` mjic/cgv in `content.ts`, `quotaKey` in `content-policy.ts`), direct `media_url` video publishing, `scripts/upload-videos-to-supabase.mjs`, `page_key` schema column + index. Videos git- and vercel-ignored.
+- Live data: bucket `mjic-video-ads` (public) holds 18 unique MJIC MP4s; `content_calendar` gained 36 READY rows (facebook + instagram, 4 PHT slots/day with ±12 min jitter, starting 2026-12-09 PHT). Script dedupes per page group, so the byte-identical CGVE reel is not lost; it is held until `META_CGV_PAGE_ID` is set.
+- Captions are generated from filenames and are weak (export names become the generic MJIC caption). Better captions need `MJIC ADS DESCRIPTION/`.
+- Verified: `tsc --noEmit` exit 0; eslint 0 errors on changed files; `npm test` 357 pass / 0 fail / 1 skipped; `npm run db:push` ok; `npm run build` (webpack) ok; prod deploy Ready (`jacket-pka2681xc`); `verify:live` 11/11; `/api/health` status `ok`; sample video URL HTTP 200.
+- Blocked (needs owner input): CGVenezuela Page ID and Page access token are not in env or repo. Set `META_CGV_PAGE_ID`, `META_CGV_PAGE_ACCESS_TOKEN` (optional `META_CGV_IG_USER_ID`) on Vercel; the held CGVE reel then registers to `cgv`.
+- Optional integrations (WhatsApp, YouTube, Lalamove, Resend, embroidery digitize, META_IG_USER_ID) report as booleans in `/api/health` and never throw; placeholders documented in `AUTOMATION_CHECKLIST.md`.
+- Deploy note: `npx vercel --prod --yes` printed CLI help JSON again; deployment confirmed with `npx vercel ls`.
