@@ -215,3 +215,18 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Blocked (needs owner input): CGVenezuela Page ID and Page access token are not in env or repo. Set `META_CGV_PAGE_ID`, `META_CGV_PAGE_ACCESS_TOKEN` (optional `META_CGV_IG_USER_ID`) on Vercel; the held CGVE reel then registers to `cgv`.
 - Optional integrations (WhatsApp, YouTube, Lalamove, Resend, embroidery digitize, META_IG_USER_ID) report as booleans in `/api/health` and never throw; placeholders documented in `AUTOMATION_CHECKLIST.md`.
 - Deploy note: `npx vercel --prod --yes` printed CLI help JSON again; deployment confirmed with `npx vercel ls`.
+
+## Completion log - quote hardening, pricelist admin, handover audit (2026-11-04)
+- Commit `e8b9125`: strict fabric class rule (pp/api/_lib/fabric-class.ts). Class B only for Microfiber, Michael Angelo, Diamond Ripstop. Everything else, including custom input, is Class A (+PHP 300). Full-sublimation bombers stay exempt. Dri-Fit, Honeycomb, Scrub Suit, and Cotton Fleece moved to Class A, which raises customer-facing prices.
+- Commit `e8b9125`: public POST /api/quote rate-limited to 10 requests per minute per IP (ateLimitResponse). /quote gained Viber and Telegram CTAs. Caveats: the limiter fails open if the DB is down, and clientIp trusts the first x-forwarded-for entry.
+- Commit `c5c37a1`: admin-editable pricelist. Table quote_pricelist (applied via 
+pm run db:push), pure rules in pricelist-logic.ts, DB overlay with seed fallback in pricelist.ts, public GET /api/quote/pricelist, admin GET/POST /api/admin/pricelist (Bearer admin token), UI /admin/pricelist. Public quotes price from the catalog.
+- Telemetry: 
+px tsc --noEmit exit 0; 
+pm run lint 0 errors (5 pre-existing warnings); 
+pm test 404 pass / 0 fail / 1 skipped; prod deploy Ready (jacket-attqxof3d); /api/health status ok, criticalErrors24h 0; /api/quote/pricelist 200; /api/admin/pricelist without token 401; /quote and /admin/pricelist 200.
+- Not verified: admin GET/POST with a real token (needs the owner's ADMIN_TOKEN). Authenticated save/load round-trip is pending.
+- Meta/Telegram handover audit: already in place in pp/api/_lib/sales-closer.ts. Escalations, payment proofs, and special-terms approvals pause AI (i_paused) and alert Telegram. Messages to paused contacts alert the CEO. No new Meta bypass was added. Meta Business Suite "webhook schedulers" are not a public API, so they were not built.
+- Deploy note: 
+px vercel --prod --yes printed CLI help JSON again; deployment confirmed with 
+px vercel ls.
