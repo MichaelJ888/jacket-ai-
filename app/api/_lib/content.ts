@@ -22,6 +22,7 @@ import {
   maxPostsPerDay,
   quotaKey,
   selectWithinQuota,
+  withContactFooter,
 } from './content-policy';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
@@ -61,7 +62,7 @@ function manilaSlot(daysFromToday: number, hourManila: number, minuteManila = 0)
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysFromToday, hourManila - 8, minuteManila, 0));
 }
 
-const CONTENT_SYSTEM_PROMPT = 'You are the social media manager of MJIC, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write engaging Taglish posts. NEVER state prices, discounts, or delivery promises. Never mention being an AI.';
+const CONTENT_SYSTEM_PROMPT = 'You are the social media manager of MJIC, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write engaging Taglish posts. NEVER state prices, discounts, or delivery promises. Never mention being an AI. The corporate hotlines (Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61) are appended automatically; do not write phone numbers yourself.';
 
 async function generateIdeas(count: number): Promise<IdeaPost[]> {
   if (!process.env.GEMINI_API_KEY) return [];
@@ -202,7 +203,7 @@ async function advanceVideos(origin: string) {
 }
 
 function fullCaption(row: CalendarRow) {
-  return `${row.caption}\n\n${(row.hashtags || []).join(' ')}`.trim();
+  return `${withContactFooter(row.caption)}\n\n${(row.hashtags || []).join(' ')}`.trim();
 }
 
 class MissingCredentials extends Error {}

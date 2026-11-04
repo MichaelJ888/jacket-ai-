@@ -10,6 +10,15 @@ export const POSTING_SLOTS_PHT: ReadonlyArray<{ hour: number; minute: number }> 
 
 // Hard ceiling per platform (Meta anti-spam). CONTENT_MAX_POSTS_PER_DAY can lower it but never raise it.
 export const HARD_MAX_POSTS_PER_DAY = 4;
+
+export const CONTACT_HOTLINES = ['Smart: 0920 695 91 67', 'Globe: 0997 411 45 94', 'Viber/Telegram: 0929 227 17 61'] as const;
+
+// Appends the corporate hotlines to a caption exactly once, so reprocessing a row never duplicates them.
+export function withContactFooter(caption: string): string {
+  const text = caption.trim();
+  if (text.includes(CONTACT_HOTLINES[2])) return text;
+  return `${text}\n\n📞 ${CONTACT_HOTLINES.join(' | ')}`;
+}
 export const DAY_MS = 24 * 3600 * 1000;
 
 export function maxPostsPerDay(raw: string | undefined): number {

@@ -7,7 +7,16 @@ import {
   maxPostsPerDay,
   remainingDailyQuota,
   selectWithinQuota,
+  withContactFooter,
 } from './content-policy.ts';
+
+test('contact footer appends all three hotlines once', () => {
+  const once = withContactFooter('Message us today.');
+  assert.match(once, /Smart: 0920 695 91 67/);
+  assert.match(once, /Globe: 0997 411 45 94/);
+  assert.match(once, /Viber\/Telegram: 0929 227 17 61/);
+  assert.equal(withContactFooter(once), once);
+});
 
 test('posting slots are the four PHT peak times', () => {
   assert.deepEqual(POSTING_SLOTS_PHT.map((slot) => `${slot.hour}:${String(slot.minute).padStart(2, '0')}`), ['9:30', '13:30', '16:00', '20:30']);
