@@ -11,10 +11,28 @@ export const PROGRAM_FEE_PER_LOGO = 1000; // flat, per logo location, not per pi
 export const PROGRAM_FEE_MAX_QTY = 300; // program fee applies only up to this quantity
 export const DEPOSIT_PCT = 50;
 
-export const SIGNATORIES = [
-  { name: 'Anne Manalo', title: 'Marketing Manager' },
-  { name: 'Richard Venezuela', title: 'CEO' },
+export const SIGNATORIES = {
+  manalo: { name: 'May Anne E. Manalo', title: 'Marketing Manager', image: '/images/signatures/manalo.jpg' },
+  venezuela: { name: 'Richard Venezuela', title: 'CEO', image: '/images/signatures/venezuela.jpg' },
+} as const;
+export type SignatoryKey = keyof typeof SIGNATORIES;
+export const DEFAULT_SIGNATORY: SignatoryKey = 'venezuela';
+
+export const VALID_DAYS = 30;
+export const PAYMENT_DETAILS = [
+  'BPI Savings Acct. | Acct. name: Richard Venezuela | Acct. no.: 4129447058',
+  'GCash: 09292271761 (Richard Venezuela)',
+  'Please send payment slip/screenshot for verification, thank you.',
 ] as const;
+
+// Verbatim from the CG Venezuela Enterprises formal quotation standard. Do not reword.
+export const TERMS = [
+  'This Quotation Sheet must be signed and emailed back to CG Venezuela Enterprises after a purchase order is filled.',
+  'The Quotation Number must be referenced on all purchase orders sent to CG Venezuela Enterprises.',
+  'Product payment should be processed and funds be made available on the agreed upon date. Otherwise, CG Venezuela Enterprises will automatically charge an additional penalty of 3%/month on the total contract price of the project. Continual refusal to release payment will force CG Venezuela Enterprises to take applicable legal actions.',
+] as const;
+
+export const PAYMENT_TERMS = '50% downpayment & 50% upon delivery';
 
 export type ProductClass = 'A' | 'B';
 
@@ -31,6 +49,7 @@ export type FormalQuoteInput = {
   isTshirt: boolean;
   isFullSublimation: boolean;
   discountPesos?: number; // fixed peso amount, subtracted from the final total
+  signatory?: SignatoryKey;
 };
 
 function whole(value: unknown) {
@@ -71,6 +90,8 @@ export function computeFormalQuote(input: FormalQuoteInput) {
   const discount = Math.min(requestedDiscount, subtotal);
   const total = subtotal - discount;
   const deposit = Math.ceil((total * DEPOSIT_PCT) / 100);
+  const signatoryKey: SignatoryKey = input.signatory && input.signatory in SIGNATORIES ? input.signatory : DEFAULT_SIGNATORY;
+  const signatory = { key: signatoryKey, ...SIGNATORIES[signatoryKey] };
 
   return {
     quantity,
@@ -96,7 +117,11 @@ export function computeFormalQuote(input: FormalQuoteInput) {
     depositPct: DEPOSIT_PCT,
     deposit,
     balance: total - deposit,
-    signatures: SIGNATORIES.map((s) => ({ ...s, line: `______________________\n${s.name}\n${s.title}` })),
+    validDays: VALID_DAYS,
+    paymentTerms: PAYMENT_TERMS,
+    paymentDetails: PAYMENT_DETAILS,
+    terms: TERMS,
+    signatory,
   };
 }
 

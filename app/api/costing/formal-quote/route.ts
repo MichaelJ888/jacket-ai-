@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../../_lib/auth';
-import { computeFormalQuote, type FormalQuoteInput } from '../../_lib/formal-quote.ts';
+import { computeFormalQuote, SIGNATORIES, type FormalQuoteInput, type SignatoryKey } from '../../_lib/formal-quote.ts';
 import { getSupabaseAdmin } from '../../_lib/integrations';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +35,7 @@ export async function POST(req: Request) {
       isTshirt: body.isTshirt === true,
       isFullSublimation: body.isFullSublimation === true,
       discountPesos: Number(body.discountPesos) || 0,
+      signatory: typeof body.signatory === 'string' && body.signatory in SIGNATORIES ? (body.signatory as SignatoryKey) : undefined,
     } satisfies FormalQuoteInput);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Invalid quote input' }, { status: 400 });

@@ -78,7 +78,29 @@ test('deposit is 50% of the total after discount, rounded up; balance is the res
   assert.equal(q.balance, 41999);
 });
 
-test('signature blocks name both signatories', () => {
+test('signature blocks name the selected signatory; default is the CEO', () => {
+  assert.equal(computeFormalQuote(base).signatory.name, 'Richard Venezuela');
+  assert.equal(computeFormalQuote(base).signatory.title, 'CEO');
+  const manalo = computeFormalQuote({ ...base, signatory: 'manalo' });
+  assert.equal(manalo.signatory.name, 'May Anne E. Manalo');
+  assert.equal(manalo.signatory.title, 'Marketing Manager');
+  assert.equal(manalo.signatory.image, '/images/signatures/manalo.jpg');
+  assert.equal(computeFormalQuote({ ...base, signatory: 'bogus' as never }).signatory.key, 'venezuela');
+});
+
+test('quote carries verbatim terms, 30-day validity, and payment terms', () => {
   const q = computeFormalQuote(base);
-  assert.deepEqual(q.signatures.map((s) => s.name), ['Anne Manalo', 'Richard Venezuela']);
+  assert.equal(q.validDays, 30);
+  assert.equal(q.paymentTerms, '50% downpayment & 50% upon delivery');
+  assert.equal(q.terms.length, 3);
+  assert.match(q.terms[2], /3%\/month on the total contract price/);
+});
+
+test('discount and deposit combine: 50% of the discounted total rounded up', () => {
+  const q = computeFormalQuote({ ...base, productClass: 'A', frontLogos: 2, backLogos: 1, discountPesos: 2500 });
+  // unit = 850 + 300 (Class A) + 65 (extra front) + 150 (back); subtotal = 100 * 1365 + program fee 2 * 1000
+  assert.equal(q.subtotal, 138500);
+  assert.equal(q.total, 136000);
+  assert.equal(q.deposit, 68000);
+  assert.equal(q.balance, 68000);
 });
