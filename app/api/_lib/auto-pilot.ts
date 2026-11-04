@@ -21,6 +21,32 @@ export const CATCH_UP_JOBS: CatchUpJob[] = [
 
 export type HeartbeatRow = { job: string; last_run_at: string | null; last_status: string | null };
 
+// "1-push Auto-Pilot / Stabilize" state for the admin badge.
+export const AUTO_PILOT_JOB = 'auto-pilot';
+// The GitHub scheduler fires at */5 and */45 cadences; 120 min tolerates heavy schedule delays without hiding a real outage.
+export const AUTO_PILOT_FRESH_MS = 120 * 60_000;
+
+export type AutoPilotState = {
+  on: boolean;
+  lastRunAt: string | null;
+  lastStatus: string | null;
+  due: string[];
+};
+
+// ON = auto-pilot's own heartbeat is fresh + healthy AND no sub-daily job is stale. OFF (amber) otherwise.
+export function autoPilotState(beats: HeartbeatRow[], now = Date.now()): AutoPilotState {
+  const self = beats.find((row) => row.job === AUTO_PILOT_JOB);
+  const lastRunMs = Date.parse(self?.last_run_at ?? '');
+  const fresh = Number.isFinite(lastRunMs) && now - lastRunMs <= AUTO_PILOT_FRESH_MS;
+  const due = dueCatchUpJobs(beats, now).map((job) => job.job);
+  return {
+    on: Boolean(fresh && self?.last_status === 'ok' && due.length === 0),
+    lastRunAt: self?.last_run_at ?? null,
+    lastStatus: self?.last_status ?? null,
+    due,
+  };
+}
+
 // Returns due jobs most-stale first, so the per-pass kick cap can never starve a job.
 export function dueCatchUpJobs(beats: HeartbeatRow[], now = Date.now(), jobs: CatchUpJob[] = CATCH_UP_JOBS): CatchUpJob[] {
   const seen = new Map(beats.map((row) => [row.job, row]));

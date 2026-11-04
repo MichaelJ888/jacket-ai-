@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { CATCH_UP_JOBS, dueCatchUpJobs, runAutoPilot, type HeartbeatRow } from './auto-pilot.ts';
+import { autoPilotState, CATCH_UP_JOBS, dueCatchUpJobs, runAutoPilot, type HeartbeatRow } from './auto-pilot.ts';
 
 const now = Date.parse('2026-11-03T12:00:00Z');
 const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -72,4 +72,28 @@ test('runAutoPilot reports heartbeat query failure without kicking anything', as
   });
   assert.equal(summary.heartbeatError, 'db down');
   assert.equal(summary.kicked.length, 0);
+});
+
+test('autoPilotState: ON only when the heartbeat is fresh, ok, and no cron job is stale', () => {
+  const freshJobs = CATCH_UP_JOBS.map((job) => ({ job: job.job, last_run_at: ago(5), last_status: 'ok' }));
+  const on: HeartbeatRow[] = [{ job: 'auto-pilot', last_run_at: ago(30), last_status: 'ok' }, ...freshJobs];
+  assert.deepEqual(autoPilotState(on, now), { on: true, lastRunAt: on[0].last_run_at, lastStatus: 'ok', due: [] });
+
+  // Stale heartbeat -> OFF
+  const stale: HeartbeatRow[] = [{ job: 'auto-pilot', last_run_at: ago(300), last_status: 'ok' }, ...freshJobs];
+  assert.equal(autoPilotState(stale, now).on, false);
+
+  // Unhealthy heartbeat -> OFF
+  const degraded: HeartbeatRow[] = [{ job: 'auto-pilot', last_run_at: ago(30), last_status: 'error' }, ...freshJobs];
+  assert.equal(autoPilotState(degraded, now).on, false);
+
+  // A stale sub-daily job -> OFF, and the due list names it
+  const due: HeartbeatRow[] = [{ job: 'auto-pilot', last_run_at: ago(30), last_status: 'ok' }, ...freshJobs];
+  due.find((row) => row.job === 'retry-queue')!.last_run_at = ago(300);
+  const state = autoPilotState(due, now);
+  assert.equal(state.on, false);
+  assert.deepEqual(state.due, ['retry-queue']);
+
+  // No auto-pilot heartbeat at all -> OFF
+  assert.equal(autoPilotState(freshJobs, now).on, false);
 });

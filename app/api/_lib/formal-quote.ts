@@ -42,6 +42,8 @@ export type FormalQuoteInput = {
   marketUnitPrice: number; // MOQ-rate garment price per piece, from the price list
   // true: marketUnitPrice is already the official tier price for this quantity, so no volume discount is applied again.
   officialTierPrice?: boolean;
+  // Minimum accepted quantity. Defaults to the company-wide MOQ; official tier tables can set a lower floor (e.g. polo at 5).
+  minQuantity?: number;
   // Class is derived from the fabric (see fabric-class.ts); it is never supplied directly.
   fabric: string;
   costPerPiece?: number;
@@ -63,7 +65,8 @@ function whole(value: unknown) {
 
 export function computeFormalQuote(input: FormalQuoteInput) {
   const quantity = whole(input.quantity);
-  if (quantity < MOQ_PIECES) throw new Error(`Minimum order is ${MOQ_PIECES} pieces`);
+  const minQuantity = whole(input.minQuantity) || MOQ_PIECES;
+  if (quantity < minQuantity) throw new Error(`Minimum order is ${minQuantity} pieces`);
   const market = Number(input.marketUnitPrice);
   if (!Number.isFinite(market) || market <= 0) throw new Error('marketUnitPrice must be a positive number');
 

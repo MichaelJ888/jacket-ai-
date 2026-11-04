@@ -1,8 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { after, NextResponse } from 'next/server';
-import { replyToComment } from '../../_lib/channels';
+import { GRAPH, replyToComment } from '../../_lib/channels';
 import { type Channel } from '../../_lib/crm';
-import { reportCriticalError } from '../../_lib/integrations';
+import { escapeTelegramHtml, recordLead, reportCriticalError, sendTelegramMessage } from '../../_lib/integrations';
+import { parseLeadgenFieldData } from '../../_lib/meta-lead-logic.ts';
+import { getPageToken } from '../../_lib/meta-pages';
 import { handleInboundMessage } from '../../_lib/sales-closer';
 
 export const maxDuration = 60;
@@ -53,6 +55,9 @@ type Change = {
     id?: string;
     message?: string;
     text?: string;
+    leadgen_id?: string;
+    form_id?: string;
+    ad_id?: string;
     from?: { id?: string; name?: string; username?: string };
     messages?: WhatsAppMessage[];
     contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>;
@@ -60,6 +65,42 @@ type Change = {
 };
 
 type Payload = { object?: string; entry?: Array<{ id?: string; messaging?: MessagingEvent[]; changes?: Change[] }> };
+
+// Lead-ads form submission -> CRM lead + Telegram alert. Page-agnostic: works for MJIC and (once
+// META_CGV_PAGE_ID/META_CGV_PAGE_ACCESS_TOKEN are set) the CG Venezuela Enterprises page.
+async function handleLeadgen(leadgenId: string, pageId?: string, formId?: string, adId?: string) {
+  const token = await getPageToken(pageId);
+  if (!token) {
+    console.error(`Leadgen ${leadgenId}: no Page access token for page ${pageId || 'unknown'} (set META_PAGE_TOKENS or META_CGV_PAGE_*).`);
+    return;
+  }
+  const response = await fetch(`${GRAPH}/${leadgenId}?fields=field_data,created_time,form_id,ad_id`, {
+    headers: { Authorization: `Bearer ${token}` },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) {
+    console.error(`Leadgen ${leadgenId}: Graph fetch failed with HTTP ${response.status}.`);
+    return;
+  }
+  const data = (await response.json()) as { field_data?: unknown; form_id?: string; ad_id?: string };
+  const parsed = parseLeadgenFieldData(data.field_data);
+  const pageLabel = pageId && pageId === process.env.META_CGV_PAGE_ID ? 'CG Venezuela Enterprises' : 'MJIC';
+  await recordLead({
+    name: parsed.name || 'Facebook lead',
+    company: parsed.company || undefined,
+    contact: parsed.contact || undefined,
+    message: parsed.message || 'Facebook lead-ad signup',
+    source: pageId && pageId === process.env.META_CGV_PAGE_ID ? 'facebook-lead-ad-cgv' : 'facebook-lead-ad',
+    details: { leadgenId, pageId: pageId || null, formId: data.form_id || formId || null, adId: data.ad_id || adId || null, email: parsed.email || null, phone: parsed.phone || null },
+  });
+  await sendTelegramMessage(
+    `🎯 <b>New Facebook lead ad signup</b> (${escapeTelegramHtml(pageLabel)} page)\n` +
+      `Name: ${escapeTelegramHtml(parsed.name || '—')}\n` +
+      `Contact: ${escapeTelegramHtml(parsed.contact || '—')}\n` +
+      (parsed.company ? `Company: ${escapeTelegramHtml(parsed.company)}\n` : '') +
+      `Lead ID: ${escapeTelegramHtml(leadgenId)}`,
+  );
+}
 
 function collectJobs(payload: Payload) {
   const jobs: Job[] = [];
@@ -78,6 +119,12 @@ function collectJobs(payload: Payload) {
 
     for (const change of entry.changes || []) {
       const value = change.value || {};
+
+      // Facebook lead-ads (leadgen) form submission
+      if (change.field === 'leadgen' && value.leadgen_id) {
+        const leadgenId = value.leadgen_id;
+        jobs.push(() => handleLeadgen(leadgenId, entry.id, value.form_id, value.ad_id));
+      }
 
       // WhatsApp Cloud API
       for (const message of value.messages || []) {

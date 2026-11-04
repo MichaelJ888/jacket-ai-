@@ -43,11 +43,15 @@ export default function QuotePage() {
   // Class follows the strict fabric rule (same helper the server uses); the customer does not choose it.
   const productClass = resolveFabricClass(fabricName);
 
+  // Each category's MOQ is its official tier floor when it has one (polo/coverall/chef/security from 5 pcs), else the company-wide MOQ.
+  const minQty = (cat?: PricelistCategory) => (cat && cat.tiers.length ? Math.min(...cat.tiers.map((tier) => tier.min)) : MOQ_PIECES);
+  const activeCategory = catalog.find((c) => c.key === category);
+  const activeMinQty = minQty(activeCategory);
+
   const unitPrice = useMemo(() => {
     const qty = Math.floor(Number(quantity));
-    const cat = catalog.find((c) => c.key === category);
-    return qty >= MOQ_PIECES && cat ? tierPrice(cat.tiers, qty) : null;
-  }, [catalog, category, quantity]);
+    return qty >= activeMinQty && activeCategory ? tierPrice(activeCategory.tiers, qty) : null;
+  }, [activeCategory, activeMinQty, quantity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,8 +177,8 @@ export default function QuotePage() {
               </select>
             </div>
             <div>
-              <label className={label} htmlFor="quantity">Quantity (min. {MOQ_PIECES} pcs)</label>
-              <input id="quantity" type="number" min={MOQ_PIECES} className={field} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} required />
+              <label className={label} htmlFor="quantity">Quantity (min. {activeMinQty} pcs)</label>
+              <input id="quantity" type="number" min={activeMinQty} className={field} value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} required />
             </div>
           </div>
 
@@ -242,7 +246,7 @@ export default function QuotePage() {
             <h2 className="font-bold text-slate-900">Live estimate</h2>
             {unitPrice === null && (
               <p className="mt-2 text-sm text-slate-600">
-                {quantity < MOQ_PIECES ? `Enter at least ${MOQ_PIECES} pieces.` : `${catalog.find((c) => c.key === category)?.label ?? 'This product'} pricing is confirmed by our sales team. Submit to request a quote.`}
+                {quantity < activeMinQty ? `Enter at least ${activeMinQty} pieces.` : `${activeCategory?.label ?? 'This product'} pricing is confirmed by our sales team. Submit to request a quote.`}
               </p>
             )}
             {unitPrice !== null && (

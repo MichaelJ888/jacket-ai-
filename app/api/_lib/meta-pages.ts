@@ -42,11 +42,13 @@ export async function discoverPages(force = false): Promise<MetaPage[]> {
   return pages.length ? pages : cache?.pages || [];
 }
 
-// Resolution order: explicit META_PAGE_TOKENS map -> auto-discovered Page -> legacy single META_PAGE_ACCESS_TOKEN.
+// Resolution order: explicit META_PAGE_TOKENS map -> CGV dedicated env pair -> OAuth connection -> auto-discovered Page -> legacy single META_PAGE_ACCESS_TOKEN.
 export async function getPageToken(pageId?: string): Promise<string | undefined> {
   if (pageId) {
     const mapped = parseTokenMap()[pageId];
     if (mapped) return mapped;
+    // CG Venezuela Enterprises page bridge: setting META_CGV_PAGE_ID + META_CGV_PAGE_ACCESS_TOKEN is all it takes.
+    if (process.env.META_CGV_PAGE_ACCESS_TOKEN && pageId === process.env.META_CGV_PAGE_ID) return process.env.META_CGV_PAGE_ACCESS_TOKEN;
     const connected = await getConnectionToken(pageId);
     if (connected) return connected;
     const found = (await discoverPages()).find((page) => page.id === pageId);

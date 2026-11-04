@@ -63,3 +63,24 @@ test('official unit price returns null outside tiers and for categories without 
   assert.equal(officialUnitPrice('polo-shirt', 5), 800);
   assert.equal(officialUnitPrice('school-uniform', 501), 700);
 });
+
+test('the 2026 official matrix prices the newly wired garment categories', () => {
+  assert.equal(officialUnitPrice('polo-jacket', 5), 1000);
+  assert.equal(officialUnitPrice('coverall', 201), 1400);
+  assert.equal(officialUnitPrice('scrub-suit', 501), 780);
+  assert.equal(officialUnitPrice('pe-uniform', 20), 800);
+  assert.equal(officialUnitPrice('chef-uniform', 21), 1200);
+  assert.equal(officialUnitPrice('security-uniform', 201), 1150);
+});
+
+test('category MOQ follows the official tier floor, not the company-wide 20', () => {
+  // Polo tiers start at 5: 4 is rejected, 5 prices instantly.
+  assert.throws(() => buildPublicQuote({ ...base, category: 'polo-shirt', quantity: 4 }), PublicQuoteError);
+  const polo = buildPublicQuote({ ...base, category: 'polo-shirt', quantity: 5 });
+  assert.equal(polo.kind, 'quote');
+  if (polo.kind === 'quote') assert.equal(polo.quote.garmentUnit, 800);
+  // Coverall tiers start at 5 as well.
+  const coverall = buildPublicQuote({ ...base, category: 'coverall', quantity: 6 });
+  assert.equal(coverall.kind, 'quote');
+  if (coverall.kind === 'quote') assert.equal(coverall.quote.garmentUnit, 2500);
+});

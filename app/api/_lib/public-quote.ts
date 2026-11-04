@@ -43,8 +43,10 @@ export function buildPublicQuote(body: Record<string, unknown>, catalog: Priceli
   if (!cat) throw new PublicQuoteError('Please choose a product category.');
   const category = cat.key;
 
+  // The MOQ is the category's own official tier floor when it has one (polo 5, lanyards 10), else the company-wide MOQ.
+  const minQuantity = cat.tiers.length ? Math.min(...cat.tiers.map((tier) => tier.min)) : MOQ_PIECES;
   const quantity = Math.floor(Number(body.quantity));
-  if (!Number.isFinite(quantity) || quantity < MOQ_PIECES) throw new PublicQuoteError(`Minimum order is ${MOQ_PIECES} pieces.`);
+  if (!Number.isFinite(quantity) || quantity < minQuantity) throw new PublicQuoteError(`Minimum order for ${cat.label} is ${minQuantity} pieces.`);
   if (quantity > MAX_PUBLIC_QUANTITY) throw new PublicQuoteError(`For orders above ${MAX_PUBLIC_QUANTITY.toLocaleString('en-US')} pieces, contact sales.`);
 
   const fabric = text(body.fabric, 120);
@@ -80,6 +82,7 @@ export function buildPublicQuote(body: Record<string, unknown>, catalog: Priceli
     quantity,
     marketUnitPrice: unit,
     officialTierPrice: true,
+    minQuantity,
     fabric,
     frontLogos: request.frontLogos,
     backLogos: request.backLogos,

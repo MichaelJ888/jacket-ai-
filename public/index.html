@@ -1526,7 +1526,7 @@
       <div>
         <div class="bg-gold/10 border border-gold-600/30 rounded-md p-4 mb-6">
           <p class="text-xs font-semibold text-navy mb-1">📸 Before you publish: real photos matter most</p>
-          <p class="text-[11px] text-navy-400 mb-2">Every product below is still using a random stock placeholder image. For a bulk manufacturer selling to procurement teams, actual photos of your real jackets and uniforms are the single strongest trust signal on this whole site — stronger than any other change here. Replace them in "Manage Catalog" below as soon as you have real photos.</p>
+          <p class="text-[11px] text-navy-400 mb-2">Catalogue photos now use real MJIC product shots for every product, including giveaways (tote bags, backpacks, lanyards, mugs). Keep replacing older shots with fresh production photos as you have them — real photos are the strongest trust signal on this site. Swap them in "Manage Catalog" below.</p>
           <p class="text-[11px] text-navy-400">🎥 Got production videos instead? Great interim option — upload your 5-min clips as an <b>unlisted</b> YouTube video first (free, private link, doesn't show on your public channel), then paste that link into "Post Production Update" below. We can't store video files directly on this site — YouTube unlisted links are the free, reliable way to host them.</p>
         </div>
 
@@ -2372,7 +2372,7 @@ function mjApp(){
     clientIndustries:['Manufacturing','BPO & Call Centers','Retail Chains','Government Agencies','Construction & Engineering','Logistics & Trucking','Hospitals & Clinics','Schools & Universities','Hospitality & F&B'],
 
     defaultProducts(){
-// One unique photo per design. Accessories have no photo in the library, so they use the branded placeholder (empty img).
+// One unique real MJIC photo per design, matched to the product (verified against public/images asset folders).
       const productImages = {
 varsity1:'/images/site/varsity-letterman.jpg',
 varsity2:'/images/site/varsity-collegiate.jpg',
@@ -2390,7 +2390,13 @@ polo2:'/images/company-uniforms/5.jpg',
 polo3:'/images/company-uniforms/4.jpg',
 scrub1:'/images/site/scrub.jpg',
 scrub2:'/images/site/labgown.jpg',
-coverall1:'/images/site/coverall.jpg'
+coverall1:'/images/site/coverall.jpg',
+tote1:'/images/CG%20Canvas%20Eco%20Tote%20Bag/mc1791778164436_hero-eco-friendly-bags.webp',
+tote2:'/images/corporate-giveaways/2.jpg',
+lanyard1:'/images/corporate-giveaways/9.jpg',
+lanyard2:'/images/CG%20Full%20Sublimation%20Lanyard%20(Full-Color)/images.jpg',
+mug1:'/images/CG%20Ceramic%20Corporate%20Mug/images.jpg',
+mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
 };
       const img = (seed) => productImages[seed] || '';
       const P = (id,title,category,moq,leadTime,desc,seed) => ({id,title,category,moq,leadTime,description:desc,img:img(seed)});
