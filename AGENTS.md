@@ -163,6 +163,16 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - Master OmniForge pillars 3, 5, 6 (2026-11-04)
+- Commit `ad0eeb6` on main, pushed. Prod deploy `jacket-irtxflmo5` Ready, aliased to https://jacket-ai.vercel.app.
+- Pillar 6 (grounding): Sales Closer `CLOSER_ADDENDUM` requires price, MOQ, lead time, DP/FP, sample fee, and proof-of-payment facts to come only from the system prompt, quote tool, approved Q&A, or CEO reference. Hotlines: Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61 (`mjic-prompt.ts` Globe fixed from 0917-320-8842).
+- Pillar 5 (Q&A ingestion): table `mjic_qa_pairs` applied via `npm run db:push`. `POST/GET /api/admin/qa` (admin token; 401 without). Rows default `pending`; only `approved` rows enter the closer prompt (up to 30).
+- Pillar 3 (COO/SEO): `app/api/_lib/coo-seo.ts` appends SEO hashtags (deduped, max 10) to every publish caption via `fullCaption`. Boost advisor adds an SEO focus line with keyword coverage of the winning post.
+- Pillar 2 (boost): readiness check and ₱350 × 2 = ₱700 Telegram alert. Spend stays manual; no automatic ad spend.
+- Not done, no public Graph API found: Pillar 1 (Facebook Marketplace listing cross-post) and Pillar 4 (disabling Meta AI auto-replies). Not faked.
+- Verified: `tsc --noEmit` clean; eslint clean on changed files; `npm test` 364 pass / 0 fail / 1 skipped; `npm run build` (webpack) passes; `npm run verify:live` 11/11; `/api/health` `ok`.
+- Deploy note: `npx vercel --prod --yes` printed CLI help JSON again; the build was confirmed Ready with `npx vercel ls`.
+
 ## Completion log - hotlines on every post + publisher check (2026-11-04)
 - Commit `148181f` on main: `withContactFooter` (`app/api/_lib/content-policy.ts`) appends Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61 to every published caption (Facebook, Instagram, YouTube). Applied in `fullCaption` at publish time, idempotent, so existing calendar rows get it too. The planner prompt tells the LLM not to write numbers itself.
 - Deploy: `npx vercel --prod --yes`; build `jacket-lfu2kgf99` Ready, Production.
