@@ -1,24 +1,12 @@
 import { NextResponse } from 'next/server';
 import { rateLimitResponse } from '../../_lib/rate-limit';
 import { recordLead } from '../../_lib/integrations';
-import { loadPricelist } from '../../_lib/pricelist.ts';
 import { PAYMENT_DETAILS, PAYMENT_TERMS } from '../../_lib/formal-quote.ts';
-import { GIVEAWAY_CATEGORIES } from '../../_lib/mjic-pricelist.ts';
-import {
-  computeGiveawayQuote,
-  GiveawayQuoteError,
-  overlayGiveawayCatalog,
-} from '../../_lib/giveaway-quote.ts';
+import { computeGiveawayQuote, GiveawayQuoteError } from '../../_lib/giveaway-quote.ts';
+import { loadGiveawayCatalog } from '../../_lib/giveaway-catalog.ts';
+import { isValidGiveawayPhoto } from '../../_lib/giveaway-vision.ts';
 
 export const dynamic = 'force-dynamic';
-
-const GIVEAWAY_KEYS = new Set(Object.keys(GIVEAWAY_CATEGORIES));
-
-// Seed catalog + any quote_pricelist rows keyed to a giveaway category (admin refinements).
-async function loadGiveawayCatalog() {
-  const all = await loadPricelist();
-  return overlayGiveawayCatalog(all.categories.filter((cat) => GIVEAWAY_KEYS.has(cat.key)));
-}
 
 // Public catalog for the /quote/giveaways page (tiers are public price-list data).
 export async function GET() {
@@ -45,6 +33,8 @@ export async function POST(req: Request) {
   const customerName = String(body.customerName ?? '').trim().slice(0, 120);
   if (customerName.length < 2) return NextResponse.json({ error: 'Please enter your name or company name.' }, { status: 400 });
   const customerContact = String(body.customerContact ?? '').trim().slice(0, 120) || null;
+  const photo = isValidGiveawayPhoto(body.photo) ? body.photo : null;
+  const suggestedCategory = typeof body.suggestedCategory === 'string' ? body.suggestedCategory.slice(0, 40) : null;
 
   let quote;
   try {
@@ -63,7 +53,7 @@ export async function POST(req: Request) {
     contact: customerContact ?? undefined,
     message: `Corporate giveaways instant estimate:\n${summary}`,
     source: 'giveaways-quote',
-    details: { quote },
+    details: { quote, ...(photo ? { photo, suggestedCategory } : {}) },
   });
 
   return NextResponse.json({

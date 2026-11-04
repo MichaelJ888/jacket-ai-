@@ -47,6 +47,16 @@ export function autoPilotState(beats: HeartbeatRow[], now = Date.now()): AutoPil
   };
 }
 
+// Manual override (persisted in system_settings.auto_pilot) wins over the computed state. null = follow heartbeats.
+export type AutoPilotOverride = 'on' | 'off' | null;
+export const AUTO_PILOT_SETTING_KEY = 'auto_pilot';
+
+export function effectiveAutoPilotOn(computedOn: boolean, override: AutoPilotOverride): boolean {
+  if (override === 'on') return true;
+  if (override === 'off') return false;
+  return computedOn;
+}
+
 // Returns due jobs most-stale first, so the per-pass kick cap can never starve a job.
 export function dueCatchUpJobs(beats: HeartbeatRow[], now = Date.now(), jobs: CatchUpJob[] = CATCH_UP_JOBS): CatchUpJob[] {
   const seen = new Map(beats.map((row) => [row.job, row]));

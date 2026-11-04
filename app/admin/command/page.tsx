@@ -125,6 +125,26 @@ export default function CommandCenterPage() {
     }
   }
 
+  async function setAutoPilotOverride(override: "on" | "off" | null) {
+    const auth = sessionStorage.getItem("mjic_admin") || token;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/admin/auto-pilot", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${auth}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ override }),
+      });
+      const body = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(body.error || "Could not save Auto-Pilot setting");
+      setMessage(override === null ? "Auto-Pilot set to automatic (heartbeat-driven)." : `Auto-Pilot override saved: ${override.toUpperCase()}. Persists across refresh and logout.`);
+      await load(auth);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save Auto-Pilot setting.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const orgLevels = useMemo(() => {
     if (!status) return [];
     const byId = new Map(status.org.nodes.map((node) => [node.id, node]));
@@ -199,6 +219,11 @@ export default function CommandCenterPage() {
             >
               {busy ? "WORKING..." : "🛰️ 1-PUSH AUTO-PILOT / STABILIZE"}
             </button>
+            <div className="flex items-center gap-1 rounded-lg border border-white/20 p-1 text-xs" role="group" aria-label="Auto-Pilot override">
+              <button onClick={() => void setAutoPilotOverride("on")} disabled={busy} className="rounded px-2 py-1 hover:bg-emerald-500/20 disabled:opacity-50">Force ON</button>
+              <button onClick={() => void setAutoPilotOverride("off")} disabled={busy} className="rounded px-2 py-1 hover:bg-amber-500/20 disabled:opacity-50">Force OFF</button>
+              <button onClick={() => void setAutoPilotOverride(null)} disabled={busy} className="rounded px-2 py-1 hover:bg-white/10 disabled:opacity-50">Auto</button>
+            </div>
           </div>
         </header>
 

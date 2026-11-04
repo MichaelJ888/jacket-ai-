@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-type State = { on: boolean; lastRunAt: string | null; lastStatus: string | null; due: string[] };
+type State = { on: boolean; lastRunAt: string | null; lastStatus: string | null; due: string[]; override: 'on' | 'off' | null; lastStabilizeAt: string | null };
 
 const POLL_MS = 60_000;
 
@@ -18,7 +18,15 @@ export default function AutoPilotBadge({ token }: { token: string }) {
       fetch('/api/admin/auto-pilot', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
-          if (!cancelled && data?.ok) setState({ on: Boolean(data.on), lastRunAt: data.lastRunAt ?? null, lastStatus: data.lastStatus ?? null, due: Array.isArray(data.due) ? data.due : [] });
+          if (!cancelled && data?.ok)
+            setState({
+              on: Boolean(data.on),
+              lastRunAt: data.lastRunAt ?? null,
+              lastStatus: data.lastStatus ?? null,
+              due: Array.isArray(data.due) ? data.due : [],
+              override: data.override === 'on' || data.override === 'off' ? data.override : null,
+              lastStabilizeAt: data.lastStabilizeAt ?? null,
+            });
         })
         .catch(() => {});
     load();
@@ -34,9 +42,7 @@ export default function AutoPilotBadge({ token }: { token: string }) {
   const on = state?.on === true;
   const title = !state
     ? 'Auto-Pilot: checking…'
-    : on
-      ? `Auto-Pilot ON — heartbeat fresh, no stale cron jobs. Last run ${state.lastRunAt ? new Date(state.lastRunAt).toLocaleString() : 'unknown'}.`
-      : `Auto-Pilot OFF — ${state.lastRunAt ? `last run ${new Date(state.lastRunAt).toLocaleString()} (${state.lastStatus || 'unknown'})` : 'no heartbeat yet'}${state.due.length ? `; stale jobs: ${state.due.join(', ')}` : ''}. Open Command Center to stabilize.`;
+    : `${on ? 'Auto-Pilot ON' : 'Auto-Pilot OFF'}${state.override ? ` (manual override: ${state.override.toUpperCase()})` : ' (automatic)'}. Last heartbeat ${state.lastRunAt ? new Date(state.lastRunAt).toLocaleString() : 'unknown'}${state.lastStabilizeAt ? `; last Stabilize ${new Date(state.lastStabilizeAt).toLocaleString()}` : ''}${!on && state.due.length ? `; stale jobs: ${state.due.join(', ')}` : ''}. Open Command Center to change.`;
 
   return (
     <a

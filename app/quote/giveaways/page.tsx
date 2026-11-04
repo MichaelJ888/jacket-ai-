@@ -16,6 +16,24 @@ const field = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-
 const label = 'mb-1 block text-sm font-semibold text-slate-700';
 
 // Corporate Giveaways instant quotation: official per-item tier pricing, itemized breakdown, 50% deposit math.
+// Downscales the photo to fit the server's 300 KB data-URL cap. Returns null if the browser cannot decode it.
+async function photoToDataUrl(file: File): Promise<string | null> {
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return null;
+  const scale = Math.min(1, 900 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  for (const quality of [0.85, 0.7, 0.55]) {
+    const url = canvas.toDataURL('image/jpeg', quality);
+    if (url.length <= 300_000) return url;
+  }
+  return null;
+}
+
 export default function GiveawayQuotePage() {
   const [catalog, setCatalog] = useState<GiveawayCatalogCategory[]>(() => seedGiveawayCatalog());
   const [picked, setPicked] = useState<Record<string, boolean>>({});
@@ -25,6 +43,10 @@ export default function GiveawayQuotePage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ServerResult | null>(null);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [analysis, setAnalysis] = useState<string | null>(null);
+  const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +78,45 @@ export default function GiveawayQuotePage() {
     }
   }, [items, catalog]);
 
+  async function handlePhoto(file: File | undefined) {
+    if (!file || !file.type.startsWith('image/')) {
+      setAnalysis('Please drop a PNG, JPG, or WEBP image.');
+      return;
+    }
+    setAnalyzing(true);
+    setAnalysis(null);
+    setSuggestedCategory(null);
+    try {
+      const dataUrl = await photoToDataUrl(file);
+      if (!dataUrl) {
+        setPhoto(null);
+        setAnalysis('That photo could not be prepared. Try a different image.');
+        return;
+      }
+      setPhoto(dataUrl);
+      const res = await fetch('/api/quote/giveaways/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo: dataUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAnalysis(data.error || 'Photo analysis failed.');
+        return;
+      }
+      if (data.verdict?.status === 'suggested') {
+        setSuggestedCategory(data.verdict.category);
+        setAnalysis(`Looks like: ${data.verdict.label}. Please confirm the item selection below.`);
+      } else {
+        setAnalysis(data.verdict?.reason || 'A sales representative will confirm pricing.');
+      }
+    } catch {
+      setAnalysis('Network error while analyzing the photo.');
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -69,7 +130,7 @@ export default function GiveawayQuotePage() {
       const res = await fetch('/api/quote/giveaways', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName, customerContact, items }),
+        body: JSON.stringify({ customerName, customerContact, items, photo, suggestedCategory }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -152,6 +213,24 @@ export default function GiveawayQuotePage() {
               <input id="contact" className={field} value={customerContact} onChange={(e) => setCustomerContact(e.target.value)} />
             </div>
           </fieldset>
+
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault();
+              void handlePhoto(e.dataTransfer.files[0]);
+            }}
+            className="rounded-lg border-2 border-dashed border-slate-300 p-4 text-center text-sm text-slate-600"
+          >
+            <p>Optional: drop a photo of the item you want (we suggest a category; sales confirms the price).</p>
+            <label className="mt-2 inline-block cursor-pointer font-semibold text-indigo-700">
+              Choose image
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => void handlePhoto(e.target.files?.[0])} />
+            </label>
+            {analyzing && <p className="mt-2">Analyzing photo…</p>}
+            {analysis && <p className="mt-2 text-slate-800">{analysis}</p>}
+            {photo && <img src={photo} alt="Uploaded reference" className="mx-auto mt-2 max-h-40 rounded" />}
+          </div>
 
           {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 

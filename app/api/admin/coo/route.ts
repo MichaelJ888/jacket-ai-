@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../../_lib/auth';
-import { runAutoPilot } from '../../_lib/auto-pilot';
+import { AUTO_PILOT_SETTING_KEY, runAutoPilot } from '../../_lib/auto-pilot';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { evaluateJobs, groupByDepartment, type Heartbeat } from '../../_lib/coo-logic';
 import { getSupabaseAdmin } from '../../_lib/integrations';
+import { readSetting, writeSetting } from '../../_lib/system-settings';
 
 export const dynamic = 'force-dynamic';
 
@@ -66,5 +67,8 @@ export async function POST(request: Request) {
   const summary = await runAutoPilot({ origin: new URL(request.url).origin, token, supabase });
   const failed = summary.kicked.filter((kick) => kick.status !== 200);
   await recordHeartbeat('auto-pilot', summary.heartbeatError ? 'error' : failed.length ? 'degraded' : 'ok', { ...summary, trigger: 'admin' });
+  const stabilizeStatus = summary.heartbeatError ? 'error' : failed.length ? 'degraded' : 'ok';
+  const current = (await readSetting<{ override?: unknown }>(supabase, AUTO_PILOT_SETTING_KEY)) ?? {};
+  await writeSetting(supabase, AUTO_PILOT_SETTING_KEY, { ...current, lastStabilizeAt: new Date().toISOString(), lastStabilizeStatus: stabilizeStatus, updatedBy: 'admin' });
   return NextResponse.json({ success: !summary.heartbeatError, ...summary });
 }

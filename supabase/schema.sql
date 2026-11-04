@@ -1270,3 +1270,14 @@ create table if not exists public.quote_pricelist (
 );
 alter table public.quote_pricelist enable row level security;
 revoke all on public.quote_pricelist from anon, authenticated;
+
+-- Key/value operator settings that must survive refresh, logout, and redeploys.
+-- auto_pilot: { override: 'on' | 'off' | null, lastStabilizeAt, lastStabilizeStatus, updatedBy }.
+-- override null = badge follows the computed heartbeat state (default); only admin POST changes it.
+create table if not exists public.system_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+alter table public.system_settings enable row level security;
+revoke all on public.system_settings from anon, authenticated;
