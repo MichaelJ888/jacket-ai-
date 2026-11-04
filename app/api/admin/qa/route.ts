@@ -7,7 +7,7 @@ import { parseQaBatch } from '../../_lib/qa-logic';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// Batch ingestion of website Q&A pairs. New rows default to 'pending' until the CEO approves them.
+// Batch ingestion of website Q&A pairs. New rows default to 'approved' so the Sales Closer uses them immediately; pass status 'pending' to hold a row.
 export async function POST(request: Request) {
   if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();

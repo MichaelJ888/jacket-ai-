@@ -3,6 +3,8 @@ import { runCeoAgent } from '../_lib/ceo-agent';
 import { devQueueCommand, queueDevTask } from '../_lib/dev-queue';
 import { routeCeoMessage, type DevRoute } from '../_lib/dev-queue-logic';
 import { answerPaymentStatus } from '../_lib/payment-status';
+import { parseBoostCallback } from '../_lib/boost-approval-logic.ts';
+import { recordBoostDecision } from '../_lib/boost-approval';
 import { compactConversationIfNeeded } from '../_lib/ceo-memory';
 import { pickTelegramMedia } from '../_lib/telegram-logic';
 import { claimTelegramUpdate, downloadTelegramMedia, startTyping } from '../_lib/telegram-media';
@@ -120,6 +122,15 @@ export async function POST(req: Request) {
           await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
         }
         await sendTelegramDirectMessage(String(callbackChatId), response);
+        return NextResponse.json({ ok: true });
+      }
+
+      const boostAction = parseBoostCallback(callbackData);
+      if (callbackId && boostAction) {
+        const result = await recordBoostDecision(boostAction.postId, boostAction.decision, String(actorId || ''));
+        await answerTelegramCallbackQuery(String(callbackId), result.message);
+        if (callback.message?.message_id) await removeTelegramInlineKeyboard(String(callbackChatId), Number(callback.message.message_id));
+        await sendTelegramDirectMessage(String(callbackChatId), result.reply);
         return NextResponse.json({ ok: true });
       }
 

@@ -1210,3 +1210,17 @@ create table if not exists public.mjic_qa_pairs (
 create index if not exists mjic_qa_pairs_status_idx on public.mjic_qa_pairs (status, created_at desc);
 alter table public.mjic_qa_pairs enable row level security;
 revoke all on public.mjic_qa_pairs from anon, authenticated;
+
+-- One CEO decision per post per Manila day (unique index makes double taps idempotent).
+create table if not exists public.boost_decisions (
+  id uuid primary key default gen_random_uuid(),
+  post_id text not null,
+  boost_date date not null,
+  budget_pesos integer not null,
+  decision text not null check (decision in ('APPROVED', 'CANCELLED')),
+  decided_by_telegram_id text,
+  decided_at timestamptz not null default now(),
+  unique (post_id, boost_date)
+);
+alter table public.boost_decisions enable row level security;
+revoke all on public.boost_decisions from anon, authenticated;

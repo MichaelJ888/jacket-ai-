@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { isCronAuthorized } from '../../_lib/auth';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
+import { BOOST_BUDGET_PESOS, BOOST_TOTAL_PESOS, boostKeyboard } from '../../_lib/boost-approval-logic.ts';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
 import { getPageToken } from '../../_lib/meta-pages';
 import { checkMetaPublishing } from '../../_lib/meta-publishing';
@@ -11,7 +12,7 @@ import { manilaWeekday, preferredCategory, rankBoostCandidates, type BoostCandid
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const BOOST_BUDGET_PESOS = 350;
+
 const GRAPH = 'https://graph.facebook.com/v26.0';
 
 type Candidate = {
@@ -150,13 +151,13 @@ export async function GET(request: Request) {
     escapeTelegramHtml(strategy),
     organicCaveat,
     '',
-    `<b>Rekomendasyon:</b> I-boost ng <b>P${BOOST_BUDGET_PESOS}/araw</b> x 2 araw = <b>P${BOOST_BUDGET_PESOS * 2}</b> total sa Meta Ads Manager.`,
+    `<b>Rekomendasyon:</b> I-boost ng <b>P${BOOST_BUDGET_PESOS}/araw</b> x 2 araw = <b>P${BOOST_TOTAL_PESOS}</b> total sa Meta Ads Manager.`,
     `Meta readiness: <b>${readiness.ok ? 'READY' : 'PAUSED'}</b> (${escapeTelegramHtml(readiness.reason)})`,
     `SEO focus: ${escapeTelegramHtml(seoHashtags([]).slice(0, 4).join(' '))} (keyword coverage ${Math.round(keywordCoverage(best.caption) * 100)}%)`,
-    `Ang boost ay manual pa rin; walang automatic spend hangga't hindi ini-approve ng CEO.`,
+    `Tap <b>APPROVE</b> para i-record ang approval ng CEO. Walang automatic spend; ang bayad ay manual pa rin sa Ads Manager.`,
   ].filter(Boolean);
 
-  const sent = await sendTelegramMessage(lines.join('\n'));
+  const sent = await sendTelegramMessage(lines.join('\n'), boostKeyboard(best.id));
   if (!sent) {
     await recordHeartbeat('boost-advisor', 'error', { candidates: candidates.length, error: 'Telegram notification failed' });
     return NextResponse.json({ success: false, error: 'Telegram notification failed' }, { status: 502 });

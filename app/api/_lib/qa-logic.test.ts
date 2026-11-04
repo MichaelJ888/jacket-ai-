@@ -9,7 +9,7 @@ test('parseQaBatch accepts valid pairs and normalizes whitespace', () => {
   assert.deepEqual(pairs, [{ question: 'Ano po ang MOQ?', answer: 'Ang MOQ po namin ay 20 pcs.', status: 'approved', source: 'website' }]);
 });
 
-test('parseQaBatch defaults status to pending and rejects bad rows individually', () => {
+test('parseQaBatch defaults status to approved and rejects bad rows individually', () => {
   const { pairs, errors } = parseQaBatch({
     pairs: [
       { question: 'Valid question?', answer: 'Valid answer.' },
@@ -18,7 +18,7 @@ test('parseQaBatch defaults status to pending and rejects bad rows individually'
     ],
   });
   assert.equal(pairs.length, 1);
-  assert.equal(pairs[0].status, 'pending');
+  assert.equal(pairs[0].status, 'approved');
   assert.equal(errors.length, 2);
 });
 

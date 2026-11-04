@@ -20,7 +20,7 @@ export function parseQaBatch(body: unknown): { pairs: QaPairInput[]; errors: str
     const item = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
     const question = clean(item.question);
     const answer = clean(item.answer);
-    const status = typeof item.status === 'string' ? item.status : 'pending';
+    const status = typeof item.status === 'string' ? item.status : 'approved';
     const source = clean(item.source) || 'website';
     if (question.length < 3 || question.length > 500) errors.push(`#${index}: question must be 3-500 chars.`);
     else if (answer.length < 3 || answer.length > 2000) errors.push(`#${index}: answer must be 3-2000 chars.`);
