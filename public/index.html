@@ -541,7 +541,7 @@
           </div>
           <div class="flex gap-2">
             <button @click="mockup.fabricClass='B'" :class="mockup.fabricClass==='B' ? 'ring-2 ring-gold-600 bg-gold/10' : ''" class="flex-1 border hairline rounded-md py-2 text-xs font-semibold">Class B (Microfiber, Ripstop) — included</button>
-            <button @click="mockup.fabricClass='A'" :class="mockup.fabricClass==='A' ? 'ring-2 ring-gold-600 bg-gold/10' : ''" class="flex-1 border hairline rounded-md py-2 text-xs font-semibold">Class A (Premium) +₱400</button>
+            <button @click="mockup.fabricClass='A'" :class="mockup.fabricClass==='A' ? 'ring-2 ring-gold-600 bg-gold/10' : ''" class="flex-1 border hairline rounded-md py-2 text-xs font-semibold">Class A (Premium) +₱300</button>
           </div>
         </div>
 
@@ -660,7 +660,7 @@
   <div class="flex flex-wrap gap-2 mb-8">
     <button @click="fabricFilter='All'" :class="fabricFilter==='All' ? 'bg-navy text-white' : 'bg-navy-50 text-navy-400 hover:bg-navy-100'" class="text-xs font-semibold px-4 py-2 rounded-full transition-colors">All Fabrics</button>
     <template x-for="cls in ['Class B','Class A']" :key="cls">
-      <button @click="fabricFilter=cls" :class="fabricFilter===cls ? 'bg-navy text-white' : 'bg-navy-50 text-navy-400 hover:bg-navy-100'" class="text-xs font-semibold px-4 py-2 rounded-full transition-colors" x-text="cls + (cls==='Class A' ? ' (+₱400/pc)' : ' (included)')"></button>
+      <button @click="fabricFilter=cls" :class="fabricFilter===cls ? 'bg-navy text-white' : 'bg-navy-50 text-navy-400 hover:bg-navy-100'" class="text-xs font-semibold px-4 py-2 rounded-full transition-colors" x-text="cls + (cls==='Class A' ? ' (+₱300/pc)' : ' (included)')"></button>
     </template>
   </div>
 
@@ -698,7 +698,7 @@
     <div>
       <p class="text-white/50 text-xs uppercase tracking-wide mb-1">Your selection</p>
       <p class="font-display font-bold text-lg"><span x-text="selectedFabric?.name"></span> — <span x-text="selectedColor"></span></p>
-      <p class="text-white/60 text-xs" x-text="selectedFabric?.class === 'Class A' ? 'Class A premium fabric (+₱400 per piece)' : 'Class B standard fabric (included in base price)'"></p>
+      <p class="text-white/60 text-xs" x-text="selectedFabric?.class === 'Class A' ? 'Class A premium fabric (+₱300 per piece)' : 'Class B standard fabric (included in base price)'"></p>
     </div>
     <a href="#mockup" class="bg-gold hover:bg-gold-600 text-navy font-display font-bold px-6 py-3 rounded-md transition-colors shrink-0">Continue to Design Studio →</a>
   </div>
@@ -732,7 +732,7 @@
 
     <!-- Step 2 -->
     <div x-show="wizStep === 2" x-cloak>
-      <p class="text-sm text-navy-400 mb-4">Choose a fabric. Class A fabrics add ₱400 per piece.</p>
+      <p class="text-sm text-navy-400 mb-4">Choose a fabric. Class A fabrics add ₱300 per piece.</p>
       <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <template x-for="f in fabrics" :key="f.name">
           <button type="button" @click="wizFabric = f.name; wizColor = ''" class="text-left border rounded-lg p-4 transition-colors"
@@ -2196,7 +2196,7 @@ function mjApp(){
     explainerVideoFallback: false,
     faqs:[
       {q:'What is your minimum order quantity (MOQ)?', a:'Company-wide minimum is 20 pieces for jackets and 20 sets for most uniforms, though enamel pins start at 10 pcs, lanyards at 10 pcs, school uniforms/trophies at 20 pcs, and giveaways (bags, mugs) at 50 pcs. Larger orders unlock significantly lower per-piece pricing.'},
-      {q:'What fabrics do you use?', a:'Class B (regular): Microfiber, Michael Angelo, and Diamond Ripstop are included in the base price. Class A (premium) fabrics are available for an additional ₱400/piece.'},
+      {q:'What fabrics do you use?', a:'Class B (regular): Microfiber, Michael Angelo, and Diamond Ripstop are included in the base price. Class A (premium) fabrics are available for an additional ₱300/piece.'},
       {q:'Is a company logo included in the price?', a:'Yes — every jacket includes 1 free logo (embroidery, DTF, or silkscreen print, 1"–3" width). Additional logos are charged per size and method — use our Instant Price Quote Calculator for the exact amount.'},
       {q:'Can you embroider or print individual names on each piece?', a:'Yes — ₱10 per letter for embroidery, ₱5 per letter for DTF printing. Provide your full name list once your order is confirmed.'},
       {q:'How long is the lead time?', a:'Typically 10–15 business days depending on product complexity, quantity, and current production volume. Exact lead time is confirmed on your formal quotation.'},
@@ -2206,7 +2206,7 @@ function mjApp(){
       {q:'Do you deliver outside Metro Manila?', a:'Yes — we serve clients nationwide and worldwide. Delivery within Metro Manila is free; provincial and international delivery is arranged via your preferred courier, billed at cost.'},
       {q:'Can I see how my logo will look before ordering?', a:'Yes — use our free Design Studio above to attach your logo, choose its placement, and preview it directly on the product photo, along with an instant price quote.'},
       {q:'What is the difference between embroidery and DTF/silkscreen printing?', a:'Embroidery is stitched and more durable for logos and text, typically used on jackets and caps. DTF/silkscreen printing is flat, ideal for detailed or multi-color designs, and generally more budget-friendly for larger prints.'},
-      {q:'Can I order a reversible jacket?', a:'Yes, for +₱400 per piece. Add-ons like reflector strips (+₱150), hood (+₱150), and net lining (+₱150) are also available.'},
+      {q:'Can I order a reversible jacket?', a:'Yes, for +₱400 per piece. Add-ons like reflector strips (+₱150), hood (+₱100), and net lining (+₱150) are also available.'},
       {q:'Do you do government (PhilGEPS) transactions?', a:'Yes — we are PhilGEPS-compliant and issue BIR-registered official receipts for every order.'},
       {q:'Where are you located?', a:'Our sales office is in Bonifacio Global City (BGC), Taguig City. Our production facility is at #22 Bayabas St., Elmar\'s Subdivision, Cupang, Antipolo City.'},
       {q:'How do I get an exact price quote?', a:'Use the Instant Price Quote Calculator in our Design Studio — select your product, fabric, add-ons, logo method, and quantity for a real, itemized price using our current rate card.'},
@@ -2229,7 +2229,7 @@ function mjApp(){
       {name:'Michael Angelo', class:'Class B', description:'Soft-hand woven polyester with a subtle sheen and good body.', bestFor:'Corporate jackets, executive uniforms', img:'/images/fabrics/michael-angelo.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Charcoal',hex:'#3A3D42'},{name:'Maroon',hex:'#6B1F2C'},{name:'Royal Blue',hex:'#1E4FBF'}]},
       {name:'Diamond Ripstop', class:'Class B', description:'Diamond-grid weave that resists tearing and spreading damage.', bestFor:'Coveralls, security and military uniforms, workwear', img:'/images/fabrics/diamond-ripstop.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Khaki',hex:'#9A8B66'},{name:'Olive Green',hex:'#4B5320'},{name:'Gray',hex:'#77797C'}]},
       {name:'Honeycomb / Pique', class:'Class B', description:'Textured knit with visible mesh structure — breathable and stretchy.', bestFor:'Corporate polo shirts, school PE uniforms', img:'/images/fabrics/honeycomb-pique.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'White',hex:'#F2F2F0'},{name:'Red',hex:'#B61B25'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Green',hex:'#1E6B3C'}]},
-      {name:'Dri-Fit / Performance Knit', class:'Class A', description:'Moisture-wicking knit that pulls sweat away from the skin.', bestFor:'Field teams, sports uniforms, outdoor staff polos', img:'/images/fabrics/dri-fit.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Gray',hex:'#77797C'}]},
+      {name:'Dri-Fit / Performance Knit', class:'Class B', description:'Moisture-wicking knit that pulls sweat away from the skin.', bestFor:'Field teams, sports uniforms, outdoor staff polos', img:'/images/fabrics/dri-fit.svg', video:'', colors:[{name:'Navy Blue',hex:'#1B2A4A'},{name:'Black',hex:'#1A1A1A'},{name:'Royal Blue',hex:'#1E4FBF'},{name:'Red',hex:'#B61B25'},{name:'Gray',hex:'#77797C'}]},
       {name:'Oxford / Broadcloth', class:'Class A', description:'Crisp woven cotton-blend with a clean, formal finish.', bestFor:'Corporate long-sleeve uniforms, executive shirts', img:'/images/fabrics/oxford.svg', video:'', colors:[{name:'White',hex:'#F2F2F0'},{name:'Light Blue',hex:'#A7C4DC'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Gray',hex:'#77797C'}]},
       {name:'Softshell', class:'Class A', description:'Bonded, water-repellent outer with fleece-backed warmth.', bestFor:'Executive jackets, cold-storage and outdoor teams', img:'/images/fabrics/softshell.svg', video:'', colors:[{name:'Black',hex:'#1A1A1A'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Charcoal',hex:'#3A3D42'}]},
       {name:'Scrub Suit Poly-Cotton', class:'Class B', description:'Easy-care poly-cotton blend built for daily washing.', bestFor:'Hospital scrub suits, lab gowns, clinic staff', img:'/images/fabrics/scrub-polycotton.svg', video:'', colors:[{name:'Ceil Blue',hex:'#7FA5C4'},{name:'Navy Blue',hex:'#1B2A4A'},{name:'Wine',hex:'#6B1F2C'},{name:'Teal',hex:'#2E7D80'},{name:'Gray',hex:'#77797C'}]},
@@ -2316,7 +2316,7 @@ function mjApp(){
       acrylic:[{size:'8"',price:1200},{size:'10"',price:1450},{size:'12"',price:1700},{size:'14"',price:1950},{size:'16"',price:2250}],
       glass:[{size:'8"',price:1600},{size:'10"',price:1900},{size:'12"',price:2300},{size:'14"',price:2700},{size:'16"',price:3200}]
     },
-    jacketAddOns:{reversible:500, classA:400, reflector:150, hood:150, netLining:150},
+    jacketAddOns:{reversible:400, classA:300, reflector:150, hood:100, netLining:150},
     logoAddOn:{embroidery:{small:60, large:120}, dtf:{small:30, large:90}},
     namePerLetter:{embroidery:10, dtf:5},
 
@@ -3199,7 +3199,7 @@ coverall1:'/images/site/coverall.jpg'
     get wizMoq(){ return this.categoryMOQ[this.wizCategory] || 20; },
     get wizQtyValid(){ return Math.max(this.wizMoq, Math.floor(Number(this.wizQty) || 0)); },
     get wizFabricObj(){ return this.fabrics.find(f=>f.name===this.wizFabric); },
-    get wizUnit(){ return this.wizCategory ? this.getPricePerPiece(this.wizCategory, this.wizQtyValid) + (this.wizFabricObj?.class==='Class A' ? 400 : 0) : 0; },
+    get wizUnit(){ return this.wizCategory ? this.getPricePerPiece(this.wizCategory, this.wizQtyValid) + (this.wizFabricObj?.class==='Class A' ? 300 : 0) : 0; },
     get wizTotal(){ return Math.round(this.wizUnit * this.wizQtyValid); },
     wizSelectCategory(cat){ this.wizCategory=cat; this.wizQty=this.categoryMOQ[cat]||20; this.wizStep=2; },
     wizNext(){

@@ -717,6 +717,25 @@ create table if not exists public.pdf_quotes (
 alter table public.pdf_quotes enable row level security;
 revoke all on public.pdf_quotes from anon, authenticated;
 
+create table if not exists public.formal_quotes (
+  id uuid primary key default gen_random_uuid(),
+  access_token text not null unique,
+  customer_name text not null,
+  customer_contact text,
+  product_name text,
+  product_class text not null check (product_class in ('A', 'B')),
+  quantity integer not null,
+  inputs jsonb not null default '{}'::jsonb,
+  breakdown jsonb not null default '{}'::jsonb,
+  discount numeric not null default 0,
+  total numeric not null default 0,
+  deposit numeric not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.formal_quotes enable row level security;
+revoke all on public.formal_quotes from anon, authenticated;
+create index if not exists formal_quotes_customer_idx on public.formal_quotes (customer_name);
+
 alter table public.payment_verifications add column if not exists fraud_score numeric not null default 0;
 alter table public.payment_verifications add column if not exists fraud_flags jsonb not null default '[]'::jsonb;
 create index if not exists payment_verification_reference_idx on public.payment_verifications (reference);
