@@ -163,6 +163,13 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - health recovery + legacy Main Goal migration (2026-11-05)
+- Commit `bce9008` on main: `migrateLegacyDoneSteps` in `app/admin/main-goals-logic.ts` maps legacy `doneSteps` checkmarks (`system_settings.main_goals`, pre-`4671835` IDs such as `vo-compare`, `pg-account`, `cu-matrix`) onto baseline steps. A goal is marked fully done only when all its legacy steps were done. It never unchecks. `GET /api/admin/main-goals` runs it once, only when no saved `goals` list exists, persists the result, and returns `migrated: true` so the panel shows a notice.
+- Production has no `main_goals` row, so the migration is a no-op for current data. It is a safety net for legacy environments.
+- `content-publisher` root cause: the degraded heartbeat (09:57Z, `failed: 6`) came from FAILED rows with "Missing or invalid image file" and "Only photo or video" errors. Those are the Meta media errors fixed in `dc93899`, so they predated the fix. The video errors (AI Gateway needs a credit card) do not degrade by design. No READY row was due at 13:33Z, so a run could not post. A scheduled run at 13:26Z recorded `ok`, `failed: 0`, `published: 4`.
+- Verified: `npx tsc --noEmit` clean; eslint 0 errors on changed files; `npm test` 464 pass / 0 fail / 1 skipped; `vercel ls --environment production` Ready (`jacket-3bfxa2fap`); `/api/health` = `ok` on all checks; `npm run verify:live` 11/11.
+- Open: the six FAILED Meta rows from 2026-11-04/05 (attempts = 3) were not requeued. They are past the retry window. The `*/45` scheduled jobs still show gaps in run history, so auto-pilot remains the fallback.
+
 ## Completion log - Interactive Main Goal tracker + AI step generator (2026-11-05)
 - Commit `4671835` on main: `/admin` "MJIC Main Goal Directives" is now an editable tracker. Six seeded goals use the CEO's exact step text. Each step has a checkbox, inline text edit, and delete. Goals can be added, edited, and deleted, with a 20-goal cap and 30-step cap per goal. Per-goal and master progress bars are included.
 - AI steps: `POST /api/admin/main-goals/suggest` (admin auth) generates 3-5 steps via `withModelFallback` (strong tier). It returns 503 if no LLM is configured, so the goal is added without steps and the CEO can type them manually.
