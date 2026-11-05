@@ -163,6 +163,17 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - Interactive Main Goal tracker + AI step generator (2026-11-05)
+- Commit `4671835` on main: `/admin` "MJIC Main Goal Directives" is now an editable tracker. Six seeded goals use the CEO's exact step text. Each step has a checkbox, inline text edit, and delete. Goals can be added, edited, and deleted, with a 20-goal cap and 30-step cap per goal. Per-goal and master progress bars are included.
+- AI steps: `POST /api/admin/main-goals/suggest` (admin auth) generates 3-5 steps via `withModelFallback` (strong tier). It returns 503 if no LLM is configured, so the goal is added without steps and the CEO can type them manually.
+- Persistence: `GET`/`PUT /api/admin/main-goals` store the full list under `system_settings.main_goals`. The panel autosaves with a 500 ms debounce, retries on error, and disables editing until the initial load succeeds.
+- Migration note: the previous `{doneSteps}` checkmarks are not carried over. The seed loads on first use, so progress restarts from zero.
+- Verified: `npm test` 460 pass / 0 fail / 1 skipped (12 new tests in `main-goals-logic.test.ts`); `npx tsc --noEmit` exit 0; eslint clean on changed files; `npm run build` (webpack) passes.
+- Deploy: `jacket-qqb3u1o4c` Ready, Production, aliased to https://jacket-ai.vercel.app. `npx vercel --prod --yes` printed help again, so status was confirmed with `vercel ls`.
+- Verify: `npm run verify:live` 11/11. New endpoints return 401 without a token.
+- Health: `/api/health` = `degraded` (HTTP 200). Only `scheduledJobs` fails: unsuccessful last run `content-publisher`. Not masked; open item.
+- Not verified visually: the admin page is token-gated, so the UI was checked by type, lint, build, and tests only. The AI generator has not been exercised live, because the production LLM key status was not checked.
+
 ## Completion log - Meta ad image validation + fallback (2026-11-05)
 - Root cause: Graph rejected ad images the publisher sent unchecked. Relative or broken `media_url` values reached Facebook (null URL posted text-only, "Missing or invalid image file"), and Instagram `image_url` only accepts JPEG at 4:5 to 1.91:1 (portrait or PNG → "Only photo or video can be accepted"). Three of the eight `SAMPLE_JACKET_IMAGES` are portrait (aspect 0.65–0.67), so they were never valid Instagram fallbacks.
 - Commit `dc93899` on main: `meta-media-rules.ts` (JPEG/PNG sniffing from magic bytes, per-platform size/dimension/ratio rules, https-only absolute URL resolution, rejection-text matcher), `meta-media.ts` (fetch-validate-cache, 10-min TTL, fallback to 4 verified landscape/square JPEGs), `content.ts` `postMetaImage` (validates before send; retries once with fallback on a Meta image rejection). `meta-media-rules.test.ts` adds 6 tests. The chat gallery `SAMPLE_JACKET_IMAGES` is unchanged.
