@@ -13,6 +13,8 @@ import {
 import { getPageToken } from './meta-pages';
 import { checkMetaPublishing, metaPublishFailure, type MetaPlatform } from './meta-publishing';
 import { recordMetaPublishingHealth } from './meta-publishing-alerts';
+import { isMetaImageRejection, resolveMetaImage } from './meta-media';
+import type { MetaImagePlatform } from './meta-media-rules';
 import { seoHashtags } from './coo-seo.ts';
 import { SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 import {
@@ -269,6 +271,15 @@ async function resolveMedia(row: CalendarRow): Promise<{ url: string | null; sto
   return { url: signed.url, storagePath: path };
 }
 
+// Sends a validated image to Meta. If Meta still rejects the image, retries once with a verified fallback banner.
+async function postMetaImage(platform: MetaImagePlatform, rawUrl: string | null, send: (url: string) => Promise<Awaited<ReturnType<typeof graphPost>>>) {
+  const first = await resolveMetaImage(platform, rawUrl);
+  const result = await send(first.url);
+  if (result.ok || first.fallback || !isMetaImageRejection(result.reason)) return result;
+  const fallback = await resolveMetaImage(platform, null);
+  return send(fallback.url);
+}
+
 async function requireMetaPostSuccess(platform: MetaPlatform, result: Awaited<ReturnType<typeof graphPost>>) {
   if (result.ok) return;
   const blocked = metaPublishFailure(result.data.error);
@@ -284,8 +295,8 @@ async function publishFacebook(row: CalendarRow, mediaUrl: string | null, valida
   const caption = fullCaption(row);
   const result = row.media_type === 'video' && mediaUrl
     ? await graphPost(`/${pageId}/videos`, { file_url: mediaUrl, description: caption }, token)
-    : row.media_type === 'image' && mediaUrl
-      ? await graphPost(`/${pageId}/photos`, { url: mediaUrl, caption }, token)
+    : row.media_type === 'image'
+      ? await postMetaImage('facebook', mediaUrl, (url) => graphPost(`/${pageId}/photos`, { url, caption }, token))
       : await graphPost(`/${pageId}/feed`, { message: caption }, token);
   await requireMetaPostSuccess('facebook', result);
   const id = String(result.data.post_id || result.data.id || '');
@@ -294,10 +305,11 @@ async function publishFacebook(row: CalendarRow, mediaUrl: string | null, valida
 
 async function publishInstagram(row: CalendarRow, mediaUrl: string | null, validateMeta: ReturnType<typeof createMetaPublishingPreflight>) {
   const { token, igId } = await validateMeta('instagram', row.page_key || 'mjic');
-  if (!mediaUrl) throw new Error('Instagram needs an image or video URL');
-  const container = await graphPost(`/${igId}/media`, row.media_type === 'video'
-    ? { media_type: 'REELS', video_url: mediaUrl, caption: fullCaption(row) }
-    : { image_url: mediaUrl, caption: fullCaption(row) }, token);
+  if (row.media_type === 'text') throw new Error('Instagram needs an image or video');
+  if (row.media_type === 'video' && !mediaUrl) throw new Error('Instagram needs a video URL');
+  const container = row.media_type === 'video'
+    ? await graphPost(`/${igId}/media`, { media_type: 'REELS', video_url: mediaUrl, caption: fullCaption(row) }, token)
+    : await postMetaImage('instagram', mediaUrl, (url) => graphPost(`/${igId}/media`, { image_url: url, caption: fullCaption(row) }, token));
   await requireMetaPostSuccess('instagram', container);
   const creationId = String(container.data.id);
 
