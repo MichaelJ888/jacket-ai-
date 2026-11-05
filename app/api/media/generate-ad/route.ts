@@ -1,5 +1,6 @@
 ﻿import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
+import { AI_GATEWAY_BILLING_MESSAGE, isAiGatewayBillingFailure, logAiGatewayBilling } from '../../_lib/ai-gateway';
 import { experimental_getVideoStatus, experimental_startVideo } from 'ai';
 import {
   completeMediaAdGeneration,
@@ -211,6 +212,19 @@ export async function POST(req: Request) {
       approvalNotificationSent: false,
     });
   } catch (error) {
+    if (isAiGatewayBillingFailure(error)) {
+      logAiGatewayBilling('media.generate-ad.post', error);
+      return NextResponse.json(
+        {
+          success: false,
+          status: 'billing_required',
+          code: 'ai_gateway_billing',
+          error: AI_GATEWAY_BILLING_MESSAGE,
+          fallback: 'Previously approved videos in the mjic-video-ads bucket remain available for Meta posting. Retry generation after billing is fixed.',
+        },
+        { status: 402 },
+      );
+    }
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Media generation failed' },
       { status: 400 },
@@ -315,6 +329,10 @@ export async function GET(request: Request) {
       approvalId: finalRecord.data?.approval_id || null,
     });
   } catch (error) {
+    if (isAiGatewayBillingFailure(error)) {
+      logAiGatewayBilling('media.generate-ad.get', error);
+      return NextResponse.json({ success: false, status: 'billing_required', code: 'ai_gateway_billing', error: AI_GATEWAY_BILLING_MESSAGE }, { status: 402 });
+    }
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Video status check failed.' },
       { status: 502 },

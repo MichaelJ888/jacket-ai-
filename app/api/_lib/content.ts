@@ -2,6 +2,7 @@ import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { experimental_startVideo, generateText } from 'ai';
 
 import { publicBaseUrl } from './channels';
+import { AI_GATEWAY_BILLING_MESSAGE, isAiGatewayBillingFailure, logAiGatewayBilling } from './ai-gateway';
 import { GRAPH, graphGet, graphPost } from './meta-graph';
 import { fetchVideoBytes, uploadFacebookVideo } from './meta-video-ads';
 import {
@@ -159,6 +160,11 @@ async function startVideos(limit: number, errors: string[]) {
         started += 1;
       }
     } catch (error) {
+      if (isAiGatewayBillingFailure(error)) {
+        logAiGatewayBilling('content.start-videos', error);
+        errors.push(AI_GATEWAY_BILLING_MESSAGE);
+        break;
+      }
       console.error('auto video start failed:', error);
       errors.push(error instanceof Error ? error.message.slice(0, 300) : String(error));
     }

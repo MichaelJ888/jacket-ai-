@@ -21,6 +21,7 @@
     "bootstrap": "node scripts/bootstrap.mjs",
     "smoke": "node scripts/smoke.mjs",
     "verify:live": "node scripts/verify-live-system.mjs",
+    "videos:sync": "node scripts/sync-video-ads.mjs",
     "ads:post": "node scripts/auto-post-ads.ts",
     "meta:heal": "node scripts/meta-heal.mjs",
     "env:check": "node scripts/sync-env-check.mjs",
