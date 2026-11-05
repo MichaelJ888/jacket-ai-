@@ -163,6 +163,15 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - source ZIP, Meta isolation, FB video ads (2026-11-05)
+- Commit `9c284ae` on main (pushed). Prod deploy `jacket-aqsles1o1` Ready, aliased to https://jacket-ai.vercel.app.
+- Admin source export: `GET /api/admin/export/source` (admin token required; 401 without it). Returns `mjic-source-<date>.zip`: 65 entries, 229 KB, no `.env*` and no `app/api` files. Secrets redacted. Button "Download source ZIP" on `/admin`.
+- Meta isolation: `app/api/_lib/meta-graph.ts` is the single Graph client. `channels.ts` re-exports it. POST publishes are never retried; GETs retry on transient failures.
+- FB video ads: `app/api/_lib/meta-video-ads.ts` runs resumable chunked uploads (5 MB chunks, 1 GB max) for Facebook video rows. Telegram labels "VIDEO AD". Videos come from Supabase bucket `mjic-video-ads`, not the repo, because `.vercelignore` excludes the video folder.
+- Verified: `npx tsc --noEmit` exit 0; lint 0 errors; `npm test` 473 pass / 0 fail / 1 skipped; `npm run build` (webpack) passes; `npm run verify:live` 11/11; `/api/health` = `ok`.
+- No real Meta posts were made during testing.
+- Open: `META_CGV_PAGE_ID` is not set, so CGV video rows stay held. Supabase bucket population not verified. Filename in the request was `CGVE video mds.mp4`; the file on disk is `CGVE video reels.mp4`. The export excludes `app/api` by design; confirm that matches intent.
+
 ## Completion log - health recovery + legacy Main Goal migration (2026-11-05)
 - Commit `bce9008` on main: `migrateLegacyDoneSteps` in `app/admin/main-goals-logic.ts` maps legacy `doneSteps` checkmarks (`system_settings.main_goals`, pre-`4671835` IDs such as `vo-compare`, `pg-account`, `cu-matrix`) onto baseline steps. A goal is marked fully done only when all its legacy steps were done. It never unchecks. `GET /api/admin/main-goals` runs it once, only when no saved `goals` list exists, persists the result, and returns `migrated: true` so the panel shows a notice.
 - Production has no `main_goals` row, so the migration is a no-op for current data. It is a safety net for legacy environments.
