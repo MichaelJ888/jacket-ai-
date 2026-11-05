@@ -2,23 +2,33 @@ import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../../_lib/auth';
 import { getSupabaseAdmin } from '../../_lib/integrations';
 import { readSetting, writeSetting } from '../../_lib/system-settings';
-import { MAX_GOALS, defaultGoals, parseGoals } from '../../../admin/main-goals-logic';
+import { MAX_GOALS, defaultGoals, migrateLegacyDoneSteps, parseGoals } from '../../../admin/main-goals-logic';
 
 export const dynamic = 'force-dynamic';
 
 const SETTING_KEY = 'main_goals';
-type GoalsSetting = { goals?: unknown; updatedAt?: string | null };
+type GoalsSetting = { goals?: unknown; doneSteps?: unknown; updatedAt?: string | null };
 
 // Goals, steps, and checked states for the CEO's "MJIC Main Goal Directives" widget on /admin.
 // Missing setting = the six baseline directives. A saved list (even empty) is returned as stored.
+// Legacy `doneSteps` checkmarks are migrated once, when no saved list exists yet, then persisted.
 export async function GET(request: Request) {
   if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 503 });
 
   const setting = (await readSetting<GoalsSetting>(supabase, SETTING_KEY)) ?? {};
+  if (setting.goals === undefined && Array.isArray(setting.doneSteps)) {
+    const { goals, migrated } = migrateLegacyDoneSteps(defaultGoals(), setting.doneSteps);
+    if (migrated) {
+      const updatedAt = new Date().toISOString();
+      const writeError = await writeSetting(supabase, SETTING_KEY, { goals, updatedAt, doneSteps: setting.doneSteps });
+      if (writeError) return NextResponse.json({ error: writeError }, { status: 503 });
+      return NextResponse.json({ ok: true, goals, updatedAt, migrated: true }, { headers: { 'Cache-Control': 'no-store' } });
+    }
+  }
   const goals = parseGoals(setting.goals) ?? defaultGoals();
-  return NextResponse.json({ ok: true, goals, updatedAt: setting.updatedAt ?? null }, { headers: { 'Cache-Control': 'no-store' } });
+  return NextResponse.json({ ok: true, goals, updatedAt: setting.updatedAt ?? null, migrated: false }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 // Body { goals: MainGoal[] } replaces the whole list. Invalid or oversized lists are rejected, not truncated.

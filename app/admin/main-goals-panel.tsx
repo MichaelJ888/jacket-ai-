@@ -53,7 +53,10 @@ export default function MainGoalsPanel({ token }: { token: string }) {
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) setLoadError(data.error || "Could not load goals.");
-        else setGoals(Array.isArray(data.goals) ? data.goals : []);
+        else {
+          setGoals(Array.isArray(data.goals) ? data.goals : []);
+          if (data.migrated) setGoalNotice("Imported your earlier completed checkmarks into the new Main Goal tracker.");
+        }
       })
       .catch(() => {
         if (!cancelled) setLoadError("Could not load goals.");

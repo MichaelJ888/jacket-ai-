@@ -87,6 +87,55 @@ export function defaultGoals(): MainGoal[] {
   }));
 }
 
+// Step IDs from the pre-redesign tracker (`system_settings.main_goals.doneSteps`), mapped onto baseline step IDs.
+const LEGACY_STEP_MAP: Readonly<Record<string, readonly string[]>> = {
+  'vo-compare': ['virtual-office-1'],
+  'vo-mail': ['virtual-office-2'],
+  'vo-signup': ['virtual-office-3'],
+  'vo-records': ['virtual-office-4'],
+  'bp-barangay': ['business-permit-1'],
+  'bp-permit': ['business-permit-3'],
+  'pg-account': ['philgeps-1'],
+  'pg-docs': ['philgeps-2'],
+  'pg-platinum': ['philgeps-3'],
+  'cg-price': ['company-giveaways-1'],
+  'cu-matrix': ['company-uniforms-1'],
+};
+
+// A baseline goal is fully migrated only when every legacy step that belonged to it is done.
+const LEGACY_GOAL_STEPS: Readonly<Record<string, readonly string[]>> = {
+  'virtual-office': ['vo-compare', 'vo-signup', 'vo-records', 'vo-mail'],
+  'business-permit': ['bp-name', 'bp-bir', 'bp-barangay', 'bp-permit', 'bp-renewal'],
+  philgeps: ['pg-docs', 'pg-account', 'pg-platinum', 'pg-verified', 'pg-record', 'pg-claim'],
+  'school-uniforms': ['su-specs', 'su-requirements', 'su-quote', 'su-approval', 'su-deliver'],
+  'company-giveaways': ['cg-logo', 'cg-price', 'cg-approve', 'cg-deliver'],
+  'company-uniforms': ['cu-matrix', 'cu-fabric', 'cu-quote', 'cu-sample', 'cu-deliver'],
+};
+
+// Marks baseline steps done when the legacy tracker had them checked. Never unchecks anything.
+// Returns `migrated: true` only when at least one step changed.
+export function migrateLegacyDoneSteps(goals: readonly MainGoal[], legacyDoneSteps: unknown): { goals: MainGoal[]; migrated: boolean } {
+  if (!Array.isArray(legacyDoneSteps)) return { goals: [...goals], migrated: false };
+  const done = new Set(legacyDoneSteps.filter((id): id is string => typeof id === 'string'));
+  const targets = new Set<string>();
+  for (const legacyId of done) for (const stepId of LEGACY_STEP_MAP[legacyId] ?? []) targets.add(stepId);
+  for (const [goalId, legacyIds] of Object.entries(LEGACY_GOAL_STEPS)) {
+    if (!legacyIds.every((id) => done.has(id))) continue;
+    const baseline = defaultGoals().find((goal) => goal.id === goalId);
+    for (const step of baseline?.steps ?? []) targets.add(step.id);
+  }
+  let migrated = false;
+  const next = goals.map((goal) => ({
+    ...goal,
+    steps: goal.steps.map((step) => {
+      if (!targets.has(step.id) || step.done) return step;
+      migrated = true;
+      return { ...step, done: true };
+    }),
+  }));
+  return { goals: next, migrated };
+}
+
 function uniqueId(value: unknown, used: Set<string>, prefix: string) {
   let id = cleanText(value, 64);
   if (!id || used.has(id)) id = newId(prefix);

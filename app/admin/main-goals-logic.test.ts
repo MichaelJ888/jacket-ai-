@@ -9,6 +9,7 @@ import {
   deleteGoal,
   deleteStep,
   goalProgress,
+  migrateLegacyDoneSteps,
   overallProgress,
   parseGoals,
   parseSuggestedSteps,
@@ -123,4 +124,34 @@ test('parseSuggestedSteps dedupes case-insensitively and caps at five', () => {
 
 test('parseSuggestedSteps returns an empty list for blank output', () => {
   assert.deepEqual(parseSuggestedSteps('   '), []);
+});
+
+test('migrateLegacyDoneSteps maps mapped legacy checkmarks onto baseline steps', () => {
+  const { goals, migrated } = migrateLegacyDoneSteps(defaultGoals(), ['vo-compare', 'bp-permit', 'cu-matrix']);
+  assert.equal(migrated, true);
+  const done = goals.flatMap((goal) => goal.steps.filter((step) => step.done).map((step) => step.id));
+  assert.deepEqual(done.sort(), ['business-permit-3', 'company-uniforms-1', 'virtual-office-1']);
+});
+
+test('migrateLegacyDoneSteps marks a whole goal when all of its legacy steps are done', () => {
+  const legacy = ['cg-logo', 'cg-price', 'cg-approve', 'cg-deliver'];
+  const { goals, migrated } = migrateLegacyDoneSteps(defaultGoals(), legacy);
+  assert.equal(migrated, true);
+  const giveaways = goals.find((goal) => goal.id === 'company-giveaways');
+  assert.ok(giveaways?.steps.every((step) => step.done));
+  assert.equal(goals.find((goal) => goal.id === 'philgeps')?.steps.some((step) => step.done), false);
+});
+
+test('migrateLegacyDoneSteps never unchecks and ignores unknown or invalid input', () => {
+  const current = toggleStep(defaultGoals(), 'philgeps-1', true);
+  const { goals, migrated } = migrateLegacyDoneSteps(current, ['unknown-id', 42]);
+  assert.equal(migrated, false);
+  assert.equal(goals.find((goal) => goal.id === 'philgeps')?.steps[0].done, true);
+  assert.equal(migrateLegacyDoneSteps(current, 'not-an-array').migrated, false);
+});
+
+test('migrateLegacyDoneSteps reports no change when the step is already done', () => {
+  const current = toggleStep(defaultGoals(), 'company-uniforms-1', true);
+  const { migrated } = migrateLegacyDoneSteps(current, ['cu-matrix']);
+  assert.equal(migrated, false);
 });
