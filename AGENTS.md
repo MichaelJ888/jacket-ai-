@@ -320,3 +320,14 @@ px vercel ls.
 - Commit `b98b48b` on main (pushed). Prod deploy `jacket-2qzthorsc` Ready, aliased to https://jacket-ai.vercel.app; `npm run verify:live` 11/11; `GET /api/admin/main-goals` returns 401 without a token.
 - Health: `/api/health` = `degraded` (HTTP 200) only on `scheduledJobs: unsuccessful last run: content-publisher`. Criticals 0, DB ok, retry backlog 0. Not masked; open item.
 - Not verified: the widget in a browser (admin is token-gated).
+
+## Completion log - AI Gateway billing fallback + mjic-video-ads sync (2026-11-05)
+- Commit `b7a57b0` on main (pushed). Prod deploy `jacket-qagp661a4` Ready (`npx vercel --prod --yes`; CLI printed help JSON again, status confirmed with `vercel ls`).
+- Billing fallback: `app/api/_lib/ai-gateway.ts` classifies HTTP 402 and credit-card / billing / quota wording (`isAiGatewayBillingFailure`) and logs one JSON warning line. `/api/media/generate-ad` returns 402 `billing_required` with a fallback message instead of an unhandled 400/502. `startVideos` in `content.ts` records one billing warning and stops the remaining prompts for that run. Video errors still do not degrade `/api/health`.
+- Supabase sync: `scripts/sync-video-ads.mjs` (`npm run videos:sync`; `--verify` is read-only). It keys objects by `<sha256[0:16]>.mp4`, the existing convention, and reports every alias of a content key so required names show up (`CGVE video reels.mp4` is byte-identical to a hash-named file).
+- Live bucket state: 18/18 unique ad videos present and public URLs resolve (`FB VIDEO AD.mp4`, `CGVE video reels.mp4`, `jacket_ad_scene1_revised.mp4`, `jacket_ad_scene2_revised.mp4` all verified). Nothing needed uploading, so the upload path was not exercised live. The local folder also has a file whose name is just `.mp4` (19 MB, present in the bucket).
+- Verified: `npx tsc --noEmit` exit 0; `npm run lint` 0 errors (6 pre-existing warnings); `npm test` 477 pass / 0 fail / 1 skipped (baseline 473 + 4 new); `npm run verify:live` 11/11; `/api/health` = `ok`.
+- Not verified live: the 402 branch was not triggered against the real gateway, to avoid spending the account; it is covered by unit tests on the classifier only.
+- Known limitation: rows that already have `media_generation_id` are not restarted by `startVideos` (it filters on `media_generation_id IS NULL`); a billing failure on a row already in flight leaves it in its current state until the existing missed-slot sweep.
+- Open (account owner action): Vercel AI Gateway still needs a credit card before video generation can run; `content-publisher` and `sales-followups` heartbeats are unchanged by this pass.
+
