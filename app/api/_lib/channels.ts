@@ -1,8 +1,8 @@
 import type { Channel } from './crm';
 import { getPageToken } from './meta-pages';
+import { graphPost, GRAPH_TIMEOUT_MS as TIMEOUT_MS } from './meta-graph';
 
-const GRAPH = 'https://graph.facebook.com/v21.0';
-const TIMEOUT_MS = 10000;
+export { GRAPH, graphPost } from './meta-graph';
 
 export type SendResult = { ok: boolean; reason?: string };
 
@@ -17,25 +17,6 @@ function chunk(text: string, size = 1900) {
   }
   if (rest) parts.push(rest);
   return parts;
-}
-
-async function graphPost(path: string, body: Record<string, unknown>, token: string): Promise<{ ok: boolean; data: Record<string, unknown>; reason?: string }> {
-  try {
-    const response = await fetch(`${GRAPH}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!response.ok) {
-      const message = (data.error as { message?: string } | undefined)?.message || `HTTP ${response.status}`;
-      return { ok: false, data, reason: message };
-    }
-    return { ok: true, data };
-  } catch (error) {
-    return { ok: false, data: {}, reason: error instanceof Error ? error.message : 'request failed' };
-  }
 }
 
 export function publicBaseUrl() {
@@ -114,5 +95,3 @@ export async function replyToComment(platform: 'facebook' | 'instagram', comment
   const result = await graphPost(path, { message: text }, token);
   return result.ok ? { ok: true } : { ok: false, reason: result.reason };
 }
-
-export { graphPost, GRAPH };

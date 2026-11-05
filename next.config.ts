@@ -2,6 +2,10 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: __dirname,
+  // The source ZIP route reads these files from disk at runtime; tracing must ship them to Vercel.
+  outputFileTracingIncludes: {
+    '/api/admin/export/source': ['./app/**/*', './components/**/*', './lib/**/*', './hooks/**/*', './public/**/*.{html,js,css,json,svg,txt,xml,webmanifest}', './package.json', './tsconfig.json', './postcss.config.mjs', './eslint.config.mjs'],
+  },
   async redirects() {
     return [
       {

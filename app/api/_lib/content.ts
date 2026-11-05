@@ -1,7 +1,9 @@
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { experimental_startVideo, generateText } from 'ai';
 
-import { graphPost, GRAPH, publicBaseUrl } from './channels';
+import { publicBaseUrl } from './channels';
+import { GRAPH, graphGet, graphPost } from './meta-graph';
+import { fetchVideoBytes, uploadFacebookVideo } from './meta-video-ads';
 import {
   createMediaAdGeneration,
   escapeTelegramHtml,
@@ -294,7 +296,7 @@ async function publishFacebook(row: CalendarRow, mediaUrl: string | null, valida
   const { token, pageId } = await validateMeta('facebook', row.page_key || 'mjic');
   const caption = fullCaption(row);
   const result = row.media_type === 'video' && mediaUrl
-    ? await graphPost(`/${pageId}/videos`, { file_url: mediaUrl, description: caption }, token)
+    ? await uploadFacebookVideo({ pageId, token, bytes: await fetchVideoBytes(mediaUrl), description: caption })
     : row.media_type === 'image'
       ? await postMetaImage('facebook', mediaUrl, (url) => graphPost(`/${pageId}/photos`, { url, caption }, token))
       : await graphPost(`/${pageId}/feed`, { message: caption }, token);
@@ -318,7 +320,7 @@ async function publishInstagram(row: CalendarRow, mediaUrl: string | null, valid
     let finished = false;
     for (let attempt = 0; attempt < (row.media_type === 'video' ? 12 : 6) && !finished; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 4000));
-      const status = await fetch(`${GRAPH}/${creationId}?fields=status_code`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000) }).then((response) => response.json()).catch(() => ({}));
+      const status = (await graphGet(`/${creationId}?fields=status_code`, token)).data;
       if (status.status_code === 'FINISHED') finished = true;
       if (status.status_code === 'ERROR') throw new Error('Instagram rejected the media');
     }
@@ -419,7 +421,7 @@ async function publishCalendarRow(supabase: NonNullable<ReturnType<typeof getSup
           : await publishTiktok(row, media.url);
     await supabase.from('content_calendar').update({ status: 'PUBLISHED', external_post_id: result.id, post_url: result.url, published_at: new Date().toISOString(), error: null }).eq('id', row.id);
     summary.published += 1;
-    void sendTelegramMessage(`<b>POSTED on ${row.platform.toUpperCase()}</b>\n${escapeTelegramHtml(row.caption.slice(0, 200))}${result.url ? `\n${escapeTelegramHtml(result.url)}` : ''}`);
+    void sendTelegramMessage(`<b>${row.media_type === 'video' ? 'VIDEO AD ' : ''}POSTED on ${row.platform.toUpperCase()}</b>\n${escapeTelegramHtml(row.caption.slice(0, 200))}${result.url ? `\n${escapeTelegramHtml(result.url)}` : ''}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (error instanceof MediaProcessingPending) {
@@ -433,7 +435,7 @@ async function publishCalendarRow(supabase: NonNullable<ReturnType<typeof getSup
       const attempts = row.attempts + 1;
       await supabase.from('content_calendar').update({ attempts, error: message.slice(0, 500), status: attempts >= 3 ? 'FAILED' : 'READY' }).eq('id', row.id);
       summary.failed += 1;
-      if (attempts >= 3) void sendTelegramMessage(`<b>POST FAILED (${row.platform})</b>\n${escapeTelegramHtml(message.slice(0, 300))}`);
+      if (attempts >= 3) void sendTelegramMessage(`<b>${row.media_type === 'video' ? 'VIDEO AD ' : ''}POST FAILED (${row.platform})</b>\n${escapeTelegramHtml(message.slice(0, 300))}`);
     }
   }
 }
