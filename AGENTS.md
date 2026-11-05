@@ -163,6 +163,16 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - Meta ad image validation + fallback (2026-11-05)
+- Root cause: Graph rejected ad images the publisher sent unchecked. Relative or broken `media_url` values reached Facebook (null URL posted text-only, "Missing or invalid image file"), and Instagram `image_url` only accepts JPEG at 4:5 to 1.91:1 (portrait or PNG → "Only photo or video can be accepted"). Three of the eight `SAMPLE_JACKET_IMAGES` are portrait (aspect 0.65–0.67), so they were never valid Instagram fallbacks.
+- Commit `dc93899` on main: `meta-media-rules.ts` (JPEG/PNG sniffing from magic bytes, per-platform size/dimension/ratio rules, https-only absolute URL resolution, rejection-text matcher), `meta-media.ts` (fetch-validate-cache, 10-min TTL, fallback to 4 verified landscape/square JPEGs), `content.ts` `postMetaImage` (validates before send; retries once with fallback on a Meta image rejection). `meta-media-rules.test.ts` adds 6 tests. The chat gallery `SAMPLE_JACKET_IMAGES` is unchanged.
+- Library note: `public/image-library.json` has 629 items (`items` array), not 139. 261 are Instagram-safe JPEGs.
+- Verified: `npx tsc --noEmit` exit 0; `npm run lint` 0 errors (6 pre-existing warnings, none in changed files); `npm test` 448 pass / 0 fail / 1 skipped.
+- Deploy: `npx vercel --prod --yes` produced Ready production `jacket-2emz1k38r-michaeljeffreyy17-7593.vercel.app` (aliased to https://jacket-ai.vercel.app). A second build, `jacket-hcwwlohzj`, also reached Ready. The CLI printed help JSON, so status came from `vercel ls`.
+- Live: `npm run verify:live` 11/11. `/api/health` = `degraded` (HTTP 200) with `scheduledJobs: unsuccessful last run: content-publisher`. Criticals 0, DB ok, storage ok, retry backlog 0.
+- Open: the content-publisher failure reason is not verified. The Supabase service key could not be used from a script (rejected as a browser-side key), so the `job_heartbeats` row was not read. No manual publisher run was made, because it posts to live Facebook and Instagram. The first live publish after this deploy is still unverified.
+- Memory: `npm run memory` issue and fix entries recorded.
+
 ## Completion log - Giveaway photo market pricing (2026-11-04)
 - Corporate giveaways (`/quote/giveaways`): photo analysis with a piece count (min 20) runs one grounded Gemini call (Google Search tool) for public market prices. Unit price = median of 3+ prices x 1.20, rounded up to the peso. Markup, median, and prompt stay server-side in `app/api/_lib/giveaway-market.ts`; the client receives only an HMAC-signed token (30-min TTL) bound to label, unit price, and quantity.
 - Core garment tiers in `mjic-pricelist.ts` unchanged. Catalog items still use official tier pricing; client prices are ignored.
