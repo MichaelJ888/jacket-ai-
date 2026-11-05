@@ -163,6 +163,16 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - CRM sync, stock alerts, executive briefing cron (2026-11-05)
+- Commit `485bf51` on main: Meta leadgen webhook upserts each lead into `crm_contacts` (`facebook` / `leadgen:<id>`). New `app/api/crm/sync/route.ts` is an idempotent daily backfill of `facebook-lead-ad%` leads, cron-authorized, heartbeat `crm-sync`.
+- Stock alerts (Telegram): order deduction fires on a shortage or a downward crossing of `reorder_level`; PO intake fires when stock is at or below reorder level. Alerts never block the deduction or PO. Pure rules in `inventory-alerts-logic.ts`.
+- Executive briefing moved from GitHub Actions (`scheduler.yml`) to a Vercel native cron `0 9 * * *` UTC (5 PM Manila). The GitHub job is removed to prevent double sends. Daily CRM sync is `0 1 * * *` UTC.
+- Quote PDF email (item 3): approval path verified read-only (`ceo-control.ts` → `sendQuoteEmail`). BLOCKED: `RESEND_API_KEY` and `RESEND_FROM` are not set in Vercel production. Add them to enable live email. Pricelist and Median x 1.20 pricing untouched.
+- Verified: `npx tsc --noEmit` exit 0; `npm run lint` 0 errors (6 pre-existing warnings); `npm test` 485 pass / 0 fail / 1 skipped; `npm run verify:live` 11/11; `/api/health` = `ok`; `/api/crm/sync` returns 401 without token.
+- Deploy: `npx vercel --prod --yes` built `jacket-et1a73mx0` (Ready, Production). A second duplicate build `jacket-cj61hxs2k` stayed Queued for 10+ minutes. Check it before the next deploy.
+- Not verified: the live CRM backfill and Telegram stock alerts were not triggered, because they need a CRON_SECRET and real stock movement.
+
+
 ## Completion log - source ZIP, Meta isolation, FB video ads (2026-11-05)
 - Commit `9c284ae` on main (pushed). Prod deploy `jacket-aqsles1o1` Ready, aliased to https://jacket-ai.vercel.app.
 - Admin source export: `GET /api/admin/export/source` (admin token required; 401 without it). Returns `mjic-source-<date>.zip`: 65 entries, 229 KB, no `.env*` and no `app/api` files. Secrets redacted. Button "Download source ZIP" on `/admin`.
