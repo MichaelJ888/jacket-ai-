@@ -3,14 +3,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   computeGiveawayQuote,
+  marketQuoteLine,
+  quoteFromLines,
   seedGiveawayCatalog,
   type GiveawayCatalogCategory,
   type GiveawayQuote,
+  type GiveawayQuoteLine,
 } from '../../api/_lib/giveaway-quote';
 
 const peso = (n: number) => `₱${Math.round(n).toLocaleString('en-US')}`;
 
 type ServerResult = { quote: GiveawayQuote; paymentTerms: string; paymentDetails: readonly string[]; leadCaptured: boolean };
+// Server-signed photo price. The token carries the label, unit price, and quantity; the client never sets them.
+type MarketQuote = { token: string; label: string; unitPrice: number; quantity: number };
+const MARKET_MIN_QUANTITY = 20;
 
 const field = 'w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900';
 const label = 'mb-1 block text-sm font-semibold text-slate-700';
@@ -47,6 +53,8 @@ export default function GiveawayQuotePage() {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [suggestedCategory, setSuggestedCategory] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [photoQuantity, setPhotoQuantity] = useState(MARKET_MIN_QUANTITY);
+  const [marketQuote, setMarketQuote] = useState<MarketQuote | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,13 +78,17 @@ export default function GiveawayQuotePage() {
   );
 
   const preview = useMemo(() => {
-    if (items.length === 0) return null;
     try {
-      return computeGiveawayQuote(items, catalog);
+      const catalogLines = items.length > 0 ? computeGiveawayQuote(items, catalog).lines : [];
+      if (!marketQuote && catalogLines.length === 0) return null;
+      const lines: GiveawayQuoteLine[] = marketQuote
+        ? [...catalogLines, marketQuoteLine(marketQuote.label, marketQuote.unitPrice, marketQuote.quantity)]
+        : catalogLines;
+      return quoteFromLines(lines);
     } catch {
       return null;
     }
-  }, [items, catalog]);
+  }, [items, catalog, marketQuote]);
 
   async function handlePhoto(file: File | undefined) {
     if (!file || !file.type.startsWith('image/')) {
@@ -86,6 +98,7 @@ export default function GiveawayQuotePage() {
     setAnalyzing(true);
     setAnalysis(null);
     setSuggestedCategory(null);
+    setMarketQuote(null);
     try {
       const dataUrl = await photoToDataUrl(file);
       if (!dataUrl) {
@@ -97,14 +110,18 @@ export default function GiveawayQuotePage() {
       const res = await fetch('/api/quote/giveaways/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photo: dataUrl }),
+        body: JSON.stringify({ photo: dataUrl, quantity: photoQuantity }),
       });
       const data = await res.json();
       if (!res.ok) {
         setAnalysis(data.error || 'Photo analysis failed.');
         return;
       }
-      if (data.verdict?.status === 'suggested') {
+      if (data.verdict?.status === 'market_priced') {
+        const v = data.verdict as { label: string; unitPrice: number; quantity: number; quoteToken: string };
+        setMarketQuote({ token: v.quoteToken, label: v.label, unitPrice: v.unitPrice, quantity: v.quantity });
+        setAnalysis(`Matched: ${v.label}. Photo price ${peso(v.unitPrice)}/pc for ${v.quantity} pieces, added to your breakdown.`);
+      } else if (data.verdict?.status === 'suggested') {
         setSuggestedCategory(data.verdict.category);
         setAnalysis(`Looks like: ${data.verdict.label}. Please confirm the item selection below.`);
       } else {
@@ -121,8 +138,8 @@ export default function GiveawayQuotePage() {
     e.preventDefault();
     setError(null);
     setResult(null);
-    if (items.length === 0) {
-      setError('Pick at least one giveaway item below.');
+    if (items.length === 0 && !marketQuote) {
+      setError('Pick at least one giveaway item below, or analyze a photo.');
       return;
     }
     setSubmitting(true);
@@ -130,7 +147,7 @@ export default function GiveawayQuotePage() {
       const res = await fetch('/api/quote/giveaways', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ customerName, customerContact, items, photo, suggestedCategory }),
+        body: JSON.stringify({ customerName, customerContact, items, marketQuote: marketQuote?.token ?? null, photo, suggestedCategory }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -222,7 +239,21 @@ export default function GiveawayQuotePage() {
             }}
             className="rounded-lg border-2 border-dashed border-slate-300 p-4 text-center text-sm text-slate-600"
           >
-            <p>Optional: drop a photo of the item you want (we suggest a category; sales confirms the price).</p>
+            <p>Optional: drop a photo of the item you want. We match it to a category and price it from current market prices, or sales confirms the price.</p>
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <label htmlFor="photo-qty" className="text-sm text-slate-700">Pieces for photo pricing (min {MARKET_MIN_QUANTITY})</label>
+              <input
+                id="photo-qty"
+                type="number"
+                min={MARKET_MIN_QUANTITY}
+                className={`${field} w-24`}
+                value={photoQuantity}
+                onChange={(e) => {
+                  setPhotoQuantity(Number(e.target.value));
+                  setMarketQuote(null);
+                }}
+              />
+            </div>
             <label className="mt-2 inline-block cursor-pointer font-semibold text-indigo-700">
               Choose image
               <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(e) => void handlePhoto(e.target.files?.[0])} />
@@ -234,7 +265,7 @@ export default function GiveawayQuotePage() {
 
           {error && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
 
-          <button type="submit" disabled={submitting || items.length === 0} className="w-full rounded-lg bg-indigo-700 px-5 py-3 font-bold text-white disabled:opacity-60">
+          <button type="submit" disabled={submitting || (items.length === 0 && !marketQuote)} className="w-full rounded-lg bg-indigo-700 px-5 py-3 font-bold text-white disabled:opacity-60">
             {submitting ? 'Creating estimate…' : 'Create my giveaways quotation'}
           </button>
         </form>

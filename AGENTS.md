@@ -163,6 +163,14 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - Giveaway photo market pricing (2026-11-04)
+- Corporate giveaways (`/quote/giveaways`): photo analysis with a piece count (min 20) runs one grounded Gemini call (Google Search tool) for public market prices. Unit price = median of 3+ prices x 1.20, rounded up to the peso. Markup, median, and prompt stay server-side in `app/api/_lib/giveaway-market.ts`; the client receives only an HMAC-signed token (30-min TTL) bound to label, unit price, and quantity.
+- Core garment tiers in `mjic-pricelist.ts` unchanged. Catalog items still use official tier pricing; client prices are ignored.
+- Admin launchers already present in `app/admin/page.tsx` (Visual Site Editor, CEO AI Studio); no change.
+- Signing key: `GIVEAWAY_QUOTE_SECRET`, falling back to `CRON_SECRET`. Without either, market mode is off and the photo path returns sales confirmation.
+- Verified: `npx tsc --noEmit` exit 0; `npm run build` (webpack) passes; no HMAC symbols in client chunks; `npm test` 442 pass / 0 fail / 1 skipped; eslint 0 errors on changed files.
+- Not verified live: grounded Gemini pricing accuracy and image+tool acceptance.
+
 ## Completion log - unified formal quotation page (2026-11-04)
 - Commit `0212a6b` on main: `/quote` merges the price and formal quotation builders. Official tiers (jacket, polo, school uniform) priced server-side in `app/api/_lib/public-quote.ts` and `mjic-pricelist.ts`; client-sent prices and discounts ignored. T-Shirt and Company Uniform return a sales-confirmation response (422), since no official table exists.
 - Fabric: catalog dropdown plus "Other" custom input. Fabrics without a class on file (Twill, Brush Cotton, Marks & Spencer, Stellini, Vellini) require the customer to pick Class A or B.

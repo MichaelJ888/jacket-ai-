@@ -6,6 +6,9 @@ import { DEPOSIT_PCT } from './formal-quote.ts';
 
 export const MAX_GIVEAWAY_ITEMS = 8;
 export const MAX_GIVEAWAY_QUANTITY = 100000;
+// Photo-priced (market) lines use the standard 20 pcs minimum order.
+export const MARKET_MIN_QUANTITY = 20;
+export const MARKET_LINE_KEY = 'market-photo';
 
 export type GiveawayCatalogCategory = PricelistCategory & { moq: number; singleTier: boolean };
 
@@ -64,6 +67,33 @@ export type GiveawayQuote = {
 
 export type GiveawayItemInput = { key: unknown; quantity: unknown };
 
+// Line for a photo-priced item. The unit price comes from a server-signed token, never from the client.
+export function marketQuoteLine(label: string, unitPrice: number, quantity: number): GiveawayQuoteLine {
+  return {
+    key: MARKET_LINE_KEY,
+    label: `${label} (photo quote)`,
+    quantity,
+    unitPrice,
+    subtotal: unitPrice * quantity,
+    moq: MARKET_MIN_QUANTITY,
+    flatRate: false,
+  };
+}
+
+// Totals and 50% deposit for any set of priced lines.
+export function quoteFromLines(lines: GiveawayQuoteLine[]): GiveawayQuote {
+  const subtotal = lines.reduce((sum, line) => sum + line.subtotal, 0);
+  const deposit = Math.ceil((subtotal * DEPOSIT_PCT) / 100);
+  return {
+    lines,
+    totalQuantity: lines.reduce((sum, line) => sum + line.quantity, 0),
+    subtotal,
+    depositPct: DEPOSIT_PCT,
+    deposit,
+    balance: subtotal - deposit,
+  };
+}
+
 // Validates item selections and prices them strictly from the giveaway catalog. Client-sent prices are ignored by design.
 export function computeGiveawayQuote(items: unknown, catalog: GiveawayCatalogCategory[] = seedGiveawayCatalog()): GiveawayQuote {
   if (!Array.isArray(items) || items.length === 0) throw new GiveawayQuoteError('Add at least one giveaway item.');
@@ -87,14 +117,5 @@ export function computeGiveawayQuote(items: unknown, catalog: GiveawayCatalogCat
     lines.push({ key: cat.key, label: cat.label, quantity, unitPrice, subtotal: unitPrice * quantity, moq: cat.moq, flatRate: cat.singleTier });
   }
 
-  const subtotal = lines.reduce((sum, line) => sum + line.subtotal, 0);
-  const deposit = Math.ceil((subtotal * DEPOSIT_PCT) / 100);
-  return {
-    lines,
-    totalQuantity: lines.reduce((sum, line) => sum + line.quantity, 0),
-    subtotal,
-    depositPct: DEPOSIT_PCT,
-    deposit,
-    balance: subtotal - deposit,
-  };
+  return quoteFromLines(lines);
 }

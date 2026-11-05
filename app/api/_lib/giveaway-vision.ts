@@ -7,6 +7,7 @@ export const GIVEAWAY_VISION_MIN_CONFIDENCE = 0.7;
 
 export type GiveawayVerdict =
   | { status: 'suggested'; category: string; label: string; confidence: number }
+  | { status: 'market_priced'; category: string; label: string; unitPrice: number; quantity: number; quoteToken: string }
   | { status: 'needs_sales_confirmation'; reason: string };
 
 export function isValidGiveawayPhoto(value: unknown): value is string {

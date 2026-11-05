@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { rateLimitResponse } from '../../_lib/rate-limit';
 import { recordLead } from '../../_lib/integrations';
 import { PAYMENT_DETAILS, PAYMENT_TERMS } from '../../_lib/formal-quote.ts';
-import { computeGiveawayQuote, GiveawayQuoteError } from '../../_lib/giveaway-quote.ts';
+import { computeGiveawayQuote, GiveawayQuoteError, marketQuoteLine, quoteFromLines, type GiveawayQuote, type GiveawayQuoteLine } from '../../_lib/giveaway-quote.ts';
 import { loadGiveawayCatalog } from '../../_lib/giveaway-catalog.ts';
 import { isValidGiveawayPhoto } from '../../_lib/giveaway-vision.ts';
+import { marketQuoteSecret, verifyMarketQuote } from '../../_lib/giveaway-market.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,9 +37,21 @@ export async function POST(req: Request) {
   const photo = isValidGiveawayPhoto(body.photo) ? body.photo : null;
   const suggestedCategory = typeof body.suggestedCategory === 'string' ? body.suggestedCategory.slice(0, 40) : null;
 
-  let quote;
+  let quote: GiveawayQuote;
   try {
-    quote = computeGiveawayQuote(body.items, await loadGiveawayCatalog());
+    const catalog = await loadGiveawayCatalog();
+    let lines: GiveawayQuoteLine[] = [];
+    const hasItems = Array.isArray(body.items) && body.items.length > 0;
+
+    // A photo-priced token is optional. Its price is server-signed, so the client cannot set it.
+    const hasMarket = body.marketQuote !== undefined && body.marketQuote !== null && body.marketQuote !== '';
+    const marketSecret = marketQuoteSecret();
+    const market = hasMarket && marketSecret ? verifyMarketQuote(body.marketQuote, marketSecret) : null;
+    if (hasMarket && !market) return NextResponse.json({ error: 'Photo price expired. Re-run the photo analysis.' }, { status: 400 });
+
+    if (hasItems || !market) lines = computeGiveawayQuote(body.items, catalog).lines;
+    if (market) lines = [...lines, marketQuoteLine(market.label, market.unitPrice, market.quantity)];
+    quote = quoteFromLines(lines);
   } catch (error) {
     if (error instanceof GiveawayQuoteError) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ error: 'Invalid quote input' }, { status: 400 });
