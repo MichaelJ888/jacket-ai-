@@ -290,3 +290,6 @@ px vercel ls.
 - Logic and step catalogue: `app/admin/main-goals-logic.ts` (pure, tested). API: `GET`/`POST /api/admin/main-goals` (admin bearer), persisted in `system_settings` key `main_goals`; unknown step IDs are rejected. No schema change.
 - Step guides are generic checklists. Confirm LGU, PhilGEPS, and school-specific requirements before acting on them.
 - Verified: `npx tsc --noEmit` exit 0; eslint 0 errors on changed files; `npm test` 454 pass, 0 fail, 1 skipped; `npm run build` (webpack) passes.
+- Commit `b98b48b` on main (pushed). Prod deploy `jacket-2qzthorsc` Ready, aliased to https://jacket-ai.vercel.app; `npm run verify:live` 11/11; `GET /api/admin/main-goals` returns 401 without a token.
+- Health: `/api/health` = `degraded` (HTTP 200) only on `scheduledJobs: unsuccessful last run: content-publisher`. Criticals 0, DB ok, retry backlog 0. Not masked; open item.
+- Not verified: the widget in a browser (admin is token-gated).
