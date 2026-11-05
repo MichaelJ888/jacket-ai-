@@ -283,3 +283,10 @@ px vercel ls.
 - Verified: `npx tsc --noEmit` exit 0; `npm run lint` 0 errors, 6 warnings; `npm test` 433 total, 432 pass, 0 fail, 1 skipped; `npm run build` (webpack) passes; `npm run verify:live` 11/11.
 - Health: `/api/health` = `degraded` (HTTP 200) on `scheduledJobs` only: "unsuccessful last run: content-publisher". criticalErrors24h 0, retryQueueBacklog 0, DB/storage ok. Not masked.
 - Open: giveaway price bounds; logo fallback providers; pricelist matrix input; content-publisher failure; scheduled cron reliability.
+
+## Completion log - Main Goal Reminder on /admin (2026-11-05)
+- Meta ad image validation and verified-banner fallback were already on main (`dc93899`, telemetry `694df44`); re-checked, no change this pass.
+- New "Main Goal Reminder" panel at the top of `/admin` (`app/admin/main-goals-panel.tsx`): six directives (Virtual Office, Business Permit, PhilGEPS, School Uniforms OLOPSCH & FEU, Company Giveaways, Company Uniforms), each with step checklists, status tags (Not started / In progress / Complete), and progress bars.
+- Logic and step catalogue: `app/admin/main-goals-logic.ts` (pure, tested). API: `GET`/`POST /api/admin/main-goals` (admin bearer), persisted in `system_settings` key `main_goals`; unknown step IDs are rejected. No schema change.
+- Step guides are generic checklists. Confirm LGU, PhilGEPS, and school-specific requirements before acting on them.
+- Verified: `npx tsc --noEmit` exit 0; eslint 0 errors on changed files; `npm test` 454 pass, 0 fail, 1 skipped; `npm run build` (webpack) passes.

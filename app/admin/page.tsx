@@ -6,6 +6,7 @@ import RecipientsPanel from "./recipients-panel";
 import CreditsPanel from "./credits-panel";
 import AnalyticsDashboard from "./analytics-dashboard";
 import AutoPilotBadge from "./auto-pilot-badge";
+import MainGoalsPanel from "./main-goals-panel";
 
 type Price = { key: string; name: string; category: string; unit: string; unit_cost: number; supplier_name: string | null; updated_at: string };
 type Overview = {
@@ -277,6 +278,7 @@ export default function AdminPage() {
           <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
         </div>
       </div>
+      <MainGoalsPanel token={token} />
       <>
       <nav className="mb-4 flex gap-2">
 
