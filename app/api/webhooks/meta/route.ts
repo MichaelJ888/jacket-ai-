@@ -1,7 +1,8 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { after, NextResponse } from 'next/server';
 import { GRAPH, replyToComment } from '../../_lib/channels';
-import { type Channel } from '../../_lib/crm';
+import { type Channel, upsertContact } from '../../_lib/crm';
+import { leadgenExternalId } from '../../_lib/leadgen-crm-logic.ts';
 import { escapeTelegramHtml, recordLead, reportCriticalError, sendTelegramMessage } from '../../_lib/integrations';
 import { parseLeadgenFieldData } from '../../_lib/meta-lead-logic.ts';
 import { getPageToken } from '../../_lib/meta-pages';
@@ -93,6 +94,15 @@ async function handleLeadgen(leadgenId: string, pageId?: string, formId?: string
     source: pageId && pageId === process.env.META_CGV_PAGE_ID ? 'facebook-lead-ad-cgv' : 'facebook-lead-ad',
     details: { leadgenId, pageId: pageId || null, formId: data.form_id || formId || null, adId: data.ad_id || adId || null, email: parsed.email || null, phone: parsed.phone || null },
   });
+  const crm = await upsertContact({
+    channel: 'facebook',
+    externalId: leadgenExternalId(leadgenId),
+    name: parsed.name || undefined,
+    phone: parsed.phone || undefined,
+    email: parsed.email || undefined,
+    pageId,
+  });
+  if (crm.error) console.error(`Leadgen ${leadgenId}: CRM upsert failed: ${crm.error}`);
   await sendTelegramMessage(
     `🎯 <b>New Facebook lead ad signup</b> (${escapeTelegramHtml(pageLabel)} page)\n` +
       `Name: ${escapeTelegramHtml(parsed.name || '—')}\n` +

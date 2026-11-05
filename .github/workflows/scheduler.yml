@@ -130,15 +130,6 @@ jobs:
           curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/client-pulse" \
             -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
 
-  executive-briefing:
-    if: github.event.schedule == '0 9 * * *' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send 5 PM executive progress briefing
-        run: |
-          curl -sf --max-time 60 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/executive-briefing" \
-            -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
-
   backup:
     if: github.event.schedule == '0 19 * * 0' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest

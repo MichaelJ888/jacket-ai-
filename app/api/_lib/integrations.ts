@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { generateText } from 'ai';
 import { randomBytes } from 'node:crypto';
 import { sanitizeTelegramText } from './telegram-text.ts';
+import { isAtOrBelowReorder, stockCrossingAlert } from './inventory-alerts-logic.ts';
 import { isAnneFirstNameSender, isMsAnneSender, type TelegramSender } from './anne-chat-logic.ts';
 
 export function getSupabaseAdmin() {
@@ -436,6 +437,14 @@ export async function createPurchaseOrder(order: {
     status: 'PENDING_APPROVAL',
   }).select().single();
 
+  if (!error) {
+    const { data: stock } = await supabase.from('material_inventory').select('material_name, quantity_available, reorder_level, unit').ilike('material_name', order.materialType).maybeSingle();
+    const reorderLevel = Number(stock?.reorder_level || 0);
+    if (stock && isAtOrBelowReorder(Number(stock.quantity_available || 0), reorderLevel)) {
+      await notifyStockAlert({ kind: 'po', materialName: stock.material_name, remaining: Number(stock.quantity_available || 0), reorderLevel, unit: stock.unit, poNumber, incomingQuantity: order.quantity });
+    }
+  }
+
   return { data, error: error?.message || null };
 }
 
@@ -810,20 +819,45 @@ export async function deductInventoryForOrder(materials: Array<{ material: strin
     const materialName = String(item?.material || '').trim();
     const quantity = Number(item?.quantity);
     if (!materialName || !Number.isFinite(quantity) || quantity <= 0) continue;
-    const { data: row, error: readError } = await supabase.from('material_inventory').select('material_name, quantity_available').eq('material_name', materialName).maybeSingle();
+    const { data: row, error: readError } = await supabase.from('material_inventory').select('material_name, quantity_available, reorder_level, unit').eq('material_name', materialName).maybeSingle();
     if (readError) return { data: null, error: readError.message };
     if (!row) {
       results.push({ material: materialName, deducted: 0, remaining: 0, shortage: true });
       continue;
     }
-    const remaining = Number(row.quantity_available || 0) - quantity;
+    const previous = Number(row.quantity_available || 0);
+    const remaining = previous - quantity;
     const { error: updateError } = await supabase.from('material_inventory').update({ quantity_available: remaining, updated_at: new Date().toISOString() }).eq('material_name', materialName);
     if (updateError) return { data: null, error: updateError.message };
     const { error: txError } = await supabase.from('inventory_transactions').insert({ material_name: materialName, quantity_change: -quantity, reason: 'ORDER_CONFIRMATION', reference });
     if (txError) console.error('inventory_transactions insert failed:', txError.message);
+    const alert = stockCrossingAlert(previous, remaining, Number(row.reorder_level || 0));
+    if (alert) await notifyStockAlert({ kind: alert, materialName, remaining, reorderLevel: Number(row.reorder_level || 0), unit: row.unit, reference });
     results.push({ material: materialName, deducted: quantity, remaining, shortage: remaining < 0 });
   }
   return { data: results, error: null };
+}
+
+// Telegram stock alert for the ops chats. Never throws: a failed alert must not block an order or PO.
+export async function notifyStockAlert(alert: { kind: 'shortage' | 'low' | 'po'; materialName: string; remaining: number; reorderLevel: number; unit?: string | null; reference?: string; poNumber?: string; incomingQuantity?: number }) {
+  try {
+    const unit = alert.unit ? ` ${escapeTelegramHtml(alert.unit)}` : '';
+    const material = escapeTelegramHtml(alert.materialName);
+    const header = alert.kind === 'shortage'
+      ? '🚨 <b>Stock SHORTAGE</b>'
+      : alert.kind === 'low'
+        ? '⚠️ <b>Stock below reorder level</b>'
+        : '📦 <b>PO logged, stock already at reorder level</b>';
+    const lines = [
+      `${header} — ${material}`,
+      `Remaining: ${alert.remaining}${unit} (reorder at ${alert.reorderLevel}${unit})`,
+    ];
+    if (alert.kind === 'po') lines.push(`PO ${escapeTelegramHtml(alert.poNumber || '—')}: incoming ${alert.incomingQuantity ?? '—'}${unit}`);
+    if (alert.reference) lines.push(`Ref: ${escapeTelegramHtml(alert.reference)}`);
+    await sendTelegramMessage(lines.join('\n'));
+  } catch (error) {
+    console.error('stock alert failed:', error instanceof Error ? error.message : error);
+  }
 }
 
 export async function sendTelegramDocument(file: Uint8Array, filename: string, caption: string, mimeType = 'application/pdf') {
