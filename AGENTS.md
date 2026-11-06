@@ -163,6 +163,14 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - executive briefing 6 AM + source export preview (2026-11-06)
+- Commit `ee341fa` on main: executive-briefing cron moved from `0 9 * * *` to `0 22 * * *` UTC (6:00 AM Manila). Briefing header, route comment, test assertion, and checklist updated.
+- `/admin` source export: "Preview & download source ZIP" opens a drawer listing the allowlisted files and showing redacted contents before download. Backed by `?list=1` and `?file=<path>` on `/api/admin/export/source`; the default ZIP is unchanged.
+- Verified: `tsc --noEmit` exit 0 and eslint 0 errors on changed files (4 GB heap); `npm test` (with `--experimental-strip-types`) 486 pass / 0 fail / 1 skipped; `npm run verify:live` 11/11; `/api/health` = `ok`.
+- Prod: `npx vercel --prod --yes` READY (`dpl_4XVXs9tv5TUZhafav1f9XdiFbf2J`), aliased to https://jacket-ai.vercel.app.
+- Open: `.github/workflows/scheduler.yml` still has a stale `0 9 * * *` executive-briefing trigger with no consuming job. Left unchanged (no behavior effect); remove in a later cleanup.
+- Environment: npm reported `ENOSPC: no space left on device` during the Vercel CLI install. Free disk space on the PC before the next deploy.
+
 ## Completion log - CRM sync, stock alerts, executive briefing cron (2026-11-05)
 - Commit `485bf51` on main: Meta leadgen webhook upserts each lead into `crm_contacts` (`facebook` / `leadgen:<id>`). New `app/api/crm/sync/route.ts` is an idempotent daily backfill of `facebook-lead-ad%` leads, cron-authorized, heartbeat `crm-sync`.
 - Stock alerts (Telegram): order deduction fires on a shortage or a downward crossing of `reorder_level`; PO intake fires when stock is at or below reorder level. Alerts never block the deduction or PO. Pure rules in `inventory-alerts-logic.ts`.
