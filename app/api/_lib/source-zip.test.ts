@@ -79,3 +79,30 @@ test('redaction removes configured secrets and token-shaped strings', () => {
   assert.ok(!out.text.includes('AKIAABCDEFGHIJKLMNOP'));
   assert.equal(out.redactions, 1);
 });
+
+test('preview refuses excluded paths and returns redacted content for allowed files', async () => {
+  const { mkdtemp, mkdir, rm, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { listSourceFiles, readSourcePreview } = await import('./source-zip.ts');
+  const root = await mkdtemp(path.join(tmpdir(), 'src-preview-'));
+  try {
+    await mkdir(path.join(root, 'app', 'api'), { recursive: true });
+    await writeFile(path.join(root, 'app', 'page.tsx'), 'const k = "super-secret-service-role-value";');
+    await writeFile(path.join(root, 'app', 'api', 'route.ts'), 'export {}');
+    await writeFile(path.join(root, '.env.local'), 'X=1');
+    const env = { SUPABASE_SERVICE_ROLE_KEY: 'super-secret-service-role-value' };
+
+    const files = (await listSourceFiles(root)).map((f) => f.name);
+    assert.deepEqual(files, ['app/page.tsx']);
+    assert.equal(await readSourcePreview(root, 'app/api/route.ts', env), null);
+    assert.equal(await readSourcePreview(root, '.env.local', env), null);
+    assert.equal(await readSourcePreview(root, '../../etc/passwd', env), null);
+    const preview = await readSourcePreview(root, 'app/page.tsx', env);
+    assert.ok(preview);
+    assert.ok(!preview.content.includes('super-secret-service-role-value'));
+    assert.equal(preview.redactions, 0);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});

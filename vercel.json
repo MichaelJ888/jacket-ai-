@@ -9,7 +9,7 @@
     { "path": "/api/cron/anne-daily-updates", "schedule": "0 0 * * *" },
     { "path": "/api/cron/quota-reminder", "schedule": "0 10 * * 1-6" },
     { "path": "/api/cron/system-health", "schedule": "0 23 * * *" },
-    { "path": "/api/cron/executive-briefing", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/executive-briefing", "schedule": "0 22 * * *" },
     { "path": "/api/crm/sync", "schedule": "0 1 * * *" }
   ]
 }

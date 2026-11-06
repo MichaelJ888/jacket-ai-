@@ -129,8 +129,8 @@ export function buildZip(entries: ZipEntry[], now = new Date()): Uint8Array {
 
 export type CollectedSource = { entries: ZipEntry[]; redactions: number; skipped: string[]; totalBytes: number };
 
-// Walks the allowlisted roots under `root`. Oversized files and anything past the total cap are listed in `skipped`.
-export async function collectSourceEntries(root: string, env: Record<string, string | undefined>): Promise<CollectedSource> {
+// Walks the allowlisted roots under `root` and returns sorted, allowed relative paths with their sizes.
+export async function listSourceFiles(root: string): Promise<Array<{ name: string; size: number }>> {
   const candidates: string[] = [];
   for (const file of SOURCE_ROOT_FILES) candidates.push(file);
   const walk = async (dir: string) => {
@@ -148,15 +148,38 @@ export async function collectSourceEntries(root: string, env: Record<string, str
   };
   for (const dir of SOURCE_DIRS) await walk(dir);
 
-  const entries: ZipEntry[] = [];
-  const skipped: string[] = [];
-  let redactions = 0;
-  let totalBytes = 0;
+  const files: Array<{ name: string; size: number }> = [];
   for (const rel of [...new Set(candidates)].sort()) {
     if (!isSourcePathAllowed(rel)) continue;
     const stat = await fs.stat(path.join(root, rel)).catch(() => null);
     if (!stat?.isFile()) continue;
-    if (stat.size > MAX_FILE_BYTES || totalBytes + stat.size > MAX_TOTAL_BYTES) {
+    files.push({ name: rel, size: stat.size });
+  }
+  return files;
+}
+
+// Returns the redacted text of one allowlisted file for the admin preview, or null if the path is not exportable.
+export async function readSourcePreview(root: string, rel: string, env: Record<string, string | undefined>): Promise<{ content: string; redactions: number; size: number } | null> {
+  const normalized = rel.replace(/\\/g, '/');
+  if (!isSourcePathAllowed(normalized)) return null;
+  const stat = await fs.stat(path.join(root, normalized)).catch(() => null);
+  if (!stat?.isFile() || stat.size > MAX_FILE_BYTES) return null;
+  const raw = await fs.readFile(path.join(root, normalized)).catch(() => null);
+  if (!raw) return null;
+  const redacted = redactSource(raw.toString('utf8'), env);
+  return { content: redacted.text, redactions: redacted.redactions, size: stat.size };
+}
+
+// Collects the allowlisted files for the ZIP. Oversized files and anything past the total cap are listed in `skipped`.
+export async function collectSourceEntries(root: string, env: Record<string, string | undefined>): Promise<CollectedSource> {
+  const files = await listSourceFiles(root);
+
+  const entries: ZipEntry[] = [];
+  const skipped: string[] = [];
+  let redactions = 0;
+  let totalBytes = 0;
+  for (const { name: rel, size } of files) {
+    if (size > MAX_FILE_BYTES || totalBytes + size > MAX_TOTAL_BYTES) {
       skipped.push(rel);
       continue;
     }

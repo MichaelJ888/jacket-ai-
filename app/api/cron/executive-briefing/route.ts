@@ -10,7 +10,7 @@ import { buildExecutiveBriefing } from '../../_lib/order-plan';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// 5:00 PM Manila executive progress briefing for CEO Richard and Ms. Anne (group + direct message).
+// 6:00 AM Manila executive progress briefing for CEO Richard and Ms. Anne (group + direct message).
 export async function GET(request: Request) {
   if (!isCronAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const nowMs = Date.now();

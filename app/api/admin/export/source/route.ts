@@ -1,16 +1,32 @@
 import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../../../_lib/auth';
-import { buildZip, collectSourceEntries } from '../../../_lib/source-zip';
+import { buildZip, collectSourceEntries, listSourceFiles, readSourcePreview } from '../../../_lib/source-zip';
 
 export const dynamic = 'force-dynamic';
 
-// Admin-only: downloads a redacted zip of the UI source (no API routes, env files, media, or secrets).
+function sourceEnv() {
+  return Object.fromEntries(Object.entries(process.env).filter(([, v]) => typeof v === 'string')) as Record<string, string>;
+}
+
+// Admin-only. Default: downloads a redacted zip of the UI source (no API routes, env files, media, or secrets).
+// `?list=1` returns the exportable file list as JSON; `?file=<path>` returns one redacted file as JSON for the preview drawer.
 export async function GET(request: Request) {
   if (!isAdminAuthorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const url = new URL(request.url);
+  if (url.searchParams.get('list') === '1') {
+    const files = await listSourceFiles(process.cwd());
+    return NextResponse.json({ files }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+  const file = url.searchParams.get('file');
+  if (file !== null) {
+    const preview = await readSourcePreview(process.cwd(), file, sourceEnv());
+    if (!preview) return NextResponse.json({ error: 'Not exportable' }, { status: 404 });
+    return NextResponse.json({ name: file, ...preview }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
   const now = new Date();
-  const env = Object.fromEntries(Object.entries(process.env).filter(([, v]) => typeof v === 'string')) as Record<string, string>;
-  const collected = await collectSourceEntries(process.cwd(), env);
+  const collected = await collectSourceEntries(process.cwd(), sourceEnv());
   const manifest = [
     `MJIC site source export generated ${now.toISOString()}`,
     `Files: ${collected.entries.length}`,

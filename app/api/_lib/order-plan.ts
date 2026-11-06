@@ -85,7 +85,7 @@ function section(title: string, items: string[]): string {
   return `\n\n<b>${title} (${items.length})</b>\n${shown.map((line) => `- ${line}`).join('\n')}${more}`;
 }
 
-// 5:00 PM briefing for CEO Richard and Ms. Anne (HTML, Telegram parse mode).
+// 6:00 AM briefing for CEO Richard and Ms. Anne (HTML, Telegram parse mode), prepping the day ahead.
 export function buildExecutiveBriefing(input: { nowMs: number; orders: PlanningOrder[]; updatesLast24h: number }): string {
   const { nowMs, orders, updatesLast24h } = input;
   const today = manilaDateKey(nowMs);
@@ -100,7 +100,7 @@ export function buildExecutiveBriefing(input: { nowMs: number; orders: PlanningO
   const onHold = open.filter((order) => order.stage === 'ON_HOLD');
   const dateLabel = new Date(nowMs).toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
-  let text = `<b>5:00 PM EXECUTIVE PROGRESS BRIEFING</b>\nFor CEO Richard and Ms. Anne · ${escapeTelegramHtml(dateLabel)}\n\nOpen orders: <b>${open.length}</b> · Client updates (24h): <b>${updatesLast24h}</b> · 🚨 Red Alerts: <b>${redAlerts.length}</b>`;
+  let text = `<b>6:00 AM EXECUTIVE PROGRESS BRIEFING</b>\nFor CEO Richard and Ms. Anne · ${escapeTelegramHtml(dateLabel)}\n\nOpen orders: <b>${open.length}</b> · Client updates (24h): <b>${updatesLast24h}</b> · 🚨 Red Alerts: <b>${redAlerts.length}</b>`;
   text += section(
     '🚨 RED ALERT: stuck 48h+',
     redAlerts.map((o) => `${orderTitle(o)} · ${escapeTelegramHtml(stageLabel(o.stage))} · ${Math.floor(stageAgeMs(o, nowMs) / 86400000)}d stuck · Next: ${escapeTelegramHtml(o.next_action_item || 'WALA PA')}`),

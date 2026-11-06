@@ -7,6 +7,7 @@ import CreditsPanel from "./credits-panel";
 import AnalyticsDashboard from "./analytics-dashboard";
 import AutoPilotBadge from "./auto-pilot-badge";
 import MainGoalsPanel from "./main-goals-panel";
+import SourcePreviewDrawer from "./source-preview-drawer";
 
 type Price = { key: string; name: string; category: string; unit: string; unit_cost: number; supplier_name: string | null; updated_at: string };
 type Overview = {
@@ -47,6 +48,7 @@ export default function AdminPage() {
   const [otpPending, setOtpPending] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [panelSize, setPanelSize] = useState<25 | 50 | 75 | 100>(100);
+  const [sourcePreviewOpen, setSourcePreviewOpen] = useState(false);
 
   useEffect(() => {
     const saved = Number(localStorage.getItem("mjic_admin_panel_size"));
@@ -289,10 +291,13 @@ export default function AdminPage() {
           </div>
           <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
           <button type="button" className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm" onClick={() => void exportHtml()}>Export HTML source</button>
-          <button type="button" className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm" onClick={() => void exportSource()}>Download source ZIP</button>
+          <button type="button" className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm" onClick={() => setSourcePreviewOpen(true)}>Preview &amp; download source ZIP</button>
           <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
         </div>
       </div>
+      {sourcePreviewOpen && (
+        <SourcePreviewDrawer token={token} onClose={() => setSourcePreviewOpen(false)} onDownload={() => void exportSource()} />
+      )}
       <MainGoalsPanel token={token} />
       <>
       <nav className="mb-4 flex gap-2">

@@ -63,7 +63,7 @@ test('buildExecutiveBriefing lists red alerts, overdue, and missing plans', () =
       { order_number: 'ORD-4', client_name: 'Smart', project_name: null, stage: 'COMPLETED', stage_entered_at: null, updated_at: null, created_at: null, next_action_item: null, target_completion_date: null },
     ],
   });
-  assert.match(text, /5:00 PM EXECUTIVE PROGRESS BRIEFING/);
+  assert.match(text, /6:00 AM EXECUTIVE PROGRESS BRIEFING/);
   assert.match(text, /Red Alerts: <b>1<\/b>/);
   assert.match(text, /Client updates \(24h\): <b>3<\/b>/);
   assert.match(text, /RED ALERT: stuck 48h\+ \(1\)/);
