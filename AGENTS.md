@@ -382,3 +382,11 @@ px vercel ls.
 - Verified: `npm test` 486 pass / 0 fail / 1 skipped; `npm run verify:live` 11/11; `/api/health` = `ok`. No code changed, so no deploy.
 - Not run live: `boost-advisor` (no dry-run mode; it would send Telegram). Constants verified in code (`BOOST_BUDGET_PESOS=350`, `BOOST_DAYS=2`).
 
+## Completion log - test-run content-plan + boost-advisor check (2026-11-06)
+- No code change, no deploy. Prod `GET /api/cron/content-plan` (bearer auth): HTTP 200, `skipped: calendar already full` (56 upcoming rows in 5 days, threshold 40). No new rows generated.
+- Queue slot audit (read-only, next 5 days): 01:00 UTC video (FB/IG READY, TikTok/YouTube AWAITING_VIDEO), 05:30 picture (FB/IG READY), 10:00 video (same as 01:00), 13:00 picture (FB/IG READY). Strict video/picture alternation matches `POSTING_SLOTS_UTC`. Video-clip source is `mjic-video-ads` via the planner, not re-verified per clip in this pass.
+- `boost-advisor`: not called live (no dry-run; a GET sends a real Telegram message and writes a heartbeat). Verified in code: budget ₱350/day, 2 days, total ₱700, approval button `APPROVE BOOST ₱700`, 9:00 AM PHT header. Ranking and format covered by existing unit tests.
+- Verified: `npx tsc --noEmit --incremental` exit 0; `npm test` 486 pass / 0 fail / 1 skipped; `npm run lint` 0 errors, 6 pre-existing warnings; `npm run verify:live` 11/11; `/api/health` = `ok` (all six checks ok, criticalErrors24h 0, retryQueueBacklog 0).
+- Environment: about 300 MB free RAM during the run. Plain `tsc` was not used; incremental was used.
+- Open: TikTok/YouTube rows on video slots remain AWAITING_VIDEO (video generation blocked by AI Gateway billing, owner action).
+
