@@ -13,9 +13,8 @@ const BUCKET = 'mjic-video-ads';
 const videoDirPath = fileURLToPath(new URL('../public/images/MJIC Facebook Video Ads/', import.meta.url));
 const FILE_SIZE_LIMIT = 50 * 1024 * 1024;
 const PLATFORMS = ['facebook', 'instagram'];
-// Same anti-ban policy as app/api/_lib/content-policy.ts: 4 PHT peaks per day, +/-12 min jitter.
-const POSTING_SLOTS_PHT = ['09:30', '13:30', '16:00', '20:30'];
-const JITTER_MINUTES = 12;
+// Same anti-ban policy as app/api/_lib/content-policy.ts (4 posts/day). Videos fill the two video slots (01:00 and 10:00 UTC = 9:00 AM and 6:00 PM PHT); the other two slots are pictures from the planner.
+const VIDEO_SLOTS_PHT = ['09:00', '18:00'];
 const PHT_OFFSET_MS = 8 * 3600 * 1000;
 const DAY_MS = 24 * 3600 * 1000;
 
@@ -95,12 +94,11 @@ async function scheduleStart() {
   return new Date(phtDayStart + DAY_MS - PHT_OFFSET_MS);
 }
 
-// Slot N: day = floor(N / 4), peak = N % 4. The argument is a UTC instant of PHT midnight.
+// Slot N: day = floor(N / 2), video slot = N % 2. The argument is a UTC instant of PHT midnight. No jitter, so rows stay on the cron triggers.
 function slotTime(phtMidnightUtc, index) {
-  const [hour, minute] = POSTING_SLOTS_PHT[index % POSTING_SLOTS_PHT.length].split(':').map(Number);
-  const jitter = Math.round((Math.random() * 2 - 1) * JITTER_MINUTES);
-  const day = Math.floor(index / POSTING_SLOTS_PHT.length);
-  return new Date(phtMidnightUtc.getTime() + day * DAY_MS + (hour * 60 + minute + jitter) * 60000);
+  const [hour, minute] = VIDEO_SLOTS_PHT[index % VIDEO_SLOTS_PHT.length].split(':').map(Number);
+  const day = Math.floor(index / VIDEO_SLOTS_PHT.length);
+  return new Date(phtMidnightUtc.getTime() + day * DAY_MS + (hour * 60 + minute) * 60000);
 }
 
 // One row per video per platform, each platform keeping its own 4-per-day sequence so the publisher never exceeds its cap.

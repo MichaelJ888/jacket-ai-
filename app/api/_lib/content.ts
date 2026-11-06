@@ -23,8 +23,7 @@ import { SAMPLE_JACKET_IMAGES } from './mjic-prompt';
 import {
   DAY_MS,
   MediaProcessingPending,
-  POSTING_SLOTS_PHT,
-  jitterMinutes,
+  POSTING_SLOTS_UTC,
   maxPostsPerDay,
   quotaKey,
   selectWithinQuota,
@@ -62,10 +61,36 @@ const FALLBACK_IDEAS: IdeaPost[] = [
   { theme: 'team', caption: 'Ang suot ng team ninyo ang mukha ng inyong brand. Custom company jackets at uniforms, delivered nationwide. Request a quote!', hashtags: ['#MJIC', '#CompanyUniform', '#BrandWear'], video: false, videoPrompt: '' },
 ];
 
-// Manila is UTC+8 with no DST.
-function manilaSlot(daysFromToday: number, hourManila: number, minuteManila = 0) {
-  const now = new Date(Date.now() + 8 * 3600 * 1000);
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysFromToday, hourManila - 8, minuteManila, 0));
+// Slot times are UTC; `daysFromToday` counts from today's UTC date.
+function utcSlot(daysFromToday: number, hourUtc: number, minuteUtc = 0) {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysFromToday, hourUtc, minuteUtc, 0));
+}
+
+const VIDEO_BUCKET = 'mjic-video-ads';
+
+async function listBucketVideoUrls(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<string[]> {
+  const storage = supabase.storage.from(VIDEO_BUCKET);
+  const { data, error } = await storage.list('', { limit: 200, sortBy: { column: 'name', order: 'asc' } });
+  if (error) {
+    console.error('listing mjic-video-ads failed:', error.message);
+    return [];
+  }
+  return (data || []).filter((file) => file.name.toLowerCase().endsWith('.mp4')).map((file) => storage.getPublicUrl(file.name).data.publicUrl);
+}
+
+// Picks the bucket video that has been queued the fewest times, so every video rotates before any repeats.
+function leastUsedVideo(videoUrls: string[], useCount: Map<string, number>): string | null {
+  let best: string | null = null;
+  let bestCount = Infinity;
+  for (const url of videoUrls) {
+    const count = useCount.get(url) || 0;
+    if (count < bestCount) {
+      best = url;
+      bestCount = count;
+    }
+  }
+  return best;
 }
 
 const CONTENT_SYSTEM_PROMPT = 'You are the social media manager of MJIC, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write engaging Taglish posts. NEVER state prices, discounts, or delivery promises. Never mention being an AI. The corporate hotlines (Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61) are appended automatically; do not write phone numbers yourself.';
@@ -78,7 +103,7 @@ async function generateIdeas(count: number): Promise<IdeaPost[]> {
     const result = await generateText({
       model: google('gemini-3.6-flash'),
       system: `${CONTENT_SYSTEM_PROMPT} Return ONLY a JSON array.`,
-      prompt: `Create ${count} distinct post ideas as JSON: [{"theme":"...","caption":"max 280 chars, ends with a call to action to message us","hashtags":["#MJIC", "..."],"video":true|false,"videoPrompt":"only if video: a vivid 8-second vertical cinematic scene description, no text overlays"}]. About 1 in 4 should be video. Avoid repeating these recent captions:\n${recent.map((row) => `- ${row.caption}`).join('\n') || '(none yet)'}`,
+      prompt: `Create ${count} distinct post ideas as JSON: [{"theme":"...","caption":"max 280 chars, ends with a call to action to message us","hashtags":["#MJIC", "..."],"video":false,"videoPrompt":""}]. Set "video" to false for every idea; videos come from the ad library. Avoid repeating these recent captions:\n${recent.map((row) => `- ${row.caption}`).join('\n') || '(none yet)'}`,
       abortSignal: AbortSignal.timeout(40000),
     });
     const text = result.text;
@@ -100,44 +125,52 @@ export async function planContent(days = 7) {
   const last = await supabase.from('content_calendar').select('scheduled_at').order('scheduled_at', { ascending: false }).limit(1).maybeSingle();
   const startOffset = last.data ? Math.max(1, Math.ceil((new Date(last.data.scheduled_at).getTime() - Date.now()) / 86400000) + 1) : 1;
 
-  const slotCount = POSTING_SLOTS_PHT.length;
+  const slotCount = POSTING_SLOTS_UTC.length;
   let ideas = await generateIdeas(days * slotCount);
   if (!ideas.length) ideas = FALLBACK_IDEAS;
-  const maxVideosPerWeek = Number(process.env.CONTENT_VIDEOS_PER_WEEK || 2);
-  let videosLeft = maxVideosPerWeek;
 
-  // One idea per posting slot; each idea fans out to every platform at that slot's time.
-  // Each slot gets a small random offset so posts do not land on a fixed, bot-like minute.
+  // Video slots draw from the bucket, rotating through the least-used clips. A video slot with no clip available is skipped
+  // rather than filled with a picture, so the posted sequence keeps strict video/picture alternation.
+  const bucketVideos = await listBucketVideoUrls(supabase);
+  const usedRows = await supabase.from('content_calendar').select('media_url').like('media_url', `%/${VIDEO_BUCKET}/%`);
+  const useCount = new Map<string, number>();
+  for (const row of usedRows.data || []) useCount.set(row.media_url, (useCount.get(row.media_url) || 0) + 1);
+
   const rows: Array<Record<string, unknown>> = [];
+  let skippedVideoSlots = 0;
   for (let day = 0; day < days; day += 1) {
     for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
-      const slot = POSTING_SLOTS_PHT[slotIndex];
+      const slot = POSTING_SLOTS_UTC[slotIndex];
       const ideaIndex = day * slotCount + slotIndex;
       const idea = ideas[ideaIndex % ideas.length];
-      const isVideo = idea.video && videosLeft > 0;
-      if (isVideo) videosLeft -= 1;
-      const imageUrl = `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + ideaIndex) % SAMPLE_JACKET_IMAGES.length]}`;
-      const videoPrompt = isVideo ? idea.videoPrompt : null;
-      const scheduledAt = manilaSlot(startOffset + day, slot.hour, slot.minute + jitterMinutes(12)).toISOString();
+      const video = slot.kind === 'video' ? leastUsedVideo(bucketVideos, useCount) : null;
+      if (slot.kind === 'video' && !video) {
+        skippedVideoSlots += 1;
+        continue;
+      }
+      if (video) useCount.set(video, (useCount.get(video) || 0) + 1);
+      const mediaUrl = video || `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + ideaIndex) % SAMPLE_JACKET_IMAGES.length]}`;
+      const scheduledAt = utcSlot(startOffset + day, slot.hour, slot.minute).toISOString();
 
-      const platforms: Platform[] = isVideo ? ['facebook', 'instagram', 'youtube', 'tiktok'] : ['facebook', 'instagram'];
-      for (const platform of platforms) {
+      // Each slot fans out to Facebook and Instagram at the same time; each platform gets 2 videos + 2 pictures per day.
+      for (const platform of ['facebook', 'instagram'] as Platform[]) {
         rows.push({
           platform,
-          media_type: isVideo ? 'video' : 'image',
+          media_type: video ? 'video' : 'image',
           caption: idea.caption,
           hashtags: idea.hashtags,
-          video_prompt: videoPrompt,
-          media_url: isVideo ? null : imageUrl,
+          video_prompt: null,
+          media_url: mediaUrl,
           scheduled_at: scheduledAt,
-          status: isVideo ? 'AWAITING_VIDEO' : 'READY',
+          status: 'READY',
         });
       }
     }
   }
 
+  if (!rows.length) return { created: 0, error: null, skippedVideoSlots };
   const { error } = await supabase.from('content_calendar').insert(rows);
-  return { created: error ? 0 : rows.length, error: error?.message || null };
+  return { created: error ? 0 : rows.length, error: error?.message || null, skippedVideoSlots };
 }
 
 async function startVideos(limit: number, errors: string[]) {

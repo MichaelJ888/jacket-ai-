@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
 import { planContent } from '../../_lib/content';
-import { POSTING_SLOTS_PHT } from '../../_lib/content-policy';
+import { POSTING_SLOTS_UTC } from '../../_lib/content-policy';
 import { getSupabaseAdmin } from '../../_lib/integrations';
 
 export const dynamic = 'force-dynamic';
@@ -17,8 +17,8 @@ export async function GET(request: Request) {
   const upcoming = supabase
     ? await supabase.from('content_calendar').select('id', { count: 'exact', head: true }).gte('scheduled_at', new Date().toISOString()).lte('scheduled_at', horizon)
     : null;
-  // Each slot yields at least 2 rows (FB + IG), so 5 days of slots needs this many rows.
-  if ((upcoming?.count || 0) >= POSTING_SLOTS_PHT.length * 2 * 5) return NextResponse.json({ success: true, skipped: 'calendar already full', upcoming: upcoming?.count });
+  // Each slot yields 2 rows (FB + IG), so 5 days of slots needs this many rows.
+  if ((upcoming?.count || 0) >= POSTING_SLOTS_UTC.length * 2 * 5) return NextResponse.json({ success: true, skipped: 'calendar already full', upcoming: upcoming?.count });
   const result = await planContent(7);
   await recordHeartbeat('content-plan', result.error ? 'error' : 'ok', result);
   return NextResponse.json({ success: !result.error, ...result });

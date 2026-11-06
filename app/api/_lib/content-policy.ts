@@ -1,11 +1,13 @@
 // Pure posting-policy rules for the content publisher. No I/O, so they are unit-tested directly.
 
-// Peak-engagement slots in Manila time (UTC+8).
-export const POSTING_SLOTS_PHT: ReadonlyArray<{ hour: number; minute: number }> = [
-  { hour: 9, minute: 30 },
-  { hour: 13, minute: 30 },
-  { hour: 16, minute: 0 },
-  { hour: 20, minute: 30 },
+// Four daily posting slots in UTC (= 9:00 AM, 1:30 PM, 6:00 PM, 9:00 PM Manila). They use the full 4-post
+// Meta quota, and the cron triggers match these exact times, so no jitter is applied.
+// Video and picture slots strictly alternate: index 0 and 2 are video, 1 and 3 are pictures.
+export const POSTING_SLOTS_UTC: ReadonlyArray<{ hour: number; minute: number; kind: 'video' | 'picture' }> = [
+  { hour: 1, minute: 0, kind: 'video' },
+  { hour: 5, minute: 30, kind: 'picture' },
+  { hour: 10, minute: 0, kind: 'video' },
+  { hour: 13, minute: 0, kind: 'picture' },
 ];
 
 // Hard ceiling per platform (Meta anti-spam). CONTENT_MAX_POSTS_PER_DAY can lower it but never raise it.
@@ -25,11 +27,6 @@ export function maxPostsPerDay(raw: string | undefined): number {
   const parsed = Math.floor(Number(raw));
   if (!Number.isFinite(parsed) || parsed < 1) return HARD_MAX_POSTS_PER_DAY;
   return Math.min(parsed, HARD_MAX_POSTS_PER_DAY);
-}
-
-// Random offset in whole minutes within +/- maxMinutes. `random` is injectable for tests.
-export function jitterMinutes(maxMinutes = 12, random: () => number = Math.random): number {
-  return Math.round((random() * 2 - 1) * maxMinutes);
 }
 
 // Posts still allowed for one platform in the rolling 24h window.

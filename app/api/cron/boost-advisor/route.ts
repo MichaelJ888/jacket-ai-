@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { isCronAuthorized } from '../../_lib/auth';
 import { recordHeartbeat } from '../../_lib/ceo-finance';
-import { BOOST_BUDGET_PESOS, BOOST_TOTAL_PESOS, boostKeyboard } from '../../_lib/boost-approval-logic.ts';
+import { BOOST_BUDGET_PESOS, BOOST_DAYS, BOOST_TOTAL_PESOS, boostKeyboard } from '../../_lib/boost-approval-logic.ts';
 import { escapeTelegramHtml, getSupabaseAdmin, sendTelegramMessage } from '../../_lib/integrations';
 import { getPageToken } from '../../_lib/meta-pages';
 import { checkMetaPublishing } from '../../_lib/meta-publishing';
@@ -82,14 +82,14 @@ export async function GET(request: Request) {
 
   const now = new Date();
   const { start, end } = manilaDayRange(now);
-  const since24Hours = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+  const since48Hours = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
   const [recent, today] = await Promise.all([
     supabase
       .from('content_calendar')
       .select('id, platform, media_type, caption, status, scheduled_at, published_at, external_post_id, post_url')
       .eq('status', 'PUBLISHED')
       .in('platform', ['facebook', 'instagram'])
-      .gte('published_at', since24Hours)
+      .gte('published_at', since48Hours)
       .not('external_post_id', 'is', null)
       .order('published_at', { ascending: false })
       .limit(12),
@@ -110,7 +110,7 @@ export async function GET(request: Request) {
   const recentRows = (recent.data || []) as Candidate[];
   const candidates = recentRows.length ? recentRows : (today.data || []) as Candidate[];
   if (!candidates.length) {
-    await sendTelegramMessage(`<b>BOOST ADVISOR</b>\nWalang published post sa nakaraang 24 oras o naka-schedule ngayong araw.`);
+    await sendTelegramMessage(`<b>BOOST ADVISOR</b>\nWalang published post sa nakaraang 48 oras o naka-schedule ngayong araw.`);
     await recordHeartbeat('boost-advisor', 'ok', { candidates: 0 });
     return NextResponse.json({ success: true, candidates: 0 });
   }
@@ -138,20 +138,20 @@ export async function GET(request: Request) {
   const when = new Date(best.published_at || best.scheduled_at).toLocaleTimeString('en-PH', { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit' });
   const metricLabel = best.platform === 'facebook' ? 'total media views' : 'reach';
   const strategy = engagementAvailable
-    ? `Batay sa Meta engagement ng post sa nakaraang 24 oras (${metricLabel}: ${best.reach ?? 'n/a'}, shares: ${best.shares ?? 'n/a'}).`
+    ? `Batay sa Meta engagement ng post sa nakaraang 48 oras (${metricLabel}: ${best.reach ?? 'n/a'}, shares: ${best.shares ?? 'n/a'}).`
     : `Hindi available ang insights ngayon; weekday focus (${fallbackTheme}) ang ginamit bilang fallback.`;
   const organicCaveat = best.platform === 'facebook'
     ? `Note: Facebook API ay nagbibigay ng total unique media views, hindi organic-only unique reach.`
     : '';
   const lines = [
-    `<b>BOOST ADVISOR (9:30 AM)</b>`,
+    `<b>BOOST ADVISOR (9:00 AM PHT)</b>`,
     `Pinakamagandang post: <b>${escapeTelegramHtml(best.platform.toUpperCase())}</b> (${escapeTelegramHtml(best.media_type)}, ${escapeTelegramHtml(when)})`,
     escapeTelegramHtml(best.caption.slice(0, 300)),
     best.post_url ? escapeTelegramHtml(best.post_url) : '',
     escapeTelegramHtml(strategy),
     organicCaveat,
     '',
-    `<b>Rekomendasyon:</b> I-boost ng <b>P${BOOST_BUDGET_PESOS}/araw</b> x 2 araw = <b>P${BOOST_TOTAL_PESOS}</b> total sa Meta Ads Manager.`,
+    `<b>Recommended Budget: ₱${BOOST_BUDGET_PESOS}/day for ${BOOST_DAYS} days (Total: ₱${BOOST_TOTAL_PESOS})</b> sa Meta Ads Manager.`,
     `Meta readiness: <b>${readiness.ok ? 'READY' : 'PAUSED'}</b> (${escapeTelegramHtml(readiness.reason)})`,
     `SEO focus: ${escapeTelegramHtml(seoHashtags([]).slice(0, 4).join(' '))} (keyword coverage ${Math.round(keywordCoverage(best.caption) * 100)}%)`,
     `Tap <b>APPROVE</b> para i-record ang approval ng CEO. Walang automatic spend; ang bayad ay manual pa rin sa Ads Manager.`,

@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   HARD_MAX_POSTS_PER_DAY,
-  POSTING_SLOTS_PHT,
-  jitterMinutes,
+  POSTING_SLOTS_UTC,
   maxPostsPerDay,
   remainingDailyQuota,
   selectWithinQuota,
@@ -18,8 +17,13 @@ test('contact footer appends all three hotlines once', () => {
   assert.equal(withContactFooter(once), once);
 });
 
-test('posting slots are the four PHT peak times', () => {
-  assert.deepEqual(POSTING_SLOTS_PHT.map((slot) => `${slot.hour}:${String(slot.minute).padStart(2, '0')}`), ['9:30', '13:30', '16:00', '20:30']);
+test('posting slots are the four UTC times (9 AM, 1:30 PM, 6 PM, 9 PM Manila)', () => {
+  assert.deepEqual(POSTING_SLOTS_UTC.map((slot) => `${slot.hour}:${String(slot.minute).padStart(2, '0')}`), ['1:00', '5:30', '10:00', '13:00']);
+});
+
+test('video and picture slots strictly alternate every day', () => {
+  assert.deepEqual(POSTING_SLOTS_UTC.map((slot) => slot.kind), ['video', 'picture', 'video', 'picture']);
+  assert.equal(POSTING_SLOTS_UTC.length, HARD_MAX_POSTS_PER_DAY);
 });
 
 test('maxPostsPerDay never exceeds the hard cap of 4', () => {
@@ -28,16 +32,6 @@ test('maxPostsPerDay never exceeds the hard cap of 4', () => {
   assert.equal(maxPostsPerDay('2'), 2);
   assert.equal(maxPostsPerDay('0'), 4);
   assert.equal(maxPostsPerDay('abc'), 4);
-});
-
-test('jitter stays within the window and is bounded by the injected random source', () => {
-  assert.equal(jitterMinutes(12, () => 0), -12);
-  assert.equal(jitterMinutes(12, () => 1), 12);
-  assert.equal(jitterMinutes(12, () => 0.5), 0);
-  for (let i = 0; i < 200; i += 1) {
-    const value = jitterMinutes(12);
-    assert.ok(value >= -12 && value <= 12);
-  }
 });
 
 test('remaining quota floors at zero', () => {
