@@ -163,6 +163,16 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - 4-slot UTC posting + 9 AM boost advisor (2026-11-06)
+- Commit `ba4c6f8` on main (pushed `f2cd76f..ba4c6f8`). Prod deploy `dpl_4DbA5HSiYUSRMkxt5qv6GFy733ww` Ready, aliased to https://jacket-ai.vercel.app.
+- Posting: `content-publisher` runs at 01:00 UTC (9 AM PHT, video), 05:30 (1:30 PM, picture), 10:00 (6 PM, video), 13:00 (9 PM, picture), via `vercel.json` and `scheduler.yml`. Retired the 03/07/17/19/22 UTC content slot jobs (`if: false`; their YAML blocks remain, see open items). Video and picture slots alternate. Video slots use the least-used `mjic-video-ads` clip and are skipped when the bucket is empty, not filled with a picture.
+- Boost advisor: moved to 01:00 UTC (9 AM PHT), 48h window, alert reads `Recommended Budget: ₱350/day for 2 days (Total: ₱700)`. Spend is still manual; no Marketing API boost.
+- Verified: `tsc --noEmit` exit 0; `npm test` 486 pass / 0 fail / 1 skipped; `npm run lint` 0 errors (6 pre-existing warnings); `npm run verify:live` 11/11; `/api/health` `ok` (0 critical, 0 retry backlog).
+- Not done / not verified: PhilGEPS/BIR accreditation wording (not in the repo, not added); Telegram alert and Meta insights not triggered live; `mjic-video-ads` bucket public access not checked.
+- Open: C: drive ran out of space during deploy (`ENOSPC`); cleared npm cache (about 300 MB) and deploy succeeded, but only about 6 GB is free. `.next` is about 570 MB. Five retired jobs remain in `scheduler.yml` with `if: false` because the file's auth lines could not be edited safely; delete them in a follow-up.
+- Existing READY rows at old PHT times still publish under the 4-per-24h cap.
+
+
 ## Completion log - Admin architecture tab (2026-11-06)
 - Commit `07fdf11` on main: new "Architecture" tab in `/admin` (`app/admin/architecture-panel.tsx`) renders a live Mermaid flowchart client-side via dynamic import. Covers lead ingestion, content engine, cron automation (Vercel `0 22 * * *` UTC = 06:00 Manila), and order/stock sync. Added `mermaid@^12.3.0`.
 - Verified: `npx tsc --noEmit` clean; eslint clean on changed files; `npm test` 486 pass / 0 fail / 1 skipped; `npm run build` (webpack) passes.
