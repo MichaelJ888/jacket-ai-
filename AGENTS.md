@@ -365,3 +365,12 @@ px vercel ls.
 - Known limitation: rows that already have `media_generation_id` are not restarted by `startVideos` (it filters on `media_generation_id IS NULL`); a billing failure on a row already in flight leaves it in its current state until the existing missed-slot sweep.
 - Open (account owner action): Vercel AI Gateway still needs a credit card before video generation can run; `content-publisher` and `sales-followups` heartbeats are unchanged by this pass.
 
+## Completion log - MJIC autonomous auto-run check (2026-11-06)
+- No code change. Commit `e090a9e` (4 UTC slots + 9 AM boost advisor) is the deployed baseline.
+- `GET /api/cron/content-plan` (prod, bearer auth): HTTP 200, `skipped: calendar already full` (76 upcoming rows, threshold 40). The planner did not generate new rows.
+- Queue audit (read-only): about 500+ upcoming `content_calendar` rows sit at 9 legacy times (17:00, 19:00, 22:00, 01:00, 03:00, 05:30, 07:00, 10:00, 13:00 UTC). 468 are READY, 32 are AWAITING_VIDEO. Only 17:00 and 05:30 UTC carry videos. This breaks the 4-slot video/picture alternation (`POSTING_SLOTS_UTC` = 01:00 video, 05:30 picture, 10:00 video, 13:00 picture). The planner's "full" check counts these stale rows, so it never adds the new slots. Not changed: rescheduling or deleting live queue rows needs owner approval.
+- `boost-advisor`: not called live. The route has no dry-run mode and sends a real Telegram message plus a heartbeat. Constants verified in code: `BOOST_BUDGET_PESOS = 350`, `BOOST_DAYS = 2`. Format and ranking are covered by existing unit tests.
+- Verified: `npm test` 486 pass / 0 fail / 1 skipped; `npx tsc --noEmit --incremental` exit 0. The plain `tsc` run hit a JS heap / memory failure because the PC had about 250-320 MB free RAM at the time.
+- `npm run verify:live` 11/11; `/api/health` = `ok` (criticalErrors24h 0, retryQueueBacklog 0, DB and storage ok).
+- Open: queue realignment to the 4 UTC slots (owner decision). Video alternation against `mjic-video-ads` is not fully verified because the queue does not follow the new slots.
+
