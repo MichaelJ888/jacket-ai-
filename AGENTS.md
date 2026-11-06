@@ -374,3 +374,11 @@ px vercel ls.
 - `npm run verify:live` 11/11; `/api/health` = `ok` (criticalErrors24h 0, retryQueueBacklog 0, DB and storage ok).
 - Open: queue realignment to the 4 UTC slots (owner decision). Video alternation against `mjic-video-ads` is not fully verified because the queue does not follow the new slots.
 
+## Completion log - queue reschedule to 4 UTC slots (2026-11-06)
+- Owner chose Option 1. Moved all 556 upcoming `content_calendar` rows onto `POSTING_SLOTS_UTC`: video rows to 01:00/10:00, picture rows to 05:30/13:00, max 2 per slot-type per platform per day. Result: 556 ok, 0 failed; verify mismatches 0; off-grid 0.
+- Rollback source: session file `reschedule-backup-before.json` (original `scheduled_at` values). Script: `reschedule-queue.mjs`.
+- Horizon: video rows (FB/IG 26 each) run to 2026-11-19; picture rows (FB/IG 244 each) run to 2027-03-08 (about 122 days). Caption repetition (4 picture captions reused across the queue) predates this change and is unchanged.
+- AWAITING_VIDEO rows (8 per platform) now sit in video slots until video generation is unblocked (AI Gateway billing).
+- Verified: `npm test` 486 pass / 0 fail / 1 skipped; `npm run verify:live` 11/11; `/api/health` = `ok`. No code changed, so no deploy.
+- Not run live: `boost-advisor` (no dry-run mode; it would send Telegram). Constants verified in code (`BOOST_BUDGET_PESOS=350`, `BOOST_DAYS=2`).
+
