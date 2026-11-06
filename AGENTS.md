@@ -163,6 +163,12 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - Admin architecture tab (2026-11-06)
+- Commit `07fdf11` on main: new "Architecture" tab in `/admin` (`app/admin/architecture-panel.tsx`) renders a live Mermaid flowchart client-side via dynamic import. Covers lead ingestion, content engine, cron automation (Vercel `0 22 * * *` UTC = 06:00 Manila), and order/stock sync. Added `mermaid@^12.3.0`.
+- Verified: `npx tsc --noEmit` clean; eslint clean on changed files; `npm test` 486 pass / 0 fail / 1 skipped; `npm run build` (webpack) passes.
+- Deploy: `npx vercel --prod --yes` produced `dpl_8B7ifukXvvV7HWQDrXmV11ZXH7GT`, status Ready, aliased to https://jacket-ai.vercel.app. `verify:live` 11/11; `/api/health` = `ok` (0 critical errors, 0 retry backlog, DB and storage ok).
+- Ops note: C: drive hit 0 bytes free during the build (ENOSPC). Cleared the regenerable `.next` cache (about 1 GB) with owner approval. Lockfile diff is large (about 1,400 lines) from the npm rewrite.
+
 ## Completion log - executive briefing 6 AM + source export preview (2026-11-06)
 - Commit `ee341fa` on main: executive-briefing cron moved from `0 9 * * *` to `0 22 * * *` UTC (6:00 AM Manila). Briefing header, route comment, test assertion, and checklist updated.
 - `/admin` source export: "Preview & download source ZIP" opens a drawer listing the allowlisted files and showing redacted contents before download. Backed by `?list=1` and `?file=<path>` on `/api/admin/export/source`; the default ZIP is unchanged.
