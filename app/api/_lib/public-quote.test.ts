@@ -28,6 +28,30 @@ test('quantity above the public cap is rejected', () => {
   assert.throws(() => buildPublicQuote({ ...base, quantity: 100001 }), PublicQuoteError);
 });
 
+test('core apparel MOQ is 20 for scrub suits, and bracket labels are returned', () => {
+  assert.throws(() => buildPublicQuote({ ...base, category: 'scrub-suit', quantity: 19 }), PublicQuoteError);
+  const scrub = buildPublicQuote({ ...base, category: 'scrub-suit', quantity: 20 });
+  assert.equal(scrub.kind === 'quote' ? scrub.bracket : 'sales', '20–49 pcs');
+});
+
+test('modular add-ons are priced per piece into the formal quote and unknown add-ons are rejected', () => {
+  const plain = buildPublicQuote({ ...base });
+  assert.equal(plain.kind, 'quote');
+  if (plain.kind !== 'quote') return;
+  assert.equal(plain.quote.addOns.modularAddOns, 0);
+
+  const withAddOns = buildPublicQuote({ ...base, addOns: ['embroidery', 'inner-lining'] });
+  assert.equal(withAddOns.kind, 'quote');
+  if (withAddOns.kind !== 'quote') return;
+  assert.equal(withAddOns.quote.addOns.modularAddOns, 110);
+  assert.equal(withAddOns.quote.unitPrice, withAddOns.quote.garmentUnit + withAddOns.quote.addOns.perPiece);
+  assert.equal(withAddOns.quote.addOnSubtotal, withAddOns.quote.addOns.perPiece * 50);
+  assert.deepEqual(withAddOns.request.addOns, ['embroidery', 'inner-lining']);
+
+  assert.throws(() => buildPublicQuote({ ...base, addOns: ['glitter'] }), PublicQuoteError);
+});
+
+
 test('T-Shirt and Company Uniform return a sales-confirmation result, not a price', () => {
   for (const category of ['t-shirt', 'company-uniform']) {
     const result = buildPublicQuote({ ...base, category });

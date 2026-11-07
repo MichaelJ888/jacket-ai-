@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { computeFormalQuote, PAYMENT_DETAILS, PAYMENT_TERMS, TERMS } from '../api/_lib/formal-quote';
 import { resolveFabricClass } from '../api/_lib/fabric-class';
 import { FABRIC_OPTIONS } from '../api/_lib/mjic-pricelist';
-import { seedPricelist, tierPrice, type PricelistCategory } from '../api/_lib/pricelist-logic';
+import { categoryMinQuantity, MODULAR_ADD_ONS, seedPricelist, tierPrice, type ModularAddOnKey, type PricelistCategory } from '../api/_lib/pricelist-logic';
 import { MOQ_PIECES } from '../api/_lib/pricing-logic';
 
 const OTHER = '__other__';
@@ -31,6 +31,7 @@ export default function QuotePage() {
   const [hood, setHood] = useState(false);
   const [threeTone, setThreeTone] = useState(false);
   const [fullSublimation, setFullSublimation] = useState(false);
+  const [addOns, setAddOns] = useState<ModularAddOnKey[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [customerContact, setCustomerContact] = useState('');
   const [productName, setProductName] = useState('');
@@ -43,8 +44,8 @@ export default function QuotePage() {
   // Class follows the strict fabric rule (same helper the server uses); the customer does not choose it.
   const productClass = resolveFabricClass(fabricName);
 
-  // Each category's MOQ is its official tier floor when it has one (polo/coverall/chef/security from 5 pcs), else the company-wide MOQ.
-  const minQty = (cat?: PricelistCategory) => (cat && cat.tiers.length ? Math.min(...cat.tiers.map((tier) => tier.min)) : MOQ_PIECES);
+  // Core apparel MOQ is 20; other categories keep their official tier floor (see categoryMinQuantity).
+  const minQty = (cat?: PricelistCategory) => (cat ? categoryMinQuantity(cat) : MOQ_PIECES);
   const activeCategory = catalog.find((c) => c.key === category);
   const activeMinQty = minQty(activeCategory);
 
@@ -80,8 +81,9 @@ export default function QuotePage() {
       threeTone,
       isTshirt: category === 't-shirt',
       isFullSublimation: fullSublimation,
+      modularAddOnsPerPiece: addOns.reduce((sum, key) => sum + MODULAR_ADD_ONS[key].perPiece, 0),
     });
-  }, [unitPrice, fabricName, quantity, frontLogos, backLogos, reversible, hood, threeTone, category, fullSublimation]);
+  }, [unitPrice, fabricName, quantity, frontLogos, backLogos, reversible, hood, threeTone, category, fullSublimation, addOns]);
 
   // Returning client: ?client=<token> shows every quote previously issued to them.
   useEffect(() => {
@@ -115,6 +117,7 @@ export default function QuotePage() {
           hood,
           threeTone,
           isFullSublimation: fullSublimation,
+          addOns,
         }),
       });
       const data = await res.json();
@@ -217,6 +220,16 @@ export default function QuotePage() {
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={hood} onChange={(e) => setHood(e.target.checked)} /> Hood</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={threeTone} onChange={(e) => setThreeTone(e.target.checked)} /> Three-tone</label>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={fullSublimation} onChange={(e) => setFullSublimation(e.target.checked)} /> Full sublimation</label>
+            {(Object.keys(MODULAR_ADD_ONS) as ModularAddOnKey[]).map((key) => (
+              <label key={key} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={addOns.includes(key)}
+                  onChange={(e) => setAddOns((prev) => (e.target.checked ? [...prev, key] : prev.filter((k) => k !== key)))}
+                />
+                {MODULAR_ADD_ONS[key].label} (+₱{MODULAR_ADD_ONS[key].perPiece}/pc)
+              </label>
+            ))}
           </fieldset>
 
           <div className="grid gap-4 sm:grid-cols-2">

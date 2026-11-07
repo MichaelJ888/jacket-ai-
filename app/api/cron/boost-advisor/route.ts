@@ -80,6 +80,8 @@ export async function GET(request: Request) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Supabase is not configured' }, { status: 500 });
 
+  // ?dry_run=1 builds the payload and logs telemetry under a separate heartbeat name, without calling the Telegram API.
+  const dryRun = new URL(request.url).searchParams.get('dry_run') === '1';
   const now = new Date();
   const { start, end } = manilaDayRange(now);
   const since48Hours = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
@@ -110,6 +112,10 @@ export async function GET(request: Request) {
   const recentRows = (recent.data || []) as Candidate[];
   const candidates = recentRows.length ? recentRows : (today.data || []) as Candidate[];
   if (!candidates.length) {
+    if (dryRun) {
+      await recordHeartbeat('boost-advisor:dry-run', 'ok', { candidates: 0 });
+      return NextResponse.json({ success: true, dry_run: true, candidates: 0, payload: null });
+    }
     await sendTelegramMessage(`<b>BOOST ADVISOR</b>\nWalang published post sa nakaraang 48 oras o naka-schedule ngayong araw.`);
     await recordHeartbeat('boost-advisor', 'ok', { candidates: 0 });
     return NextResponse.json({ success: true, candidates: 0 });
@@ -156,6 +162,12 @@ export async function GET(request: Request) {
     `SEO focus: ${escapeTelegramHtml(seoHashtags([]).slice(0, 4).join(' '))} (keyword coverage ${Math.round(keywordCoverage(best.caption) * 100)}%)`,
     `Tap <b>APPROVE</b> para i-record ang approval ng CEO. Walang automatic spend; ang bayad ay manual pa rin sa Ads Manager.`,
   ].filter(Boolean);
+
+  if (dryRun) {
+    const payload = { text: lines.join('\n'), replyMarkup: boostKeyboard(best.id) };
+    await recordHeartbeat('boost-advisor:dry-run', 'ok', { candidates: candidates.length, platform: best.platform, engagementAvailable, weekday });
+    return NextResponse.json({ success: true, dry_run: true, payload });
+  }
 
   const sent = await sendTelegramMessage(lines.join('\n'), boostKeyboard(best.id));
   if (!sent) {

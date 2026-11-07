@@ -56,6 +56,8 @@ export type FormalQuoteInput = {
   isFullSublimation: boolean;
   discountPesos?: number; // fixed peso amount, subtracted from the final total
   signatory?: SignatoryKey;
+  // Modular customization add-ons (embroidery, vinyl, screen print, etc.), per piece. See MODULAR_ADD_ONS in pricelist-logic.ts.
+  modularAddOnsPerPiece?: number;
 };
 
 function whole(value: unknown) {
@@ -85,7 +87,8 @@ export function computeFormalQuote(input: FormalQuoteInput) {
   const hood = input.hood ? HOOD_FEE : 0;
   const threeTone = input.threeTone && !input.isTshirt ? THREE_TONE_FEE : 0;
 
-  const addOnsPerPiece = surcharge + extraFront + backCharge + reversible + hood + threeTone;
+  const modularPerPiece = Math.max(0, whole(input.modularAddOnsPerPiece));
+  const addOnsPerPiece = surcharge + extraFront + backCharge + reversible + hood + threeTone + modularPerPiece;
   const unitPrice = garmentUnit + addOnsPerPiece;
 
   // The first front logo is included in the program; every other logo location is charged.
@@ -117,6 +120,7 @@ export function computeFormalQuote(input: FormalQuoteInput) {
       reversible,
       hood,
       threeTone,
+      modularAddOns: modularPerPiece,
       perPiece: addOnsPerPiece,
     },
     unitPrice,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { normalizeCategoryInput, seedPricelist, tierPrice } from './pricelist-logic.ts';
+import { calculateQuote, normalizeCategoryInput, seedPricelist, tierPrice, volumeBracket, QuoteValidationError } from './pricelist-logic.ts';
 
 const tiers = [
   { min: 5, max: 20, price: 800 },
@@ -48,3 +48,33 @@ test('normalizeCategoryInput rejects bad keys, labels, quantities, prices, and o
     /overlap/,
   );
 });
+
+test('volumeBracket labels the four corporate brackets and returns null below 20', () => {
+  assert.equal(volumeBracket(19), null);
+  assert.equal(volumeBracket(20), '20–49 pcs');
+  assert.equal(volumeBracket(49), '20–49 pcs');
+  assert.equal(volumeBracket(50), '50–99 pcs');
+  assert.equal(volumeBracket(150), '100–249 pcs');
+  assert.equal(volumeBracket(250), '250+ pcs');
+});
+
+test('calculateQuote enforces MOQ 20 for core apparel and keeps official floors elsewhere', () => {
+  const catalog = seedPricelist().categories;
+  const jacket = catalog.find((c) => c.key === 'jacket')!;
+  const scrub = catalog.find((c) => c.key === 'scrub-suit')!;
+  const polo = catalog.find((c) => c.key === 'polo-shirt')!;
+  assert.throws(() => calculateQuote({ category: jacket, quantity: 19 }), QuoteValidationError);
+  assert.equal(calculateQuote({ category: jacket, quantity: 20 }).minQuantity, 20);
+  assert.throws(() => calculateQuote({ category: scrub, quantity: 19 }), QuoteValidationError);
+  assert.equal(calculateQuote({ category: polo, quantity: 5 }).minQuantity, 5);
+});
+
+test('calculateQuote adds modular add-ons per piece and rejects unknown keys', () => {
+  const jacket = seedPricelist().categories.find((c) => c.key === 'jacket')!;
+  const priced = calculateQuote({ category: jacket, quantity: 50, addOns: ['embroidery', 'vinyl-print', 'embroidery'] });
+  assert.deepEqual(priced.addOns, ['embroidery', 'vinyl-print']);
+  assert.equal(priced.addOnPerPiece, 90);
+  assert.equal(priced.bracket, '50–99 pcs');
+  assert.throws(() => calculateQuote({ category: jacket, quantity: 50, addOns: ['glitter'] }), QuoteValidationError);
+});
+

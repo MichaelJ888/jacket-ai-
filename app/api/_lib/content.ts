@@ -173,9 +173,35 @@ export async function planContent(days = 7) {
   return { created: error ? 0 : rows.length, error: error?.message || null, skippedVideoSlots };
 }
 
+// When AI video generation is unavailable (no gateway key or credit limit hit), AWAITING_VIDEO slots take ready clips
+// from the bucket instead, so the slot still posts a video and the video/picture alternation holds.
+async function fallbackAwaitingVideosToBucket(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<number> {
+  const pending = await supabase.from('content_calendar').select('id').eq('status', 'AWAITING_VIDEO').is('media_generation_id', null).order('scheduled_at');
+  if (!pending.data?.length) return 0;
+  const videoUrls = await listBucketVideoUrls(supabase);
+  if (!videoUrls.length) return 0;
+  const usedRows = await supabase.from('content_calendar').select('media_url').like('media_url', `%/${VIDEO_BUCKET}/%`);
+  const useCount = new Map<string, number>();
+  for (const row of usedRows.data || []) useCount.set(row.media_url, (useCount.get(row.media_url) || 0) + 1);
+
+  let moved = 0;
+  for (const row of pending.data) {
+    const url = leastUsedVideo(videoUrls, useCount);
+    if (!url) break;
+    useCount.set(url, (useCount.get(url) || 0) + 1);
+    const { error } = await supabase.from('content_calendar').update({ status: 'READY', media_type: 'video', media_url: url, video_prompt: null, error: null }).eq('id', row.id).eq('status', 'AWAITING_VIDEO');
+    if (!error) moved += 1;
+  }
+  return moved;
+}
+
 async function startVideos(limit: number, errors: string[]) {
   const supabase = getSupabaseAdmin();
-  if (!supabase || !process.env.AI_GATEWAY_API_KEY) return 0;
+  if (!supabase) return 0;
+  if (!process.env.AI_GATEWAY_API_KEY) {
+    await fallbackAwaitingVideosToBucket(supabase);
+    return 0;
+  }
   const { data } = await supabase.from('content_calendar').select('id, video_prompt, scheduled_at').eq('status', 'AWAITING_VIDEO').is('media_generation_id', null).lte('scheduled_at', new Date(Date.now() + 3 * 86400000).toISOString()).order('scheduled_at');
   const byPrompt = new Map<string, string[]>();
   for (const row of data || []) {
@@ -196,6 +222,8 @@ async function startVideos(limit: number, errors: string[]) {
       if (isAiGatewayBillingFailure(error)) {
         logAiGatewayBilling('content.start-videos', error);
         errors.push(AI_GATEWAY_BILLING_MESSAGE);
+        const moved = await fallbackAwaitingVideosToBucket(supabase);
+        if (moved) errors.push(`${moved} video slot(s) filled from the mjic-video-ads bucket`);
         break;
       }
       console.error('auto video start failed:', error);

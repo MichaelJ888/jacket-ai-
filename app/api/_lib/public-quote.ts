@@ -1,7 +1,6 @@
 import { computeFormalQuote, type FormalQuote, type ProductClass } from './formal-quote.ts';
 import { resolveFabricClass } from './fabric-class.ts';
-import { seedPricelist, tierPrice, type Pricelist } from './pricelist-logic.ts';
-import { MOQ_PIECES } from './pricing-logic.ts';
+import { calculateQuote, seedPricelist, QuoteValidationError, type ModularAddOnKey, type Pricelist } from './pricelist-logic.ts';
 
 export const MAX_PUBLIC_QUANTITY = 100000;
 
@@ -19,10 +18,11 @@ export type PublicQuoteRequest = {
   hood: boolean;
   threeTone: boolean;
   isFullSublimation: boolean;
+  addOns: ModularAddOnKey[];
 };
 
 export type PublicQuoteResult =
-  | { kind: 'quote'; request: PublicQuoteRequest; quote: FormalQuote }
+  | { kind: 'quote'; request: PublicQuoteRequest; quote: FormalQuote; bracket: string | null }
   | { kind: 'sales'; message: string };
 
 export class PublicQuoteError extends Error {}
@@ -43,16 +43,23 @@ export function buildPublicQuote(body: Record<string, unknown>, catalog: Priceli
   if (!cat) throw new PublicQuoteError('Please choose a product category.');
   const category = cat.key;
 
-  // The MOQ is the category's own official tier floor when it has one (polo 5, lanyards 10), else the company-wide MOQ.
-  const minQuantity = cat.tiers.length ? Math.min(...cat.tiers.map((tier) => tier.min)) : MOQ_PIECES;
-  const quantity = Math.floor(Number(body.quantity));
-  if (!Number.isFinite(quantity) || quantity < minQuantity) throw new PublicQuoteError(`Minimum order for ${cat.label} is ${minQuantity} pieces.`);
-  if (quantity > MAX_PUBLIC_QUANTITY) throw new PublicQuoteError(`For orders above ${MAX_PUBLIC_QUANTITY.toLocaleString('en-US')} pieces, contact sales.`);
+  const rawQuantity = Math.floor(Number(body.quantity));
+  if (Number.isFinite(rawQuantity) && rawQuantity > MAX_PUBLIC_QUANTITY) throw new PublicQuoteError(`For orders above ${MAX_PUBLIC_QUANTITY.toLocaleString('en-US')} pieces, contact sales.`);
 
   const fabric = text(body.fabric, 120);
   if (!fabric) throw new PublicQuoteError('Please choose or type a fabric.');
   // Class is derived from the fabric by the strict rule; the customer cannot override it.
   const productClass = resolveFabricClass(fabric);
+
+  // calculateQuote enforces the MOQ (20 for core apparel, otherwise the category's official tier floor) and validates add-ons.
+  let pricing: ReturnType<typeof calculateQuote>;
+  try {
+    pricing = calculateQuote({ category: cat, quantity: rawQuantity, addOns: body.addOns });
+  } catch (error) {
+    if (error instanceof QuoteValidationError) throw new PublicQuoteError(error.message);
+    throw error;
+  }
+  const { quantity, minQuantity } = pricing;
 
   const request: PublicQuoteRequest = {
     customerName,
@@ -68,9 +75,10 @@ export function buildPublicQuote(body: Record<string, unknown>, catalog: Priceli
     hood: flag(body.hood),
     threeTone: flag(body.threeTone),
     isFullSublimation: flag(body.isFullSublimation),
+    addOns: pricing.addOns,
   };
 
-  const unit = tierPrice(cat.tiers, quantity);
+  const unit = pricing.unitPrice;
   if (unit === null) {
     return {
       kind: 'sales',
@@ -91,6 +99,8 @@ export function buildPublicQuote(body: Record<string, unknown>, catalog: Priceli
     threeTone: request.threeTone,
     isTshirt: category === 't-shirt',
     isFullSublimation: request.isFullSublimation,
+    modularAddOnsPerPiece: pricing.addOnPerPiece,
   });
-  return { kind: 'quote', request, quote };
+  return { kind: 'quote', request, quote, bracket: pricing.bracket };
 }
+
