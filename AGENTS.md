@@ -163,6 +163,14 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - scheduler YAML outage fix (2026-11-07)
+- Root cause: `.github/workflows/scheduler.yml` was invalid YAML since commit `ba4c6f8`. Retired jobs `content-slot-11am` and `content-slot-6am` (both `if: false`) lost their `runs-on`/`steps` headers. GitHub reported 0 jobs for every push run (643-649). Scheduled runs stopped after run 642 (2026-11-06 13:09Z), which made the heartbeats go stale.
+- Fix: restored `runs-on` and `steps` on both retired jobs. They stay `if: false`, so no behavior change. PyYAML parses the file (28 jobs).
+- Recovery: called `/api/cron/retry-queue` and `/api/cron/swarm-worker` directly with SCHEDULER_TOKEN. Both returned 200 and refreshed their heartbeats. `sales-followups` was NOT triggered, because it sends customer DMs. Its heartbeat remains stale until the scheduler resumes or the owner approves a manual run.
+- Env audit (names only, values not read): all required production variables exist. The code reads `META_PAGE_ACCESS_TOKEN`, not `META_ACCESS_TOKEN`, so that name is the one checked. `/api/health` env check is OK.
+- Verified: `npx tsc --noEmit --incremental` exit 0; `npm run lint` 0 errors, 6 pre-existing warnings; `npm test` 491 pass / 0 fail / 1 skipped.
+- Still degraded (not masked): `scheduledJobs` stale `sales-followups`; `content-publisher` last run unsuccessful. Open items.
+
 ## Completion log - boost dry-run, core-apparel MOQ 20, AWAITING_VIDEO fallback (2026-11-07)
 - Commit `fe3fa6d` on main; prod deploy `dpl_6m7fUcBRZM5oZrw3PFXcq3tCJjMN` Ready and aliased to https://jacket-ai.vercel.app.
 - Boost advisor: `?dry_run=1` on `/api/cron/boost-advisor` returns `{success, dry_run: true, payload}` with no Telegram send. Callbacks stay `boost_go:(yes|no):<id>` (requested `approve_boost_700` / `dismiss_boost` would drop the post ID). The 01:00 UTC live path is unchanged.

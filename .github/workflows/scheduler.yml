@@ -200,6 +200,9 @@ jobs:
 
   content-slot-11am:
     if: false  # retired: not in the 4-slot schedule (01:00, 05:30, 10:00, 13:00 UTC)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (11:00 AM slot, retired)
         run: |
           curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
             -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
@@ -251,6 +254,9 @@ jobs:
 
   content-slot-6am:
     if: false  # retired: not in the 4-slot schedule (01:00, 05:30, 10:00, 13:00 UTC)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish due posts (6:00 AM slot, retired)
         run: |
           curl -sf --max-time 120 -X GET "${{ secrets.APP_BASE_URL }}/api/cron/content-publisher" \
             -H "Authorization: Bearer ${{ secrets.SCHEDULER_TOKEN }}"
