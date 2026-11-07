@@ -163,6 +163,15 @@ Do not edit `agent_memory_events` rows directly via SQL — always go through
 - Health: `/api/health` still `degraded` (HTTP 200). Only check failing: `scheduledJobs` stale heartbeat `sales-followups`. The GitHub `External scheduler` runs complete with `success`, so the job is failing inside `/api/cron/sales-followups`, not missing its schedule. Not re-triggered manually, because that job sends customer follow-up messages. Open item.
 - No code or deploy change in this pass.
 
+## Completion log - boost dry-run, core-apparel MOQ 20, AWAITING_VIDEO fallback (2026-11-07)
+- Commit `fe3fa6d` on main; prod deploy `dpl_6m7fUcBRZM5oZrw3PFXcq3tCJjMN` Ready and aliased to https://jacket-ai.vercel.app.
+- Boost advisor: `?dry_run=1` on `/api/cron/boost-advisor` returns `{success, dry_run: true, payload}` with no Telegram send. Callbacks stay `boost_go:(yes|no):<id>` (requested `approve_boost_700` / `dismiss_boost` would drop the post ID). The 01:00 UTC live path is unchanged.
+- Quote engine: MOQ 20 for Jacket, Company/School Uniform, and Scrub (Medical Wear). Other categories keep their official floors. Volume bracket labels (20–49, 50–99, 100–249, 250+) are display-only; unit prices still come from the official tier. Modular add-ons are per piece: embroidery 50, vinyl 40, screen print 30, reflective tape 35, inner lining 60. `calculateQuote()` in `pricelist-logic.ts`. `/quote` page gained add-on checkboxes and uses the category MOQ.
+- AWAITING_VIDEO: `fallbackAwaitingVideosToBucket` in `content.ts` moves rows with no generation id to READY from the `mjic-video-ads` bucket when the AI Gateway key is missing or billing fails.
+- Verified: `npx tsc --noEmit --incremental` clean; `npm test` 491 pass / 0 fail / 1 skipped; `npm run lint` 0 errors (6 pre-existing warnings); `npm run verify:live` 11/11; production `/api/quote` rejects scrub qty 10 with HTTP 400.
+- Health: `/api/health` = `degraded` (HTTP 200) on `scheduledJobs`: stale heartbeats `sales-followups`, `retry-queue`. Not masked. Open item from the 2026-11-04 entry.
+- Assumptions: add-on fees are per piece; bags keep MOQ 50.
+
 ## Completion log - 4-slot UTC posting + 9 AM boost advisor (2026-11-06)
 - Commit `ba4c6f8` on main (pushed `f2cd76f..ba4c6f8`). Prod deploy `dpl_4DbA5HSiYUSRMkxt5qv6GFy733ww` Ready, aliased to https://jacket-ai.vercel.app.
 - Posting: `content-publisher` runs at 01:00 UTC (9 AM PHT, video), 05:30 (1:30 PM, picture), 10:00 (6 PM, video), 13:00 (9 PM, picture), via `vercel.json` and `scheduler.yml`. Retired the 03/07/17/19/22 UTC content slot jobs (`if: false`; their YAML blocks remain, see open items). Video and picture slots alternate. Video slots use the least-used `mjic-video-ads` clip and are skipped when the bucket is empty, not filled with a picture.
