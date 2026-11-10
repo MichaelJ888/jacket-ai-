@@ -15,7 +15,7 @@ export type QuoteInput = {
 
 // Business details copied verbatim from MJIC_SYSTEM_PROMPT.
 const BUSINESS = {
-  name: 'MJIC',
+  name: 'MICHAEL JEFFREY INTERNATIONAL CORPORATION',
   address: "#22 Bayabas St., Elmar's Subdivision, Brgy. Cupang, Antipolo City (behind SM Masinag)",
   phones: 'Viber/Smart 0920-695-9167 | Globe 0917-320-8842 | DITO 0934-768-7987',
   payment: 'GCash / Maya: RICHARD DG VENEZUELA (0929-227-1761)',
@@ -24,6 +24,33 @@ const BUSINESS = {
 // pdf-lib's standard fonts are WinAnsi only, so the peso sign is written as "PHP".
 const php = (value: number) => `PHP ${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const clean = (value: string) => value.replace(/[^\x20-\x7E]/g, '?');
+const MAX_LOGO_BYTES = 1024 * 1024;
+
+export async function loadQuoteLogo(): Promise<Uint8Array> {
+  const assetOrigin = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'https://jacket-ai.vercel.app';
+  let response: Response;
+  try {
+    response = await fetch(new URL('/branding/mjic-official-logo.jpg', assetOrigin), {
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    throw new Error('Could not load the MJIC logo for the quotation PDF.');
+  }
+  if (!response.ok || !response.headers.get('content-type')?.startsWith('image/jpeg')) {
+    throw new Error('The MJIC quotation logo asset is unavailable or invalid.');
+  }
+  const contentLength = Number(response.headers.get('content-length'));
+  if (Number.isFinite(contentLength) && contentLength > MAX_LOGO_BYTES) {
+    throw new Error('The MJIC quotation logo asset has an invalid size.');
+  }
+  const logoBytes = new Uint8Array(await response.arrayBuffer());
+  if (logoBytes.byteLength === 0 || logoBytes.byteLength > MAX_LOGO_BYTES) {
+    throw new Error('The MJIC quotation logo asset has an invalid size.');
+  }
+  return logoBytes;
+}
 
 export function quoteTotals(items: QuoteItem[], depositPct = 50) {
   const subtotal = Number(items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0).toFixed(2));
@@ -31,19 +58,21 @@ export function quoteTotals(items: QuoteItem[], depositPct = 50) {
   return { subtotal, deposit, balance: Number((subtotal - deposit).toFixed(2)) };
 }
 
-export async function renderQuotePdf(input: QuoteInput): Promise<Uint8Array> {
+export async function renderQuotePdf(input: QuoteInput, logoJpg: Uint8Array): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([595, 842]);
+  const logo = await pdf.embedJpg(logoJpg);
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const ink = rgb(0.1, 0.1, 0.12);
+  const ink = rgb(0.04, 0.12, 0.24);
+  const gold = rgb(0.72, 0.57, 0.18);
   const muted = rgb(0.4, 0.4, 0.45);
   const depositPct = input.depositPct ?? 50;
   const issued = input.issuedAt || new Date();
   const valid = new Date(issued.getTime() + (input.validDays ?? 7) * 86400000);
   const fmt = (date: Date) => date.toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Manila' });
 
-  let y = 800;
+  let y = 773;
   const text = (value: string, x: number, size = 10, useBold = false, color = ink, maxWidth?: number) => {
     let line = clean(value);
     const f = useBold ? bold : font;
@@ -51,14 +80,18 @@ export async function renderQuotePdf(input: QuoteInput): Promise<Uint8Array> {
     page.drawText(line, { x, y, size, font: f, color });
   };
 
-  text(BUSINESS.name, 40, 26, true);
-  y -= 16; text(BUSINESS.address, 40, 8, false, muted);
-  y -= 11; text(BUSINESS.phones, 40, 8, false, muted);
-  page.drawText('QUOTATION', { x: 400, y: 800, size: 20, font: bold, color: ink });
-  page.drawText(clean(input.quoteNumber), { x: 400, y: 784, size: 10, font, color: muted });
-  y -= 30;
-  page.drawLine({ start: { x: 40, y }, end: { x: 555, y }, thickness: 1, color: ink });
+  const logoSize = logo.scaleToFit(106, 58);
+  page.drawImage(logo, { x: 40, y: 760, width: logoSize.width, height: logoSize.height });
+  page.drawText(BUSINESS.name, { x: 158, y: 802, size: 10, font: bold, color: ink });
+  page.drawText('Custom Jackets and more', { x: 158, y: 786, size: 10, font: bold, color: gold });
+  text(BUSINESS.address, 158, 8, false, muted, 230);
+  y -= 11;
+  text(BUSINESS.phones, 158, 8, false, muted, 230);
+  page.drawText('QUOTATION', { x: 420, y: 802, size: 16, font: bold, color: ink });
+  page.drawText(clean(input.quoteNumber), { x: 420, y: 784, size: 9, font, color: muted });
+  page.drawLine({ start: { x: 40, y: 748 }, end: { x: 555, y: 748 }, thickness: 1, color: ink });
 
+  y = 726;
   y -= 22; text('Prepared for', 40, 8, false, muted); text('Date', 400, 8, false, muted);
   y -= 13; text(input.clientName || 'Valued Client', 40, 12, true, ink, 330); text(fmt(issued), 400, 10);
   y -= 13; if (input.contact) text(input.contact, 40, 9, false, muted, 330); text(`Valid until ${fmt(valid)}`, 400, 9, false, muted);

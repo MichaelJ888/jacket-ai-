@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { computeFormalQuote, PAYMENT_DETAILS, PAYMENT_TERMS, TERMS } from '../api/_lib/formal-quote';
 import { resolveFabricClass } from '../api/_lib/fabric-class';
@@ -139,7 +140,21 @@ export default function QuotePage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
       <header className="mb-8">
-        <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700">CG Venezuela Enterprises · Michael Jeffrey International</p>
+        <div className="mb-5 flex flex-wrap items-center gap-4">
+          <Image
+            src="/branding/mjic-official-logo.webp"
+            alt="Michael Jeffrey International Corporation official logo"
+            width={1408}
+            height={768}
+            priority
+            className="h-auto w-32 sm:w-40"
+          />
+          <div>
+            <p className="text-sm font-bold uppercase tracking-wide text-[#0B1E3D]">Michael Jeffrey International Corporation</p>
+            <p className="text-sm font-semibold text-[#9C7521]">Custom Jackets and more</p>
+          </div>
+        </div>
+        <p className="text-sm font-semibold uppercase tracking-wide text-indigo-700">CG Venezuela Enterprises</p>
         <h1 className="mt-1 text-3xl font-bold text-slate-900">Price Quotation &amp; Formal Quote</h1>
         <p className="mt-2 text-slate-600">Get official MJIC pricing as you type. Your formal quote gets a reference number and a link to your quote history.</p>
         <div className="mt-4 flex flex-wrap gap-3" data-testid="quote-cta">

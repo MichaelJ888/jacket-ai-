@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useState, type DragEvent, type FormEvent } from 'react';
 import { SIGNATORIES, TERMS, VALID_DAYS, PAYMENT_DETAILS, type SignatoryKey } from '../../api/_lib/formal-quote';
@@ -160,8 +161,22 @@ export default function QuotationPage() {
             <button type="button" onClick={() => window.print()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm">Print / Save PDF</button>
           </div>
           <header>
-            <h2 className="text-xl font-bold">CG VENEZUELA ENTERPRISES</h2>
-            <p className="text-xs text-zinc-600">Create. Enhance. and Sustain. · 22 Bayabas St., Elmar&apos;s Subdivision, Cupang, Antipolo City</p>
+            <div className="flex flex-wrap items-center gap-4 border-b-2 border-[#B8912F] pb-3">
+              <Image
+                src="/branding/mjic-official-logo.webp"
+                alt="Michael Jeffrey International Corporation official logo"
+                width={1408}
+                height={768}
+                priority
+                className="h-auto w-36 sm:w-44"
+              />
+              <div>
+                <h2 className="text-lg font-bold text-[#0B1E3D]">MICHAEL JEFFREY INTERNATIONAL CORPORATION</h2>
+                <p className="text-sm font-semibold text-[#9C7521]">Custom Jackets and more</p>
+                <p className="mt-1 text-xs text-zinc-600">CG Venezuela Enterprises · Create. Enhance. and Sustain.</p>
+                <p className="text-xs text-zinc-600">22 Bayabas St., Elmar&apos;s Subdivision, Cupang, Antipolo City</p>
+              </div>
+            </div>
             <p className="mt-2 text-sm">Prepared for: <strong>{form.customerName}</strong> · {new Date(result.createdAt).toLocaleDateString('en-PH')} · Valid for {VALID_DAYS} days</p>
           </header>
           <table className="w-full text-sm">

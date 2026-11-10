@@ -1,5 +1,5 @@
 import { getSupabaseAdmin, sendTelegramDocument } from './integrations.ts';
-import { renderQuotePdf, quoteTotals } from './quote-pdf.ts';
+import { loadQuoteLogo, renderQuotePdf, quoteTotals } from './quote-pdf.ts';
 import { createApproval } from './ceo-control.ts';
 import { quoteInputFromRow, type QuoteRow } from './quote-dispatch-logic.ts';
 
@@ -22,7 +22,7 @@ export async function loadQuoteRow(supabase: Supabase, quoteNumber: string): Pro
 }
 
 export async function renderStoredQuotePdf(row: QuoteRow): Promise<Uint8Array> {
-  return renderQuotePdf(quoteInputFromRow(row));
+  return renderQuotePdf(quoteInputFromRow(row), await loadQuoteLogo());
 }
 
 // Sends the quotation PDF through Resend. Only called after the CEO approves the matching approval.

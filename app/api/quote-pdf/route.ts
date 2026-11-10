@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import { isAdminAuthorized } from '../_lib/auth';
 import { getSupabaseAdmin, sendTelegramDocument } from '../_lib/integrations';
-import { quoteTotals, renderQuotePdf, type QuoteItem } from '../_lib/quote-pdf';
+import { loadQuoteLogo, quoteTotals, renderQuotePdf, type QuoteItem } from '../_lib/quote-pdf';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +21,22 @@ export async function POST(request: Request) {
   const quoteNumber = `Q-${stamp.toISOString().slice(2, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
   const depositPct = Number(body.depositPct) > 0 && Number(body.depositPct) <= 100 ? Number(body.depositPct) : 50;
   const clientName = String(body.clientName || '').slice(0, 120);
-  const pdf = await renderQuotePdf({ quoteNumber, clientName, projectName: body.projectName ? String(body.projectName).slice(0, 120) : undefined, contact: body.contact ? String(body.contact).slice(0, 120) : undefined, items, notes: body.notes ? String(body.notes).slice(0, 600) : undefined, validDays: Number(body.validDays) || 7, depositPct, issuedAt: stamp });
+  let logoBytes: Uint8Array;
+  try {
+    logoBytes = await loadQuoteLogo();
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Could not load the MJIC quotation logo.' },
+      { status: 502 },
+    );
+  }
+
+  let pdf: Uint8Array;
+  try {
+    pdf = await renderQuotePdf({ quoteNumber, clientName, projectName: body.projectName ? String(body.projectName).slice(0, 120) : undefined, contact: body.contact ? String(body.contact).slice(0, 120) : undefined, items, notes: body.notes ? String(body.notes).slice(0, 600) : undefined, validDays: Number(body.validDays) || 7, depositPct, issuedAt: stamp }, logoBytes);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? `Could not generate the quotation PDF: ${error.message}` : 'Could not generate the quotation PDF.' }, { status: 500 });
+  }
 
   const created = await supabase.storage.createBucket('quotes', { public: false });
   if (created.error && !/already exists/i.test(created.error.message)) return NextResponse.json({ error: created.error.message }, { status: 500 });

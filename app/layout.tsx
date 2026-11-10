@@ -14,8 +14,41 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MJIC Customized Apparel Supplier | Corporate Uniforms & Custom Jackets Philippines",
-  description: "MJIC custom apparel, corporate uniform and custom jacket manufacturer in the Philippines. MOQ 20 pcs, free Metro Manila delivery, free digital mock-up.",
+  metadataBase: new URL("https://jacket-ai.vercel.app"),
+  title: {
+    default: "Michael Jeffrey International Corporation | Custom Jackets and More",
+    template: "%s | MJIC",
+  },
+  description:
+    "Michael Jeffrey International Corporation (MJIC) makes custom jackets, corporate uniforms, and branded products in the Philippines. MOQ 20 pieces, free digital mock-up, and free Metro Manila delivery.",
+  openGraph: {
+    title: "Michael Jeffrey International Corporation | Custom Jackets and More",
+    description:
+      "Custom jackets, corporate uniforms, and branded products by Michael Jeffrey International Corporation in the Philippines.",
+    url: "/",
+    siteName: "Michael Jeffrey International Corporation",
+    locale: "en_PH",
+    type: "website",
+    images: [
+      {
+        url: "/branding/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Michael Jeffrey International Corporation — Custom Jackets and More",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Michael Jeffrey International Corporation | Custom Jackets and More",
+    description:
+      "Custom jackets, corporate uniforms, and branded products by MJIC in the Philippines.",
+    images: ["/branding/og-image.jpg"],
+  },
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

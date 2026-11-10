@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { ReactNode } from "react";
 
 const NAV_LINKS = [
@@ -23,8 +24,19 @@ export default function MjicPageShell({
     <div className="min-h-screen bg-white text-[#0B1E3D]">
       <header className="sticky top-0 z-10 border-b border-[#0B1E3D]/10 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <Link href="/" className="font-bold tracking-widest">
-            MJIC
+          <Link href="/" className="flex items-center gap-3">
+            <Image
+              src="/branding/mjic-official-logo.webp"
+              alt="Michael Jeffrey International Corporation official logo"
+              width={1408}
+              height={768}
+              priority
+              className="h-10 w-20 object-contain sm:h-12 sm:w-24"
+            />
+            <span className="font-bold leading-tight tracking-wide text-[#0B1E3D]">
+              <span className="block">Custom Jackets</span>
+              <span className="block text-xs font-semibold text-[#9C7521]">and more</span>
+            </span>
           </Link>
           <nav className="flex flex-wrap gap-x-5 gap-y-2 text-sm font-medium text-[#3C567F]">
             {NAV_LINKS.map((link) => (
