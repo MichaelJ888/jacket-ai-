@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useState } from "react";
 import CooPanel from "./coo-panel";
 import RecipientsPanel from "./recipients-panel";
 import CreditsPanel from "./credits-panel";
@@ -46,14 +46,50 @@ const TRAINING_MODULES = [
 type TrainingModuleId = (typeof TRAINING_MODULES)[number]["id"];
 
 function highlightHtml(source: string) {
-  return source.split(/(<!--[\s\S]*?-->|<\/?[a-z][^>]*>)/gi).map((part, index) => (
-    <span
-      key={index}
-      className={part.startsWith("<!--") ? "text-zinc-500" : part.startsWith("<") ? "text-cyan-300" : undefined}
-    >
-      {part}
-    </span>
-  ));
+  const chunks: ReactNode[] = [];
+  const tokens = /<!--[\s\S]*?-->|<![^>]*>|<\/?[a-z][^>]*>/gi;
+  const attributes = /(\s+)([^\s=/>]+)(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+))?/g;
+  let cursor = 0;
+  let key = 0;
+
+  for (const match of source.matchAll(tokens)) {
+    const position = match.index ?? 0;
+    if (position > cursor) chunks.push(source.slice(cursor, position));
+    const token = match[0];
+    if (token.startsWith("<!--") || token.startsWith("<!")) {
+      chunks.push(<span key={key++} className="text-zinc-500">{token}</span>);
+    } else {
+      const tag = /^(<\/?)([a-z][\w:-]*)([\s\S]*?)(\/?>)$/i.exec(token);
+      if (!tag) {
+        chunks.push(token);
+      } else {
+        chunks.push(<span key={key++} className="text-cyan-300">{tag[1]}</span>);
+        chunks.push(<span key={key++} className="text-emerald-300">{tag[2]}</span>);
+        let attrCursor = 0;
+        for (const attribute of tag[3].matchAll(attributes)) {
+          const attrPosition = attribute.index ?? 0;
+          if (attrPosition > attrCursor) chunks.push(tag[3].slice(attrCursor, attrPosition));
+          chunks.push(attribute[1]);
+          chunks.push(<span key={key++} className="text-amber-300">{attribute[2]}</span>);
+          if (attribute[3]) {
+            const value = /^(\s*=\s*)([\s\S]+)$/.exec(attribute[3]);
+            if (value) {
+              chunks.push(<span key={key++} className="text-zinc-400">{value[1]}</span>);
+              chunks.push(<span key={key++} className="text-yellow-200">{value[2]}</span>);
+            } else {
+              chunks.push(attribute[3]);
+            }
+          }
+          attrCursor = attrPosition + attribute[0].length;
+        }
+        if (attrCursor < tag[3].length) chunks.push(tag[3].slice(attrCursor));
+        chunks.push(<span key={key++} className="text-cyan-300">{tag[4]}</span>);
+      }
+    }
+    cursor = position + token.length;
+  }
+  if (cursor < source.length) chunks.push(source.slice(cursor));
+  return chunks;
 }
 
 export default function AdminPage() {
@@ -327,7 +363,6 @@ export default function AdminPage() {
         <a href="/admin/editor" className="rounded-lg border border-cyan-400/50 bg-cyan-500/10 px-4 py-3 text-center text-base font-semibold text-cyan-200 transition hover:bg-cyan-500/25 hover:shadow-[0_0_16px_-2px_rgba(34,211,238,0.6)]">🎨 Live Visual Site Editor</a>
         <a href="/admin/system-health" className="rounded-lg border border-emerald-400/50 bg-emerald-500/10 px-4 py-3 text-center text-base font-semibold text-emerald-200 transition hover:bg-emerald-500/25 hover:shadow-[0_0_16px_-2px_rgba(52,211,153,0.6)]">🩺 System Health</a>
         <a href="/admin/digitizer" className="rounded-lg border border-violet-400/50 bg-violet-500/10 px-4 py-3 text-center text-base font-semibold text-violet-200 transition hover:bg-violet-500/25 hover:shadow-[0_0_16px_-2px_rgba(167,139,250,0.6)]">🧵 Embroidery Digitizer</a>
-        <a href="/admin/studio" className="rounded-lg border border-amber-400/50 bg-amber-500/10 px-4 py-3 text-center text-base font-semibold text-amber-200 transition hover:bg-amber-500/25 hover:shadow-[0_0_16px_-2px_rgba(251,191,36,0.6)]">📸 CEO AI Studio &amp; Enhancer</a>
         <a href="/admin/seo" className="rounded-lg border border-sky-400/50 bg-sky-500/10 px-4 py-3 text-center text-base font-semibold text-sky-200 transition hover:bg-sky-500/25 hover:shadow-[0_0_16px_-2px_rgba(56,189,248,0.6)]">📈 SEO Rank Tracker</a>
         <a href="/admin/logo-creator" className="rounded-lg border border-rose-400/50 bg-rose-500/10 px-4 py-3 text-center text-base font-semibold text-rose-200 transition hover:bg-rose-500/25 hover:shadow-[0_0_16px_-2px_rgba(251,113,133,0.6)]">🖌️ AI Logo Creator</a>
       </nav>

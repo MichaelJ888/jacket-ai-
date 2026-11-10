@@ -42,8 +42,8 @@ const FILE_LABELS: Array<[string, string]> = [
 ];
 
 const input = 'w-full rounded-lg border border-white/60 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200';
-const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-200';
-const card = 'rounded-2xl border border-white/70 bg-white/70 p-6 shadow-xl shadow-indigo-900/5 backdrop-blur-xl';
+const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-800';
+const card = 'rounded-2xl border border-white/20 bg-white/10 p-6 shadow-xl shadow-indigo-900/5 backdrop-blur-xl';
 
 const FABRIC_OPTIONS: Array<[string, string]> = [
   ['cotton-uniform', 'Cotton Uniform'],
@@ -187,8 +187,8 @@ export default function EmbroideryDigitizerPage() {
           </div>
           <label className="block"><span className={label}>Order ID (UUID, optional — links files to the order)</span><input className={input} value={orderId} onChange={(e) => setOrderId(e.target.value)} /></label>
 
-          <details className="rounded-xl border border-indigo-100 bg-white/60 p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-indigo-900">Advanced settings</summary>
+          <details className="rounded-xl border border-indigo-200/20 bg-white/5 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-cyan-200">Advanced settings</summary>
             <div className="mt-4 grid grid-cols-2 gap-3">
               <label className="col-span-2"><span className={label}>Fabric</span>
                 <select className={input} value={fabric} onChange={(e) => setFabric(e.target.value)}>
@@ -206,7 +206,7 @@ export default function EmbroideryDigitizerPage() {
           <button type="button" disabled={busy} onClick={() => void generate('standard')} className="w-full rounded-lg bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:brightness-110 disabled:opacity-50">
             {busy ? 'Digitizing…' : 'Generate stitch files'}
           </button>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-300">{error}</p>}
         </section>
 
         <section className={`space-y-4 ${card}`}>
@@ -214,7 +214,7 @@ export default function EmbroideryDigitizerPage() {
           {!result && !busy && <p className="text-sm text-slate-500">Upload a logo and generate to see stitch count, thread colors, QA warnings and downloads.</p>}
           {qa && (
             <>
-              <p className={`text-sm font-semibold ${qa.needsHumanReview ? 'text-amber-700' : 'text-emerald-700'}`}>
+              <p className={`text-sm font-semibold ${qa.needsHumanReview ? 'text-amber-300' : 'text-emerald-300'}`}>
                 {qa.needsHumanReview ? 'Needs manual digitizing review' : 'Ready for production'} · status {result?.job?.status ?? '—'}
               </p>
               <dl className="grid grid-cols-2 gap-3 text-sm">
@@ -234,7 +234,7 @@ export default function EmbroideryDigitizerPage() {
                 ))}
               </ul>
               {qa.warnings.length > 0 && (
-                <ul className="list-disc space-y-1 pl-5 text-sm text-amber-800">{qa.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
+                <ul className="list-disc space-y-1 pl-5 text-sm text-amber-200">{qa.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
               )}
               <div className="flex flex-wrap gap-2">
                 {FILE_LABELS.map(([key, text]) => result?.files?.[key] && (

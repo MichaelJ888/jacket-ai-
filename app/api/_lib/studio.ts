@@ -8,7 +8,6 @@ import {
   STUDIO_OUTPUT_BUCKET,
   buildEnhanceInput,
   buildFaceSwapInput,
-  logoPlacementLeftChest,
   studioJobPath,
   type StudioMetadata,
 } from './studio-logic';
@@ -147,17 +146,37 @@ async function finalizeJob(supabase: Supabase, job: StudioJob, enhancedUrl: stri
   try {
     const enhanced = await downloadImage(enhancedUrl);
     const base = cutoutUrl ? await applyStudioBackdrop(enhanced, cutoutUrl) : enhanced;
-    let composed: Buffer;
-    if (job.logo_url) {
-      const logo = await downloadImage(job.logo_url);
-      const baseMeta = await sharp(base).metadata();
-      const logoMeta = await sharp(logo).metadata();
-      const place = logoPlacementLeftChest(baseMeta.width ?? 1, baseMeta.height ?? 1, logoMeta.width ?? 1, logoMeta.height ?? 1);
-      const logoPng = await sharp(logo).resize({ width: place.width }).png().toBuffer();
-      composed = await sharp(base).composite([{ input: logoPng, left: place.left, top: place.top }]).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
-    } else {
-      composed = await sharp(base).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
+    const baseMeta = await sharp(base).metadata();
+    const width = baseMeta.width ?? 1;
+    const height = baseMeta.height ?? 1;
+    const patchWidth = Math.max(1, Math.round(width * 0.26));
+    const patchHeight = Math.max(1, Math.round(patchWidth * 0.36));
+    const left = Math.min(Math.max(0, Math.round(width * 0.66 - patchWidth / 2)), Math.max(0, width - patchWidth));
+    const top = Math.min(Math.max(0, Math.round(height * 0.3 - patchHeight / 2)), Math.max(0, height - patchHeight));
+    const logo = job.logo_url ? await downloadImage(job.logo_url) : null;
+    const placeholderText = logo ? '' : '<text x="300" y="132" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="43" font-weight="700" letter-spacing="2" fill="#0f172a">YOUR LOGO HERE</text>';
+    const placeholderSvg = Buffer.from(
+      `<svg width="600" height="216" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="590" height="206" rx="24" fill="#f8fafc" stroke="#0f172a" stroke-width="10"/>${placeholderText}</svg>`,
+      'utf8',
+    );
+    // The opaque chest patch hides an existing mark before showing a replacement or placeholder.
+    const composite: Array<{ input: Buffer; left: number; top: number }> = [
+      { input: await sharp(placeholderSvg).resize(patchWidth, patchHeight).png().toBuffer(), left, top },
+    ];
+    if (logo) {
+      const logoPng = await sharp(logo).resize({
+        width: Math.max(1, Math.round(patchWidth * 0.72)),
+        height: Math.max(1, Math.round(patchHeight * 0.72)),
+        fit: 'inside',
+      }).png().toBuffer();
+      const logoMeta = await sharp(logoPng).metadata();
+      composite.push({
+        input: logoPng,
+        left: left + Math.round((patchWidth - (logoMeta.width ?? 1)) / 2),
+        top: top + Math.round((patchHeight - (logoMeta.height ?? 1)) / 2),
+      });
     }
+    const composed = await sharp(base).composite(composite).withExif(STUDIO_ORIGINAL_EXIF).jpeg({ quality: 92 }).toBuffer();
 
     await supabase.storage.createBucket(STUDIO_OUTPUT_BUCKET, { public: true });
     const path = studioJobPath('outputs', 'jpg', job.id);

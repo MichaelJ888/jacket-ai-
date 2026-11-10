@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  buildAutoStudioDescription,
   buildEnhanceInput,
   buildFaceSwapInput,
   isAllowedStudioAssetUrl,
@@ -10,6 +11,17 @@ import {
 } from './studio-logic.ts';
 
 const SUPABASE = 'https://abc.supabase.co';
+
+test('builds a factual editable product description from supplied fields only', () => {
+  assert.equal(
+    buildAutoStudioDescription('Navy Polo', 'corporate-wear', '220gsm cotton pique'),
+    'Custom corporate wear item: Navy Polo. Specified fabric: 220gsm cotton pique. A flexible option for teams, schools, and events. Add your logo and request a quotation for details.',
+  );
+  assert.equal(
+    buildAutoStudioDescription('Canvas Tote', 'bag', ''),
+    'Custom bag item: Canvas Tote. A flexible option for teams, schools, and events. Add your logo and request a quotation for details.',
+  );
+});
 
 test('parseStudioCallback reads approve and reject payloads', () => {
   const id = '3f2a9c1e-8b7d-4e6f-9a0b-1c2d3e4f5a6b';

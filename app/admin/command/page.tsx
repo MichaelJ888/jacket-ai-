@@ -211,7 +211,6 @@ export default function CommandCenterPage() {
           <div className="flex flex-wrap items-center gap-2">
             <a href="/admin" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10">← Admin</a>
             <a href="/admin/editor" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10">🎨 Site Editor</a>
-            <a href="/admin/studio" className="rounded-lg border border-white/20 px-3 py-2 text-sm hover:bg-white/10">📸 AI Studio</a>
             <button
               onClick={() => void stabilize()}
               disabled={busy}

@@ -99,6 +99,12 @@ export function studioThemeForDay(manilaDate: string): StudioAdTheme {
 
 export type StudioMetadata = { productTitle: string; category: string; fabric: string | null; description: string | null };
 
+export function buildAutoStudioDescription(productTitle: string, category: string, fabric: string): string {
+  const itemType = category.trim().replace(/-/g, ' ');
+  const material = fabric.trim() ? ` Specified fabric: ${fabric.trim()}.` : '';
+  return `Custom ${itemType} item: ${productTitle.trim()}.${material} A flexible option for teams, schools, and events. Add your logo and request a quotation for details.`;
+}
+
 // Catalog and ads need a real title and category; fabric and description are optional.
 export function parseStudioMetadata(input: { productTitle?: unknown; category?: unknown; fabric?: unknown; description?: unknown }): StudioMetadata | null {
   const clean = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
