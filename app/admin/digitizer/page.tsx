@@ -42,7 +42,7 @@ const FILE_LABELS: Array<[string, string]> = [
 ];
 
 const input = 'w-full rounded-lg border border-white/60 bg-white/80 px-3 py-2 text-sm shadow-inner focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-200';
-const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-600';
+const label = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-200';
 const card = 'rounded-2xl border border-white/70 bg-white/70 p-6 shadow-xl shadow-indigo-900/5 backdrop-blur-xl';
 
 const FABRIC_OPTIONS: Array<[string, string]> = [

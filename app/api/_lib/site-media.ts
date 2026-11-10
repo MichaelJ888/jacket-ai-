@@ -18,13 +18,23 @@ export async function uploadSiteImage(supabase: Supabase, bytes: Buffer, mime: s
   const extension = SITE_MEDIA_EXTENSIONS[mime];
   if (!extension) return null;
   if (!bucketReady) {
-    // "Already exists" is expected after the first call, so the result is ignored.
-    await supabase.storage.createBucket(SITE_MEDIA_BUCKET, { public: true, fileSizeLimit: SITE_MEDIA_MAX_BYTES, allowedMimeTypes: Object.keys(SITE_MEDIA_EXTENSIONS) });
+    const { error } = await supabase.storage.createBucket(SITE_MEDIA_BUCKET, {
+      public: true,
+      fileSizeLimit: SITE_MEDIA_MAX_BYTES,
+      allowedMimeTypes: Object.keys(SITE_MEDIA_EXTENSIONS),
+    });
+    if (error && !/already exists/i.test(error.message)) {
+      console.error('Site media bucket creation failed:', error.message);
+      return null;
+    }
     bucketReady = true;
   }
   const path = `${Date.now()}-${randomUUID()}.${extension}`;
   const { error } = await supabase.storage.from(SITE_MEDIA_BUCKET).upload(path, bytes, { contentType: mime, cacheControl: '3600', upsert: false });
-  if (error) return null;
+  if (error) {
+    console.error('Site media upload failed:', error.message);
+    return null;
+  }
   return supabase.storage.from(SITE_MEDIA_BUCKET).getPublicUrl(path).data.publicUrl;
 }
 

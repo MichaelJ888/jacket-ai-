@@ -7,6 +7,7 @@
   var PAGE_PREFIX = /\/index\.html$/.test(location.pathname) || location.pathname === '/' ? '' : location.pathname + '|';
   var POLL_MS = 20000;
   var MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+  var ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
   var DEFAULT_THEME = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF' };
   var DEFAULT_OPACITY = 15;
   var LIBRARY_MIME = 'application/x-mjic-library';
@@ -383,6 +384,10 @@
   }
 
   function setImage(img, url) {
+    if (!doc || !img || typeof url !== 'string' || !url) {
+      alert('The editor is not ready to update this image. Reload the page and try again.');
+      return;
+    }
     var key = pathKey(img);
     doc.images[key] = url;
     img.setAttribute('src', url);
@@ -398,20 +403,39 @@
       var url = URL.createObjectURL(file);
       var image = new Image();
       image.onload = function () {
+        if (!image.naturalWidth || !image.naturalHeight) {
+          URL.revokeObjectURL(url);
+          return resolve(file);
+        }
         var scale = Math.min(1, 1600 / image.naturalWidth);
         var canvas = document.createElement('canvas');
         canvas.width = Math.round(image.naturalWidth * scale);
         canvas.height = Math.round(image.naturalHeight * scale);
-        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
+        var context;
+        try {
+          context = canvas.getContext('2d');
+        } catch {
+          return resolve(file);
+        }
+        if (!context) return resolve(file);
+        try {
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        } catch {
+          return resolve(file);
+        }
         var qualities = [0.82, 0.7, 0.58, 0.46];
         (function next(i) {
           if (i >= qualities.length) return resolve(file);
-          canvas.toBlob(function (blob) {
-            if (blob && blob.type === 'image/webp' && blob.size <= IMAGE_BUDGET) {
-              resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' }));
-            } else next(i + 1);
-          }, 'image/webp', qualities[i]);
+          try {
+            canvas.toBlob(function (blob) {
+              if (blob && blob.type === 'image/webp' && blob.size <= IMAGE_BUDGET) {
+                resolve(new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp' }));
+              } else next(i + 1);
+            }, 'image/webp', qualities[i]);
+          } catch {
+            resolve(file);
+          }
         })(0);
       };
       image.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
@@ -420,7 +444,7 @@
   }
 
   function uploadImage(img, file) {
-    if (!file || file.type.indexOf('image/') !== 0) { alert('Please choose an image file.'); return; }
+    if (!file || ALLOWED_IMAGE_TYPES.indexOf(file.type) === -1) { alert('Choose a PNG, JPEG, WebP, or GIF image.'); return; }
     if (file.size > MAX_IMAGE_BYTES) { alert('Image must be 5 MB or smaller.'); return; }
     toBudgetWebp(file).then(function (optimized) {
       var form = new FormData();
@@ -454,7 +478,7 @@
     panel.innerHTML = '<div style="display:flex;gap:8px;align-items:center;padding:12px 16px;border-bottom:1px solid #e5e7eb;flex-wrap:wrap">' +
       '<strong style="font-size:15px">Choose image for this slot</strong>' +
       '<input data-role="search" placeholder="Search local images" style="flex:1;min-width:160px;border:1px solid #d4d4d8;border-radius:6px;padding:6px 8px;font-size:13px">' +
-      '<label style="font-size:13px;background:#0f172a;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">Upload new<input type="file" accept="image/*" style="display:none" data-role="upload"></label>' +
+      '<label style="font-size:13px;background:#0f172a;color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">Upload new<input type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none" data-role="upload"></label>' +
       '<button type="button" data-role="close" style="font-size:13px;border:1px solid #d4d4d8;border-radius:6px;padding:6px 10px;background:#fff;cursor:pointer">Close</button>' +
       '</div><div data-role="grid" style="overflow:auto;padding:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;font-size:12px">Loading…</div>';
     overlay.appendChild(panel);

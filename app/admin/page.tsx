@@ -23,6 +23,38 @@ type KnowledgeItem = { id: string; category: string; title: string; content: str
 const STYLES = ["windbreaker", "varsity", "corporate", "bomber"];
 const input = "rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900";
 const button = "rounded bg-zinc-900 px-3 py-1 text-sm font-medium text-white disabled:opacity-50";
+const TRAINING_MODULES = [
+  {
+    id: "garments-subcon",
+    title: "Replies to garments subcon",
+    audience: "supplier",
+    description: "Use real, approved examples for garment subcontractor conversations.",
+  },
+  {
+    id: "lalamove",
+    title: "Replies to Lalamove service",
+    audience: "supplier",
+    description: "Use real examples about coordinating Lalamove service; do not invent fees or delivery promises.",
+  },
+  {
+    id: "other-services",
+    title: "Replies to services like embroidery, DTF, silkscreen and others",
+    audience: "client",
+    description: "Use approved customer replies about MJIC services and only verified service details.",
+  },
+] as const;
+type TrainingModuleId = (typeof TRAINING_MODULES)[number]["id"];
+
+function highlightHtml(source: string) {
+  return source.split(/(<!--[\s\S]*?-->|<\/?[a-z][^>]*>)/gi).map((part, index) => (
+    <span
+      key={index}
+      className={part.startsWith("<!--") ? "text-zinc-500" : part.startsWith("<") ? "text-cyan-300" : undefined}
+    >
+      {part}
+    </span>
+  ));
+}
 
 export default function AdminPage() {
   const [token, setToken] = useState("");
@@ -50,6 +82,9 @@ export default function AdminPage() {
   const [otpCode, setOtpCode] = useState("");
   const [panelSize, setPanelSize] = useState<25 | 50 | 75 | 100>(100);
   const [sourcePreviewOpen, setSourcePreviewOpen] = useState(false);
+  const [htmlPreview, setHtmlPreview] = useState<{ filename: string; source: string } | null>(null);
+  const [htmlExportLoading, setHtmlExportLoading] = useState(false);
+  const [trainingModule, setTrainingModule] = useState<TrainingModuleId | null>(null);
 
   useEffect(() => {
     const saved = Number(localStorage.getItem("mjic_admin_panel_size"));
@@ -69,18 +104,33 @@ export default function AdminPage() {
   }, [token]);
 
   const exportHtml = useCallback(async () => {
-    const response = await fetch("/api/admin/export/html", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
-    if (!response.ok) { alert(`Export failed (HTTP ${response.status}).`); return; }
-    const blob = await response.blob();
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const name = /filename="([^"]+)"/.exec(disposition)?.[1] || "mjic-html-export.html";
-    const url = URL.createObjectURL(blob);
+    setHtmlExportLoading(true);
+    setMessage("");
+    try {
+      const response = await fetch("/api/admin/export/html", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      if (!response.ok) {
+        setMessage(`HTML export failed (HTTP ${response.status}).`);
+        return;
+      }
+      const disposition = response.headers.get("Content-Disposition") || "";
+      const filename = /filename="([^"]+)"/.exec(disposition)?.[1] || "mjic-html-export.html";
+      setHtmlPreview({ filename, source: await response.text() });
+    } catch (error) {
+      setMessage(error instanceof Error ? `HTML export failed: ${error.message}` : "HTML export failed.");
+    } finally {
+      setHtmlExportLoading(false);
+    }
+  }, [token]);
+
+  function downloadHtmlPreview() {
+    if (!htmlPreview) return;
+    const url = URL.createObjectURL(new Blob([htmlPreview.source], { type: "text/html;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = name;
+    link.download = htmlPreview.filename;
     link.click();
-    URL.revokeObjectURL(url);
-  }, [token]);
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   const exportSource = useCallback(async () => {
     const response = await fetch("/api/admin/export/source", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
@@ -291,13 +341,30 @@ export default function AdminPage() {
             ))}
           </div>
           <a className="text-sm underline" href="/admin/video-mockups">Local video mockups</a>
-          <button type="button" className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm" onClick={() => void exportHtml()}>Export HTML source</button>
+          <button type="button" className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm disabled:opacity-50" disabled={htmlExportLoading} onClick={() => void exportHtml()}>{htmlExportLoading ? "Preparing HTML preview…" : "Download HTML Code"}</button>
           <button type="button" className="rounded border border-zinc-300 bg-white px-2 py-1 text-sm" onClick={() => setSourcePreviewOpen(true)}>Preview &amp; download source ZIP</button>
           <button className="text-sm underline" onClick={() => { sessionStorage.removeItem("mjic_admin"); setAuthed(false); setToken(""); }}>Sign out</button>
         </div>
       </div>
       {sourcePreviewOpen && (
         <SourcePreviewDrawer token={token} onClose={() => setSourcePreviewOpen(false)} onDownload={() => void exportSource()} />
+      )}
+      {htmlPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3" role="dialog" aria-modal="true" aria-labelledby="html-preview-title">
+          <section className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-100 shadow-2xl">
+            <header className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-700 px-4 py-3">
+              <div>
+                <h2 id="html-preview-title" className="font-semibold">HTML code preview</h2>
+                <p className="text-xs text-zinc-400">{htmlPreview.filename} · Review before downloading</p>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="rounded bg-cyan-700 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-600" onClick={downloadHtmlPreview}>Download HTML</button>
+                <button type="button" className="rounded border border-zinc-600 px-3 py-2 text-sm hover:bg-zinc-800" onClick={() => setHtmlPreview(null)}>Close</button>
+              </div>
+            </header>
+            <pre className="min-h-0 flex-1 overflow-auto p-4 text-xs leading-relaxed"><code>{highlightHtml(htmlPreview.source)}</code></pre>
+          </section>
+        </div>
       )}
       <MainGoalsPanel token={token} />
       <>
@@ -415,11 +482,32 @@ export default function AdminPage() {
       {tab === "teach" && (
         <section className="space-y-3">
           <p className="text-sm text-zinc-600">Upload your Word (.docx) or .txt client-safe chat/Q&amp;A file, and/or paste text. Use lines like <code>Client: ...</code> and <code>Me: ...</code> (or <code>Q:</code>/<code>A:</code>). Without those markers each paragraph is saved as one of your replies. Put supplier lists and internal costs in the Knowledge Base&apos;s internal categories instead.</p>
+          <div className="grid gap-3 md:grid-cols-3">
+            {TRAINING_MODULES.map((module) => (
+              <article key={module.id} className={`rounded-lg border p-3 ${trainingModule === module.id ? "border-cyan-500 bg-cyan-50" : "border-zinc-200 bg-white"}`}>
+                <h2 className="text-sm font-semibold text-zinc-900">{module.title}</h2>
+                <p className="mt-1 text-xs text-zinc-600">{module.description}</p>
+                <p className="mt-2 text-xs text-zinc-500">Saved as {module.audience} reply examples.</p>
+                <button
+                  type="button"
+                  className="mt-3 rounded border border-zinc-400 px-2 py-1 text-xs font-medium text-zinc-800 hover:bg-zinc-100"
+                  aria-pressed={trainingModule === module.id}
+                  onClick={() => {
+                    setTrainingModule(module.id);
+                    setAudience(module.audience);
+                    setFile(null);
+                  }}
+                >
+                  {trainingModule === module.id ? "Module selected" : "Use this module"}
+                </button>
+              </article>
+            ))}
+          </div>
           <select className={input} value={audience} onChange={(e) => setAudience(e.target.value)}>
             <option value="client">Replies to clients</option><option value="employee">Replies to employees</option><option value="supplier">Replies to suppliers</option>
           </select>
           <div><input type="file" accept=".docx,.txt" onChange={(e) => setFile(e.target.files?.[0] || null)} /></div>
-          <textarea className={`${input} h-48 w-full`} placeholder="Or paste Q&A here" value={pasted} onChange={(e) => setPasted(e.target.value)} />
+          <textarea className={`${input} h-48 w-full`} placeholder={trainingModule ? "Paste real examples: Client: [actual question] / Me: [approved reply], or Q: [actual question] / A: [approved reply]. Do not include unverified prices or promises." : "Or paste Q&A here"} value={pasted} onChange={(e) => setPasted(e.target.value)} />
           <div className="flex gap-2"><button className={button} onClick={() => void teach(true)}>Preview</button><button className={button} onClick={() => void teach(false)}>Save to AI memory</button></div>
         </section>
       )}
