@@ -452,3 +452,11 @@ px vercel ls.
 - Safe post-deploy GET checks: `/`, `/catalogue-enhancer`, `/admin`, `/admin/logo-creator`, `/api/health`, and `/journey-audio.js` returned HTTP 200; `/api/health` reported `ok`; unauthenticated `/api/admin/meta-pages` returned 401.
 - No production Meta subscription mutation, customer messaging, ad publication, or billable logo/image-generation request was made. Meta Page subscription state and App Review status remain unverified; ad-account-level routing remains unverified without `META_AD_ACCOUNT_ID`.
 - `npm run verify:live` was not run because it invokes an authenticated cron probe with sample-row and Telegram side effects.
+
+## Completion log - MJIC audit and production verification (2026-11-11)
+- Audited the already-released HTML export modal, client-journey audio controls and rendered wizard placement, persistent admin navigation, Teach the AI modules, protected catalogue enhancer, and MJIC-only Meta leadgen gate. No production code repair was needed; the feature implementation is already in commit `4827713`.
+- Verified: `npx tsc --noEmit --incremental` exit 0; `npm test` 496 pass / 0 fail / 1 skipped (497 total); `npm run lint` 0 errors / 6 warnings; `npm run build` (webpack) passes; `node --check public/journey-audio.js` and `git diff --check` pass.
+- `npm run verify:live` passed 11/11, including its authenticated `/api/cron/samples` probe. That route can send overdue-sample Telegram alerts and updates sample rows; unauthenticated probes correctly returned 401.
+- Production remains `READY` at `dpl_2C9EqL7g6eoqadRx7TVh8reGr63y`, aliased to `https://jacket-ai.vercel.app`; this audit made no runtime code changes, so no duplicate deployment was created.
+- Cloud architecture unchanged: existing Replicate/Supabase Studio path remains metered; journey audio is synthesized locally after user activation. No new provider, worker, dependency, schema, or provider spend was introduced.
+- Read-only workstation telemetry at 2026-11-11 03:37 +08:00: 1.14 GB available physical memory and 18.64 GB free on C:. The verification build completed successfully.
