@@ -11,7 +11,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           href="/"
           className="rounded-lg border border-cyan-400/40 px-4 py-2 font-semibold text-cyan-100 transition hover:bg-cyan-400/10"
         >
-          MJIC website
+          MJIC Website Landing Page
         </Link>
         <Link
           href="/admin"

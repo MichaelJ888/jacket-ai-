@@ -8,6 +8,7 @@ export type HealthInputs = {
   tokenError?: string;
   tokenExpiresAt?: number;
   tokenAppId?: string;
+  leadgenRequired?: boolean;
   subscribedApps?: Array<{ id?: string; subscribed_fields?: string[] }>;
   igUserId?: string | null;
   now?: number;
@@ -17,7 +18,8 @@ export function evaluateHealth(input: HealthInputs): HealthCheck[] {
   const now = input.now ?? Date.now();
   const expiresOk = !input.tokenExpiresAt || input.tokenExpiresAt * 1000 > now;
   const mine = (input.subscribedApps || []).find((app) => app.id === input.appId);
-  const missing = REQUIRED_FIELDS.filter((field) => !mine?.subscribed_fields?.includes(field));
+  const requiredFields = input.leadgenRequired ? [...REQUIRED_FIELDS, 'leadgen'] : REQUIRED_FIELDS;
+  const missing = requiredFields.filter((field) => !mine?.subscribed_fields?.includes(field));
   return [
     {
       id: 'token',
@@ -33,7 +35,7 @@ export function evaluateHealth(input: HealthInputs): HealthCheck[] {
     },
     {
       id: 'fields',
-      label: 'Messages, postbacks and comments are enabled',
+      label: input.leadgenRequired ? 'Messaging and MJIC lead ads are enabled' : 'Messages, postbacks and comments are enabled',
       ok: Boolean(mine) && missing.length === 0,
       hint: mine ? `Missing webhook fields: ${missing.join(', ')}. Press "Re-subscribe".` : 'Subscribe the webhook first.',
     },

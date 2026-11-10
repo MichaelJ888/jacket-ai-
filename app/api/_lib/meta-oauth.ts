@@ -19,10 +19,21 @@ export const META_OAUTH_SCOPES = [
   'instagram_basic',
   'instagram_manage_messages',
 ];
+const META_LEADGEN_SCOPES = ['leads_retrieval'];
 export const META_SUBSCRIBED_FIELDS = 'messages,messaging_postbacks,feed';
 export const META_NONCE_COOKIE = 'meta_oauth_nonce';
 export const META_CTX_COOKIE = 'meta_oauth_ctx';
 export type OAuthContext = 'popup' | 'connect' | 'admin';
+
+export function metaSubscribedFieldsForPage(
+  pageId: string,
+  mjicPageId = process.env.META_PAGE_ID,
+  cgvPageId = process.env.META_CGV_PAGE_ID,
+) {
+  return mjicPageId && pageId === mjicPageId && pageId !== cgvPageId
+    ? `${META_SUBSCRIBED_FIELDS},leadgen`
+    : META_SUBSCRIBED_FIELDS;
+}
 
 export function parseOAuthContext(value: string | null | undefined): OAuthContext {
   return value === 'popup' || value === 'connect' ? value : 'admin';
@@ -74,12 +85,13 @@ export function verifyOAuthState(state: string | null, nonceCookie: string | nul
   }
 }
 
-export function buildAuthorizeUrl(appId: string, redirectUri: string, state: string) {
+export function buildAuthorizeUrl(appId: string, redirectUri: string, state: string, context: OAuthContext = 'admin') {
   const url = new URL('https://www.facebook.com/v21.0/dialog/oauth');
   url.searchParams.set('client_id', appId);
   url.searchParams.set('redirect_uri', redirectUri);
   url.searchParams.set('state', state);
-  url.searchParams.set('scope', META_OAUTH_SCOPES.join(','));
+  const scopes = context === 'admin' ? [...META_OAUTH_SCOPES, ...META_LEADGEN_SCOPES] : META_OAUTH_SCOPES;
+  url.searchParams.set('scope', scopes.join(','));
   url.searchParams.set('response_type', 'code');
   return url.toString();
 }
@@ -135,7 +147,7 @@ export async function subscribePageToWebhooks(pageId: string, pageToken: string)
     const response = await fetch(`${GRAPH}/${pageId}/subscribed_apps`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${pageToken}` },
-      body: JSON.stringify({ subscribed_fields: META_SUBSCRIBED_FIELDS }),
+      body: JSON.stringify({ subscribed_fields: metaSubscribedFieldsForPage(pageId) }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const data = (await response.json().catch(() => ({}))) as { success?: boolean; error?: { message?: string } };

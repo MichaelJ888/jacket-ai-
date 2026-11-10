@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import { after, NextResponse } from 'next/server';
 import { GRAPH, replyToComment } from '../../_lib/channels';
 import { type Channel, upsertContact } from '../../_lib/crm';
-import { leadgenExternalId } from '../../_lib/leadgen-crm-logic.ts';
+import { isMjicLeadgenPage, leadgenExternalId } from '../../_lib/leadgen-crm-logic.ts';
 import { escapeTelegramHtml, recordLead, reportCriticalError, sendTelegramMessage } from '../../_lib/integrations';
 import { parseLeadgenFieldData } from '../../_lib/meta-lead-logic.ts';
 import { getPageToken } from '../../_lib/meta-pages';
@@ -67,12 +67,20 @@ type Change = {
 
 type Payload = { object?: string; entry?: Array<{ id?: string; messaging?: MessagingEvent[]; changes?: Change[] }> };
 
-// Lead-ads form submission -> CRM lead + Telegram alert. Page-agnostic: works for MJIC and (once
-// META_CGV_PAGE_ID/META_CGV_PAGE_ACCESS_TOKEN are set) the CG Venezuela Enterprises page.
+// Lead-ads form submissions are accepted only from the configured MJIC Page.
 async function handleLeadgen(leadgenId: string, pageId?: string, formId?: string, adId?: string) {
+  const mjicPageId = process.env.META_PAGE_ID;
+  if (!isMjicLeadgenPage(pageId, mjicPageId)) {
+    console.error(`Ignoring Meta leadgen ${leadgenId}: Page ID does not match the configured MJIC META_PAGE_ID.`);
+    return;
+  }
+  if (mjicPageId === process.env.META_CGV_PAGE_ID) {
+    console.error(`Ignoring Meta leadgen ${leadgenId}: META_PAGE_ID conflicts with META_CGV_PAGE_ID.`);
+    return;
+  }
   const token = await getPageToken(pageId);
   if (!token) {
-    console.error(`Leadgen ${leadgenId}: no Page access token for page ${pageId || 'unknown'} (set META_PAGE_TOKENS or META_CGV_PAGE_*).`);
+    console.error(`Leadgen ${leadgenId}: no Page access token for configured MJIC Page ${mjicPageId}.`);
     return;
   }
   const response = await fetch(`${GRAPH}/${leadgenId}?fields=field_data,created_time,form_id,ad_id`, {
@@ -85,14 +93,13 @@ async function handleLeadgen(leadgenId: string, pageId?: string, formId?: string
   }
   const data = (await response.json()) as { field_data?: unknown; form_id?: string; ad_id?: string };
   const parsed = parseLeadgenFieldData(data.field_data);
-  const pageLabel = pageId && pageId === process.env.META_CGV_PAGE_ID ? 'CG Venezuela Enterprises' : 'MJIC';
   await recordLead({
     name: parsed.name || 'Facebook lead',
     company: parsed.company || undefined,
     contact: parsed.contact || undefined,
     message: parsed.message || 'Facebook lead-ad signup',
-    source: pageId && pageId === process.env.META_CGV_PAGE_ID ? 'facebook-lead-ad-cgv' : 'facebook-lead-ad',
-    details: { leadgenId, pageId: pageId || null, formId: data.form_id || formId || null, adId: data.ad_id || adId || null, email: parsed.email || null, phone: parsed.phone || null },
+    source: 'facebook-lead-ad',
+    details: { leadgenId, pageId, formId: data.form_id || formId || null, adId: data.ad_id || adId || null, email: parsed.email || null, phone: parsed.phone || null },
   });
   const crm = await upsertContact({
     channel: 'facebook',
@@ -104,7 +111,7 @@ async function handleLeadgen(leadgenId: string, pageId?: string, formId?: string
   });
   if (crm.error) console.error(`Leadgen ${leadgenId}: CRM upsert failed: ${crm.error}`);
   await sendTelegramMessage(
-    `🎯 <b>New Facebook lead ad signup</b> (${escapeTelegramHtml(pageLabel)} page)\n` +
+    `🎯 <b>New MJIC Facebook lead ad signup</b>\n` +
       `Name: ${escapeTelegramHtml(parsed.name || '—')}\n` +
       `Contact: ${escapeTelegramHtml(parsed.contact || '—')}\n` +
       (parsed.company ? `Company: ${escapeTelegramHtml(parsed.company)}\n` : '') +

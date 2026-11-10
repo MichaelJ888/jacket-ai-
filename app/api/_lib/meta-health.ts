@@ -39,7 +39,16 @@ export async function checkPageHealth(pageId: string, igUserId: string | null): 
     tokenError = error instanceof Error ? error.message : 'Health check failed';
   }
 
-  const checks = evaluateHealth({ appId: config.appId, tokenValid, tokenError, tokenExpiresAt, tokenAppId, subscribedApps, igUserId });
+  const checks = evaluateHealth({
+    appId: config.appId,
+    tokenValid,
+    tokenError,
+    tokenExpiresAt,
+    tokenAppId,
+    leadgenRequired: pageId === process.env.META_PAGE_ID,
+    subscribedApps,
+    igUserId,
+  });
   return { checks, healthy: checks.filter((check) => check.id !== 'instagram').every((check) => check.ok) };
 }
 

@@ -182,7 +182,7 @@ export default function CeoAiStudioClient() {
           <h1 className="mt-1 text-xl font-bold">CEO AI Studio &amp; Enhancer</h1>
         </div>
         <nav aria-label="Studio navigation" className="flex gap-2 text-sm">
-          <Link href="/" className="rounded border border-cyan-400/40 px-3 py-2 font-semibold text-cyan-100 hover:bg-cyan-400/10">MJIC website</Link>
+          <Link href="/" className="rounded border border-cyan-400/40 px-3 py-2 font-semibold text-cyan-100 hover:bg-cyan-400/10">MJIC Website Landing Page</Link>
           <Link href="/admin" className="rounded border border-fuchsia-400/40 px-3 py-2 font-semibold text-fuchsia-100 hover:bg-fuchsia-400/10">Admin Dashboard</Link>
         </nav>
       </header>

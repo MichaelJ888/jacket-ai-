@@ -4,6 +4,10 @@ export function leadgenExternalId(leadgenId: string) {
   return `leadgen:${leadgenId}`;
 }
 
+export function isMjicLeadgenPage(pageId: string | undefined, mjicPageId: string | undefined): pageId is string {
+  return Boolean(pageId && mjicPageId && pageId === mjicPageId);
+}
+
 type LeadRow = {
   name?: string | null;
   contact?: string | null;

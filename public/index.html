@@ -461,13 +461,18 @@
 </section>
 
 <!-- ============ OFFICIAL MJIC CLIENT JOURNEY SHOWCASE (admin-editable) ============ -->
-<section x-show="siteSettings.explainerVideoUrl" x-cloak class="max-w-5xl mx-auto px-6 sm:px-10 py-16">
+<section id="mjic-client-journey" x-show="siteSettings.explainerVideoUrl" x-cloak class="max-w-5xl mx-auto px-6 sm:px-10 py-16">
   <p class="text-gold-600 font-semibold text-sm mb-2 text-center">Watch</p>
-  <h2 class="font-display font-bold text-navy text-2xl sm:text-3xl tracking-tight mb-2 text-center">The Official MJIC Client Journey.</h2>
+  <h2 class="font-display font-bold text-navy text-2xl sm:text-3xl tracking-tight mb-2 text-center">The Official MJIC Client Journey VIDEO</h2>
   <p class="text-navy-400 text-sm text-center mb-6">Idea → Fabric Selection → Antipolo Production → Finished Garments</p>
+  <div class="mb-5 flex flex-wrap justify-center gap-3" aria-label="Client journey audio controls">
+    <button id="journey-music-toggle" type="button" aria-pressed="false" class="rounded-md bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700">Play upbeat soundtrack</button>
+    <button id="journey-voiceover-toggle" type="button" aria-pressed="false" class="rounded-md border border-navy px-4 py-2 text-sm font-semibold text-navy hover:bg-navy-50">Play voiceover</button>
+  </div>
+  <p id="journey-audio-status" class="mb-3 min-h-5 text-center text-xs text-navy-400" role="status" aria-live="polite"></p>
   <div class="aspect-video rounded-lg overflow-hidden border hairline">
     <iframe x-show="siteSettings.explainerVideoType!=='file'" :src="youtubeEmbedUrl(siteSettings.explainerVideoUrl)" class="w-full h-full" frameborder="0" allowfullscreen title="Website explainer video"></iframe>
-    <video x-show="siteSettings.explainerVideoType==='file' && !explainerVideoFallback" :src="siteSettings.explainerVideoUrl" :poster="siteSettings.explainerVideoUrl==='/videos/mjic-client-journey.webm' ? '/videos/mjic-client-journey-poster.jpg' : ''" controls loop muted playsinline preload="metadata" class="w-full h-full bg-navy" @error="if(siteSettings.explainerVideoUrl==='/videos/mjic-client-journey.webm') explainerVideoFallback=true"></video>
+    <video x-show="siteSettings.explainerVideoType==='file' && !explainerVideoFallback" :src="siteSettings.explainerVideoUrl" :poster="siteSettings.explainerVideoUrl==='/videos/mjic-client-journey.webm' ? '/videos/mjic-client-journey-poster.jpg' : ''" controls loop playsinline preload="metadata" class="w-full h-full bg-navy" @error="if(siteSettings.explainerVideoUrl==='/videos/mjic-client-journey.webm') explainerVideoFallback=true"></video>
     <iframe x-show="siteSettings.explainerVideoType==='file' && explainerVideoFallback" x-cloak src="/mjic-client-journey.html" class="w-full h-full" frameborder="0" title="MJIC client journey showcase"></iframe>
   </div>
 </section>
@@ -804,6 +809,8 @@
   </div>
 </section>
 
+
+
 <section id="catalog" class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 py-20">
   <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-5 mb-10">
     <div>
@@ -826,7 +833,7 @@
   <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
     <template x-for="p in filteredProducts" :key="p.id">
       <div class="group border hairline rounded-lg overflow-hidden hover:shadow-xl hover:shadow-gold/10 hover:border-gold-400/50 transition-all duration-300 bg-white flex flex-col">
-        <div class="aspect-[4/3] overflow-hidden bg-navy-50 relative">
+        <div role="button" tabindex="0" :aria-label="'Open product gallery for ' + p.title" @click="openModal(p)" @keydown.enter="openModal(p)" @keydown.space.prevent="openModal(p)" class="aspect-[4/3] overflow-hidden bg-navy-50 relative cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold-500">
           <img x-show="p.img" :src="p.img" :alt="p.title" loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
           <div x-show="!p.img" class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-navy to-navy-600 text-center px-4">
             <span class="font-display font-bold text-gold-100 tracking-widest text-sm">MJIC</span>
@@ -842,7 +849,7 @@
           <h3 class="font-display font-bold text-navy text-sm leading-snug mb-2" x-text="p.title"></h3>
           <p class="text-xs text-navy-400 line-clamp-2 mb-4 flex-1" x-text="p.description"></p>
           <div class="flex gap-2">
-            <button @click="openModal(p)" class="flex-1 text-xs font-semibold border border-navy text-navy rounded-md py-2 hover:bg-navy hover:text-white transition-colors">View Details</button>
+            <button @click="openModal(p)" class="flex-1 text-xs font-semibold border border-navy text-navy rounded-md py-2 hover:bg-navy hover:text-white transition-colors">View Gallery &amp; Details</button>
             <button @click="addToQuote(p)" class="shrink-0 flex items-center gap-1.5 px-3 text-xs font-semibold rounded-md bg-gold-100 text-gold-600 hover:bg-gold hover:text-white transition-colors" title="Add to Cart">
               <i data-lucide="shopping-cart" class="w-4 h-4"></i> Add to Cart
             </button>
@@ -865,6 +872,18 @@
     <a href="/catalogue-enhancer" target="_top" rel="noopener" class="inline-flex shrink-0 items-center justify-center rounded-md bg-navy px-5 py-3 text-sm font-bold text-white transition hover:bg-navy-600">Open secure AI Studio</a>
   </div>
 </section>
+
+<script>
+  (function () {
+    const journey = document.getElementById('mjic-client-journey');
+    const wizard = document.getElementById('order-wizard');
+    if (!journey || !wizard) {
+      console.error('MJIC page layout: client journey or order wizard section is missing.');
+      return;
+    }
+    journey.insertAdjacentElement('afterend', wizard);
+  })();
+</script>
 
 <!-- ============ STUDIO COLLECTION (approved CEO AI Studio photos, loaded from /api/studio/catalog) ============ -->
 <section id="studio-collection" class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 pb-20" hidden>
@@ -4026,5 +4045,6 @@ function fictionalLiveOrders() {
 </div>
 <script src="/live-ticker.js" defer></script>
 <script src="/site-cms.js" defer></script>
+<script src="/journey-audio.js"></script>
 </body>
 </html>

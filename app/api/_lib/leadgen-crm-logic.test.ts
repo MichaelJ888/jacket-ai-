@@ -1,7 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { leadgenContactInput, leadgenExternalId } from './leadgen-crm-logic.ts';
+import { isMjicLeadgenPage, leadgenContactInput, leadgenExternalId } from './leadgen-crm-logic.ts';
+
+test('accepts leadgen only for the configured MJIC Meta Page', () => {
+  assert.equal(isMjicLeadgenPage('mjic-page', 'mjic-page'), true);
+  assert.equal(isMjicLeadgenPage('cgv-page', 'mjic-page'), false);
+  assert.equal(isMjicLeadgenPage(undefined, 'mjic-page'), false);
+  assert.equal(isMjicLeadgenPage('mjic-page', undefined), false);
+});
 
 test('leadgenExternalId is stable per leadgen id', () => {
   assert.equal(leadgenExternalId('123'), 'leadgen:123');

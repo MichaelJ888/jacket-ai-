@@ -18,9 +18,14 @@ test('missing subscription and fields are reported', () => {
   assert.equal(byId(partial).fields, false);
 });
 
+test('MJIC Page health requires the leadgen webhook field', () => {
+  const common = { ...base, leadgenRequired: true, subscribedApps: [{ id: '1', subscribed_fields: ['messages', 'messaging_postbacks', 'feed'] }] };
+  assert.equal(byId(evaluateHealth(common)).fields, false);
+  assert.equal(byId(evaluateHealth({ ...common, subscribedApps: [{ id: '1', subscribed_fields: ['messages', 'messaging_postbacks', 'feed', 'leadgen'] }] })).fields, true);
+});
+
 test('expired or foreign token fails', () => {
   assert.equal(byId(evaluateHealth({ ...base, tokenExpiresAt: 500 }))['token'], false);
   assert.equal(byId(evaluateHealth({ ...base, tokenAppId: '2' }))['token'], false);
   assert.equal(byId(evaluateHealth({ ...base, tokenValid: false }))['token'], false);
 });
-

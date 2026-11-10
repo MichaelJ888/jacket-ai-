@@ -19,6 +19,7 @@ type Overview = {
   receipts: Array<{ reference: string | null; detected_amount: number | null; verified: boolean; fraud_score: number; fraud_flags: string[] }>;
 };
 type KnowledgeItem = { id: string; category: string; title: string; content: string; file_name: string | null; mime_type: string | null; created_at: string; asset_url: string | null };
+type MetaPageSubscriptionResult = { name: string; subscribed: boolean; leadgenRequested: boolean; error?: string };
 
 const STYLES = ["windbreaker", "varsity", "corporate", "bomber"];
 const input = "rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900";
@@ -44,6 +45,15 @@ const TRAINING_MODULES = [
   },
 ] as const;
 type TrainingModuleId = (typeof TRAINING_MODULES)[number]["id"];
+
+function isMetaPageSubscriptionResult(value: unknown): value is MetaPageSubscriptionResult {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Record<string, unknown>;
+  return typeof result.name === "string"
+    && typeof result.subscribed === "boolean"
+    && typeof result.leadgenRequested === "boolean"
+    && (result.error === undefined || typeof result.error === "string");
+}
 
 function highlightHtml(source: string) {
   const chunks: ReactNode[] = [];
@@ -120,6 +130,7 @@ export default function AdminPage() {
   const [sourcePreviewOpen, setSourcePreviewOpen] = useState(false);
   const [htmlPreview, setHtmlPreview] = useState<{ filename: string; source: string } | null>(null);
   const [htmlExportLoading, setHtmlExportLoading] = useState(false);
+  const [htmlCopyMessage, setHtmlCopyMessage] = useState("");
   const [trainingModule, setTrainingModule] = useState<TrainingModuleId | null>(null);
 
   useEffect(() => {
@@ -142,6 +153,7 @@ export default function AdminPage() {
   const exportHtml = useCallback(async () => {
     setHtmlExportLoading(true);
     setMessage("");
+    setHtmlCopyMessage("");
     try {
       const response = await fetch("/api/admin/export/html", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
       if (!response.ok) {
@@ -166,6 +178,16 @@ export default function AdminPage() {
     link.download = htmlPreview.filename;
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  async function copyHtmlPreview() {
+    if (!htmlPreview) return;
+    try {
+      await navigator.clipboard.writeText(htmlPreview.source);
+      setHtmlCopyMessage("HTML code copied to clipboard.");
+    } catch {
+      setHtmlCopyMessage("Clipboard access failed. Select the preview code and copy it manually.");
+    }
   }
 
   const exportSource = useCallback(async () => {
@@ -206,6 +228,25 @@ export default function AdminPage() {
   async function registerCallbacks() {
     const r = await call("/api/admin/meta-setup", { method: "POST" });
     if (r.ok) { setSetup(r.data.checks); setMessage(r.data.registered.ok ? "Callbacks registered." : `Could not register: ${r.data.registered.error}`); }
+  }
+
+  async function subscribeMetaPages() {
+    const r = await call("/api/admin/meta-pages", { method: "POST" });
+    if (!r.ok) return setMessage(r.data.error || `Page subscription failed (HTTP ${r.status}).`);
+    const rawResults: unknown = r.data.results;
+    const results = Array.isArray(rawResults) ? rawResults.filter(isMetaPageSubscriptionResult) : [];
+    if (!results.length) return setMessage("Meta Page subscription returned no valid Page results.");
+    const mjicPage = results.find((result) => result.leadgenRequested);
+    const failed = results.filter((result) => !result.subscribed);
+    if (!mjicPage) {
+      setMessage("No unique MJIC Page was subscribed. Check META_PAGE_ID, META_CGV_PAGE_ID, and System User Page access.");
+    } else if (!mjicPage.subscribed) {
+      setMessage(`MJIC lead-ad subscription failed: ${mjicPage.error || "Meta rejected the Page subscription."}`);
+    } else if (failed.length) {
+      setMessage(`MJIC lead-ad subscription succeeded; ${failed.length} other Page subscription(s) failed.`);
+    } else {
+      setMessage(`Subscribed ${results.length} Page(s); leadgen is enabled only for the configured MJIC Page.`);
+    }
   }
 
   async function saveKnowledge() {
@@ -393,10 +434,12 @@ export default function AdminPage() {
                 <p className="text-xs text-zinc-400">{htmlPreview.filename} · Review before downloading</p>
               </div>
               <div className="flex gap-2">
+                <button type="button" className="rounded bg-emerald-600 px-4 py-2 text-sm font-bold text-white hover:bg-emerald-500" onClick={() => void copyHtmlPreview()}>COPY CODE</button>
                 <button type="button" className="rounded bg-cyan-700 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-600" onClick={downloadHtmlPreview}>Download HTML</button>
                 <button type="button" className="rounded border border-zinc-600 px-3 py-2 text-sm hover:bg-zinc-800" onClick={() => setHtmlPreview(null)}>Close</button>
               </div>
             </header>
+            {htmlCopyMessage && <p className="border-b border-zinc-700 px-4 py-2 text-sm text-emerald-300" role="status" aria-live="polite">{htmlCopyMessage}</p>}
             <pre className="min-h-0 flex-1 overflow-auto p-4 text-xs leading-relaxed"><code>{highlightHtml(htmlPreview.source)}</code></pre>
           </section>
         </div>
@@ -431,6 +474,7 @@ export default function AdminPage() {
             ))}
           </ul>
           <button className="mt-2 rounded bg-zinc-900 px-3 py-1 text-sm text-white" onClick={registerCallbacks}>Register callbacks</button>
+          <button className="ml-2 mt-2 rounded bg-blue-700 px-3 py-1 text-sm text-white" onClick={() => void subscribeMetaPages()}>Subscribe Page webhooks (MJIC lead ads)</button>
           <h3 className="mb-1 mt-5 text-sm font-semibold">Buyers</h3>
           <ul className="space-y-1 text-sm">
             {tenants.map((t) => (

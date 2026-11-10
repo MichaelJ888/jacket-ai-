@@ -14,10 +14,11 @@ export async function POST(request: Request) {
   if (!config) return NextResponse.json({ error: 'Facebook connection is not configured yet.' }, { status: 503 });
 
   const body = (await request.json().catch(() => ({}))) as { context?: string };
+  const context = parseOAuthContext(body.context);
   const { state, nonce } = createOAuthState(config.appSecret);
-  const response = NextResponse.json({ url: buildAuthorizeUrl(config.appId, oauthRedirectUri(publicBaseUrl()), state) });
+  const response = NextResponse.json({ url: buildAuthorizeUrl(config.appId, oauthRedirectUri(publicBaseUrl()), state, context) });
   const cookie = { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/api/meta/oauth', maxAge: 600 };
   response.cookies.set(META_NONCE_COOKIE, nonce, cookie);
-  response.cookies.set(META_CTX_COOKIE, parseOAuthContext(body.context), cookie);
+  response.cookies.set(META_CTX_COOKIE, context, cookie);
   return response;
 }
