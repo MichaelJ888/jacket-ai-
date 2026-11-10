@@ -407,3 +407,10 @@ px vercel ls.
 - Environment: about 300 MB free RAM during the run. Plain `tsc` was not used; incremental was used.
 - Open: TikTok/YouTube rows on video slots remain AWAITING_VIDEO (video generation blocked by AI Gateway billing, owner action).
 
+## Completion log - MJIC official brand integration (2026-11-11)
+- Commit `578549e` on `main`: official logo and responsive brand name added to the storefront, Next.js content shell, public quote page, and printable formal quotation. Root and static storefront metadata now use MJIC's official name and OpenGraph/Twitter art.
+- Preserved the supplied JPEG at `public/branding/mjic-official-logo-source.jpg`; generated optimized JPEG/WebP, PNG, favicon, Apple touch icon, and 1200×630 OG image variants. Navy/gold styling matches existing tokens.
+- Both generated PDF paths (direct PDF endpoint and stored-quote/email preview) now embed the official logo. The shared loader retrieves the public JPEG from the same Vercel deployment with a 5-second timeout and 1 MB size guard; no paid image provider or new dependency was added.
+- Verified: incremental TypeScript clean; `npm test` 492 pass / 0 fail / 1 skipped (493 total); `npm run lint` 0 errors (6 warnings); webpack production build passes; focused PDF logo test passes.
+- Production deploy `dpl_D74DvWxM7r1CreYeyBzVzaabSHYx` Ready and aliased to `https://jacket-ai.vercel.app`. `npm run verify:live` 11/11; `/`, `/index.html`, `/quote`, `/admin/quotation`, favicon, Apple icon, and logo/OG assets return HTTP 200; `/api/health` = `ok`.
+- No schema or environment changes. The authenticated PDF-upload workflow was not invoked live because it writes quotation records and files; its renderer is covered by the focused unit test.
