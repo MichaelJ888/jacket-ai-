@@ -596,7 +596,7 @@
                   <option>Right Sleeve</option>
                   <option>Back</option>
                 </select>
-                <select x-model="logo.size" class="text-xs border hairline rounded px-2 py-1">
+                <select x-model="logo.size" @change="renderMockup()" class="text-xs border hairline rounded px-2 py-1">
                   <option value="small">1"–3"</option>
                   <option value="large">3.1"+</option>
                 </select>
@@ -629,8 +629,9 @@
 
       <div class="lg:col-span-3 space-y-6">
         <div class="bg-white border hairline rounded-lg p-6 flex items-center justify-center">
-          <canvas x-ref="mockupCanvas" width="600" height="450" class="w-full max-w-lg rounded-md border hairline"></canvas>
+          <canvas x-ref="mockupCanvas" width="600" height="450" role="img" :aria-label="'Design mock-up preview for '+(getMockupProduct()?.title || 'selected product')" class="w-full max-w-lg rounded-md border hairline"></canvas>
         </div>
+        <p x-show="mockupRendering" role="status" class="text-center text-xs text-navy-400">Updating your design preview…</p>
 
         <div class="bg-navy rounded-lg p-6 sm:p-8 text-white" x-show="mockup.productId">
           <h3 class="font-display font-bold mb-4 flex items-center gap-2"><i data-lucide="calculator" class="w-4 h-4 text-gold-400"></i> Your Instant Quote</h3>
@@ -1023,8 +1024,9 @@
           <div class="border border-dashed hairline rounded-md p-5 flex flex-col items-center justify-center text-center">
             <template x-if="(method.id==='gcash' || method.id==='maya' || method.id==='bank') && paymentQR[method.id==='bank'?'bpi':method.id]">
               <div class="mb-3">
-                <img :src="paymentQR[method.id==='bank'?'bpi':method.id]" class="w-56 h-56 object-contain mx-auto border hairline rounded-md p-2 bg-white">
+                <img :src="paymentQR[method.id==='bank'?'bpi':method.id]" :alt="(method.id==='bank'?'BPI':method.label)+' merchant payment QR code'" class="w-56 h-56 object-contain mx-auto border hairline rounded-md p-2 bg-white">
                 <p class="text-[10px] text-navy-400 mt-1">Scan to pay via <span x-text="method.id==='bank' ? 'BPI' : method.label"></span></p>
+                <button type="button" @click="openPaymentQR(method)" class="mt-2 rounded-md border border-navy px-3 py-1.5 text-xs font-semibold text-navy hover:bg-navy hover:text-white">View full-size QR</button>
               </div>
             </template>
             <template x-if="(method.id==='gcash' || method.id==='maya' || method.id==='bank') && !paymentQR[method.id==='bank'?'bpi':method.id]">
@@ -1056,6 +1058,18 @@
     </div>
   </div>
 </section>
+
+<div x-show="paymentQRModal.src" x-cloak class="fixed inset-0 z-[70] flex items-center justify-center bg-navy-900/80 p-4" @keydown.escape.window="closePaymentQR()">
+  <button type="button" class="absolute inset-0 cursor-default" aria-label="Close payment QR preview" @click="closePaymentQR()"></button>
+  <section role="dialog" aria-modal="true" aria-labelledby="payment-qr-modal-title" class="relative z-10 w-full max-w-lg rounded-xl bg-white p-5 text-center shadow-2xl">
+    <div class="flex items-center justify-between gap-4 text-left">
+      <h2 id="payment-qr-modal-title" class="font-display font-bold text-navy text-lg"><span x-text="paymentQRModal.label"></span> payment QR</h2>
+      <button type="button" autofocus @click="closePaymentQR()" class="rounded-md border hairline px-3 py-2 text-sm font-semibold text-navy hover:bg-navy-50">Close</button>
+    </div>
+    <img :src="paymentQRModal.src" :alt="paymentQRModal.label+' merchant payment QR code'" class="mx-auto mt-4 max-h-[70vh] w-full max-w-sm object-contain">
+    <p class="mt-3 text-xs text-navy-400">Verify the amount and merchant details before you send payment.</p>
+  </section>
+</div>
 
 <!-- ============ PRODUCTION UPDATES FEED ============ -->
 <section class="bg-navy-50/50 border-b hairline">
@@ -1452,7 +1466,7 @@
       <div>
         <div class="bg-navy-50">
           <div class="h-72 sm:h-80 relative bg-navy-900/5">
-            <img x-show="activeMedia(selectedProduct).type==='image' && activeMedia(selectedProduct).src" :src="activeMedia(selectedProduct).src" class="w-full h-full object-contain">
+            <img x-show="activeMedia(selectedProduct).type==='image' && activeMedia(selectedProduct).src" :src="activeMedia(selectedProduct).src" :alt="selectedProduct.title+' reference photo '+(mediaIndex+1)" class="w-full h-full object-contain">
             <div x-show="!allMedia(selectedProduct).length" class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-navy to-navy-600 text-gold-100">
               <span class="font-display font-bold tracking-widest">MJIC</span>
               <span class="text-xs text-white/70 mt-1" x-text="selectedProduct.category"></span>
@@ -1470,12 +1484,18 @@
 
           <div x-show="allMedia(selectedProduct).length > 1" class="flex gap-2 overflow-x-auto p-3">
             <template x-for="(m, i) in allMedia(selectedProduct)" :key="i">
-              <button @click="mediaIndex = i" class="shrink-0 w-16 h-16 rounded border-2 overflow-hidden relative" :class="mediaIndex===i ? 'border-gold-600' : 'border-transparent opacity-70 hover:opacity-100'">
+              <button type="button" @click="mediaIndex = i" :aria-label="'Show reference photo '+(i+1)+' for '+selectedProduct.title" :aria-pressed="mediaIndex===i" class="shrink-0 w-16 h-16 rounded border-2 overflow-hidden relative" :class="mediaIndex===i ? 'border-gold-600' : 'border-transparent opacity-70 hover:opacity-100'">
                 <img x-show="m.type==='image'" :src="m.src" class="w-full h-full object-cover">
                 <div x-show="m.type!=='image'" class="w-full h-full bg-navy flex items-center justify-center"><i data-lucide="play" class="w-4 h-4 text-white"></i></div>
               </button>
             </template>
           </div>
+          <p x-show="catalogueGalleryState[selectedProduct.id]==='loading'" role="status" class="px-3 pb-3 text-xs text-navy-400">Loading matching apparel reference photos…</p>
+          <p x-show="catalogueGalleryState[selectedProduct.id]==='error'" role="status" class="px-3 pb-3 text-xs text-amber-800">
+            Additional apparel photos could not be loaded.
+            <button type="button" @click="loadCatalogueGallery(selectedProduct)" class="font-semibold underline">Retry</button>
+          </p>
+          <p x-show="catalogueGalleryState[selectedProduct.id]==='loaded'" class="px-3 pb-3 text-[11px] text-navy-400">Additional photos are category references; they are not verified alternate angles of this exact item.</p>
         </div>
         <div class="p-6 sm:p-8">
           <div class="flex justify-between items-start mb-2">
@@ -2250,7 +2270,12 @@ function mjApp(){
       {q:'How do I place a bulk order today?', a:'Browse the catalog or use the Design Studio to configure your item, add it to your Quotation Builder, then send it to our sales team via Telegram or Viber — or request a formal, signed quotation with down payment computation.'}
     ],
     paymentQR: safeLS.get('mji_payment_qr', {gcash:'', maya:'', bpi:''}),
+    paymentQRModal: {label:'', src:''},
+    catalogueGalleryById: {},
+    catalogueGalleryState: {},
     mockup: {productId:'', color:'Navy', logos:[], fabricClass:'B', logoMethod:'embroidery', qty:20, addons:{reversible:false, reflector:false, hood:false, netLining:false}, addNames:false, sampleName:'JUAN DELA CRUZ', rushOrder:false},
+    mockupRenderVersion: 0,
+    mockupRendering: false,
     ealaNextMatch: safeLS.get('mji_eala_match_v2', {event:'Singapore Tennis Open 2026 (WTA 500) — Round of 16', opponent:'Tatiana Prozorova', watchLink:'https://www.wtatennis.com/tournaments/1152/singapore/2026/scores', targetDate:'2026-09-24T11:00:00+08:00', isLive:false, liveScore:'', lastVerified:'September 22, 2026 (Philippine time)'}),
     fabricFilter:'All', selectedFabric:null, selectedColor:'',
     crmOrders: safeLS.get('mji_crm_orders', []), crmFilter:'All',
@@ -2914,6 +2939,7 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
       // Carry the choice straight into the Design Studio's pricing
       this.mockup.fabricClass = fabric.class==='Class A' ? 'A' : 'B';
       this.mockup.color = this.selectedColor;
+      this.renderMockup();
       this.showToast(fabric.name + ' — ' + this.selectedColor + ' selected.');
     },
 
@@ -3169,17 +3195,74 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
       });
     },
 
-    openModal(p){ this.selectedProduct = p; this.mediaIndex = 0; },
+    openModal(p){
+      this.selectedProduct = p;
+      this.mediaIndex = 0;
+      void this.loadCatalogueGallery(p);
+    },
+    openPaymentQR(method){
+      const key = method.id==='bank' ? 'bpi' : method.id;
+      const src = this.paymentQR[key];
+      if(!src) return this.showToast('No published QR code is available for this payment method.');
+      this.paymentQRModal = {label:method.id==='bank' ? 'BPI' : method.label, src};
+    },
+    closePaymentQR(){ this.paymentQRModal = {label:'', src:''}; },
 
     // ---- Product media gallery (Alibaba-style: main image + extra photos/videos) ----
     allMedia(p){
       if(!p) return [];
       const media = p.img ? [{type:'image', src:p.img}] : [];
+      const seen = new Set(media.map(item=>item.src));
+      (this.catalogueGalleryById[p.id] || []).forEach(src=>{
+        if(!seen.has(src)){ media.push({type:'image', src}); seen.add(src); }
+      });
       (p.gallery || []).forEach(g=>{
-        if(g.type==='youtube'){ media.push({type:'youtube', src:this.youtubeEmbedUrl(g.src)}); }
-        else { media.push({type:g.type||'image', src:g.src}); }
+        const src = g.type==='youtube' ? this.youtubeEmbedUrl(g.src) : g.src;
+        if(src && !seen.has(src)){ media.push({type:g.type==='youtube' ? 'youtube' : (g.type||'image'), src}); seen.add(src); }
       });
       return media;
+    },
+    cataloguePhotoFolders(p){
+      const text = ((p && p.category) || '') + ' ' + ((p && p.title) || '');
+      const value = text.toLowerCase();
+      if(value.includes('polo')) return ['polo shirts','sublimation polo shirts','company-uniforms'];
+      if(value.includes('school')) return ['school-uniforms','company-uniforms'];
+      if(value.includes('hospital') || value.includes('scrub')) return ['hospital-uniforms','company-uniforms'];
+      if(value.includes('uniform')) return ['company-uniforms','school-uniforms','hospital-uniforms'];
+      if(/varsity|letterman|bomber/.test(value)) return ['jackets-all-design','sublimation jackets'];
+      if(/jacket|windbreaker/.test(value)) return ['sublimation jackets','jackets-all-design'];
+      if(/t-shirt|tee shirt/.test(value)) return ['CG T shirts','sublimation tshirts'];
+      return [];
+    },
+    async loadCatalogueGallery(p){
+      if(!p || this.catalogueGalleryState[p.id]==='loading' || this.catalogueGalleryState[p.id]==='loaded' || this.catalogueGalleryState[p.id]==='empty') return;
+      const folders = this.cataloguePhotoFolders(p);
+      if(!folders.length) return;
+      this.catalogueGalleryState[p.id] = 'loading';
+      try{
+        const response = await fetch('/image-library.json', {cache:'force-cache'});
+        if(!response.ok) throw new Error('Image library request failed: '+response.status);
+        const library = await response.json();
+        if(!Array.isArray(library.items)) throw new Error('Image library format is invalid.');
+        const occupied = new Set([p.img, ...(p.gallery || []).map(item=>item.src)].filter(Boolean));
+        const limit = Math.max(0, 5 - (p.img ? 1 : 0) - (p.gallery || []).length);
+        const photos = [];
+        for(const folder of folders){
+          for(const item of library.items){
+            if(photos.length >= limit) break;
+            if(!item || typeof item.src !== 'string' || typeof item.label !== 'string') continue;
+            if(item.label.split(' / ')[0] !== folder || !/\.(?:avif|gif|jpe?g|png|webp)(?:[?#].*)?$/i.test(item.src)) continue;
+            if(occupied.has(item.src)) continue;
+            occupied.add(item.src);
+            photos.push(item.src);
+          }
+          if(photos.length >= limit) break;
+        }
+        this.catalogueGalleryById[p.id] = photos;
+        this.catalogueGalleryState[p.id] = photos.length ? 'loaded' : 'empty';
+      }catch(error){
+        this.catalogueGalleryState[p.id] = 'error';
+      }
     },
     mediaCount(p){ return this.allMedia(p).length; },
     activeMedia(p){
@@ -3530,10 +3613,23 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
     },
 
     uploadQR(method, e){
-      const file = e.target.files[0];
+      const file = e.target.files && e.target.files[0];
       if(!file) return;
+      if(!['image/png','image/jpeg','image/webp'].includes(file.type) || file.size > 5*1024*1024){
+        this.showToast('Use a PNG, JPEG, or WebP QR image under 5 MB.');
+        e.target.value = '';
+        return;
+      }
       const reader = new FileReader();
-      reader.onload = (ev)=>{ this.paymentQR[method] = ev.target.result; safeLS.set('mji_payment_qr', this.paymentQR); this.showToast(method.toUpperCase()+' QR code saved.'); };
+      reader.onload = (ev)=>{
+        if(typeof ev.target.result !== 'string') return this.showToast('Could not read the QR image. Please try another file.');
+        this.paymentQR[method] = ev.target.result;
+        const stored = safeLS.set('mji_payment_qr', this.paymentQR);
+        this.showToast(stored
+          ? method.toUpperCase()+' QR saved on this device. Click Save All Changes to publish it for customers.'
+          : method.toUpperCase()+' QR is available for this session only. Click Save All Changes now to publish it for customers.');
+      };
+      reader.onerror = ()=> this.showToast('Could not read the QR image. Please try another file.');
       reader.readAsDataURL(file);
     },
 
@@ -3636,6 +3732,7 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
     },
 
     loadImg(src){
+      if(typeof src !== 'string' || !src) return Promise.resolve(null);
       return new Promise((resolve)=>{
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -3646,12 +3743,28 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
     },
 
     async renderMockup(){
+      const renderVersion = ++this.mockupRenderVersion;
+      this.mockupRendering = true;
+      try{
+        await this.drawMockup(renderVersion);
+      }catch(error){
+        console.error('Mock-up rendering failed.', error);
+        if(renderVersion === this.mockupRenderVersion) this.showToast('Could not render this mock-up. Try selecting the product or logo again.');
+      }finally{
+        if(renderVersion === this.mockupRenderVersion) this.mockupRendering = false;
+      }
+    },
+
+    async drawMockup(renderVersion){
       const canvas = this.$refs.mockupCanvas;
       if(!canvas) return;
       const ctx = canvas.getContext('2d');
+      if(!ctx){ this.showToast('The design preview is unavailable in this browser.'); return; }
       ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = '#F8FAFC';
+      ctx.fillRect(0,0,canvas.width,canvas.height);
 
-      const product = this.products.find(p=> p.id === Number(this.mockup.productId) || p.id === this.mockup.productId);
+      const product = this.getMockupProduct();
       if(!product){
         ctx.fillStyle = '#EEF1F6'; ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.fillStyle = '#3C567F'; ctx.font = '16px Inter'; ctx.textAlign='center';
@@ -3659,7 +3772,15 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
         return;
       }
       const baseImg = await this.loadImg(product.img);
+      if(renderVersion !== this.mockupRenderVersion) return;
       if(baseImg) ctx.drawImage(baseImg, 0, 0, canvas.width, canvas.height);
+      else{
+        ctx.fillStyle = '#EEF1F6'; ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle = '#3C567F'; ctx.font = 'bold 18px Inter'; ctx.textAlign='center';
+        ctx.fillText(product.title, canvas.width/2, canvas.height/2 - 8, canvas.width - 32);
+        ctx.font = '12px Inter';
+        ctx.fillText('Product photo unavailable — logo placement preview', canvas.width/2, canvas.height/2 + 18, canvas.width - 32);
+      }
 
       const zones = {
         'Front Chest': {x:0.36, y:0.32, w:0.20},
@@ -3670,12 +3791,14 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
 
       for(const logo of this.mockup.logos){
         const img = await this.loadImg(logo.src);
+        if(renderVersion !== this.mockupRenderVersion) return;
         if(!img) continue;
         const zone = zones[logo.placement] || zones['Front Chest'];
-        const w = canvas.width * zone.w;
-        const h = w * (img.height/img.width);
-        const x = canvas.width * zone.x;
-        const y = canvas.height * zone.y;
+        const scale = logo.size === 'large' ? 1.5 : 1;
+        const w = Math.min(canvas.width * zone.w * scale, canvas.width * 0.4);
+        const h = Math.min(w * (img.height/img.width), canvas.height * 0.35);
+        const x = Math.max(0, Math.min(canvas.width * zone.x, canvas.width - w - 8));
+        const y = Math.max(0, Math.min(canvas.height * zone.y, canvas.height - h - 8));
         if(logo.placement === 'Back'){
           ctx.fillStyle = 'rgba(11,30,61,0.85)'; ctx.fillRect(x-4, y-16, w+8, 16);
           ctx.fillStyle = '#E0A458'; ctx.font = '9px Inter'; ctx.textAlign='left';
@@ -3683,18 +3806,34 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
         }
         ctx.drawImage(img, x, y, w, h);
       }
+
+      const colorName = this.mockup.color || 'Navy';
+      const colorHex = this.selectedFabric?.colors?.find(color=>color.name===colorName)?.hex;
+      const label = 'Fabric color: '+colorName;
+      ctx.font = '12px Inter';
+      const labelWidth = Math.min(ctx.measureText(label).width + 20, canvas.width - 24);
+      ctx.fillStyle = 'rgba(11,30,61,0.88)';
+      ctx.fillRect(12, canvas.height - 36, labelWidth, 24);
+      if(colorHex){
+        ctx.fillStyle = colorHex;
+        ctx.fillRect(18, canvas.height - 30, 12, 12);
+      }
+      ctx.fillStyle = '#FFFFFF';
+      ctx.textAlign = 'left';
+      ctx.fillText(label, colorHex ? 36 : 18, canvas.height - 20, canvas.width - 48);
     },
 
     downloadMockup(){
       const canvas = this.$refs.mockupCanvas;
       if(!canvas) return;
+      if(this.mockupRendering){ this.showToast('Please wait for the design preview to finish updating.'); return; }
       try{
         const link = document.createElement('a');
         link.download = 'MJI-mockup-preview.png';
         link.href = canvas.toDataURL('image/png');
         link.click();
       }catch(err){
-        this.showToast('Can\'t export this preview yet — the product photo is still a placeholder from another site. Attach a real photo in Admin first, then downloads will work.');
+        this.showToast('Could not export this preview. Try another product photo or logo, then download again.');
       }
     },
 

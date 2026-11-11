@@ -18,6 +18,8 @@ type Saved = {
 };
 
 type HistoryRow = { quote_number: string | null; product_name: string | null; quantity: number; total: number; created_at: string };
+type PaymentQrMethod = 'gcash' | 'maya' | 'bpi';
+type PaymentQr = { method: PaymentQrMethod; label: string; src: string };
 
 export default function QuotePage() {
   const [category, setCategory] = useState('jacket');
@@ -40,6 +42,9 @@ export default function QuotePage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<Saved | null>(null);
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
+  const [paymentQrs, setPaymentQrs] = useState<Partial<Record<PaymentQrMethod, string>>>({});
+  const [paymentQrError, setPaymentQrError] = useState('');
+  const [activePaymentQr, setActivePaymentQr] = useState<PaymentQr | null>(null);
 
   const fabricName = fabricChoice === OTHER ? customFabric.trim() : fabricChoice;
   // Class follows the strict fabric rule (same helper the server uses); the customer does not choose it.
@@ -67,6 +72,38 @@ export default function QuotePage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/site/overlay', { cache: 'no-store' })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Payment details request failed (${res.status}).`);
+        const data = await res.json();
+        const published = data?.overlay?.paymentQR;
+        if (!cancelled && published && typeof published === 'object') {
+          const next: Partial<Record<PaymentQrMethod, string>> = {};
+          for (const method of ['gcash', 'maya', 'bpi'] as const) {
+            if (typeof published[method] === 'string' && published[method]) next[method] = published[method];
+          }
+          setPaymentQrs(next);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentQrError('Payment QR images could not be loaded. Use the account details above and confirm the deposit with MJIC before transferring.');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!activePaymentQr) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActivePaymentQr(null);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [activePaymentQr]);
 
   const preview = useMemo(() => {
     if (unitPrice === null || !fabricName) return null;
@@ -136,6 +173,11 @@ export default function QuotePage() {
 
   const field = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900';
   const label = 'mb-1 block text-sm font-semibold text-slate-700';
+  const availablePaymentQrs: PaymentQr[] = [
+    { method: 'gcash' as const, label: 'GCash', src: paymentQrs.gcash || '' },
+    { method: 'maya' as const, label: 'Maya', src: paymentQrs.maya || '' },
+    { method: 'bpi' as const, label: 'BPI', src: paymentQrs.bpi || '' },
+  ].filter((qr) => Boolean(qr.src));
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-10">
@@ -309,9 +351,30 @@ export default function QuotePage() {
                     <li key={line}>{line}</li>
                   ))}
                 </ul>
+                {availablePaymentQrs.length > 0 && (
+                  <div className="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                    <h4 className="font-semibold text-slate-900">Scan to pay</h4>
+                    <p className="mt-1 text-slate-600">Confirm the deposit amount and payment destination with MJIC before transferring.</p>
+                    <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {availablePaymentQrs.map((qr) => (
+                        <button
+                          key={qr.method}
+                          type="button"
+                          onClick={() => setActivePaymentQr(qr)}
+                          aria-label={`View ${qr.label} payment QR code`}
+                          className="rounded-lg border border-slate-200 bg-white p-2 text-center hover:border-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-indigo-600"
+                        >
+                          <Image src={qr.src} alt={`${qr.label} merchant payment QR code`} width={224} height={224} unoptimized className="mx-auto h-28 w-28 object-contain" />
+                          <span className="mt-1 block text-xs font-semibold text-indigo-700">View {qr.label} QR</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {paymentQrError && <p role="status" className="mt-3 text-xs text-amber-800">{paymentQrError}</p>}
                 <div className="mt-3 rounded border border-dashed border-amber-400 bg-amber-50 p-2 text-amber-900">
                   <p className="font-semibold">GCash / PayMaya online checkout: placeholder</p>
-                  <p>Online merchant checkout is not connected yet. No payment link or QR code is shown here. Use the account details above.</p>
+                  <p>Online merchant checkout is not connected yet. Use a published merchant QR above, or the account details listed here.</p>
                   <button type="button" disabled className="mt-2 rounded bg-slate-300 px-3 py-1 font-semibold text-slate-600">Pay online (not available yet)</button>
                 </div>
               </section>
@@ -337,6 +400,36 @@ export default function QuotePage() {
           )}
         </aside>
       </div>
+      {activePaymentQr && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setActivePaymentQr(null);
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="payment-qr-title"
+            className="w-full max-w-md rounded-2xl bg-white p-5 text-center shadow-2xl"
+          >
+            <div className="flex items-center justify-between gap-4 text-left">
+              <h2 id="payment-qr-title" className="text-lg font-bold text-slate-900">{activePaymentQr.label} payment QR</h2>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setActivePaymentQr(null)}
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+            <Image src={activePaymentQr.src} alt={`${activePaymentQr.label} merchant payment QR code`} width={720} height={720} unoptimized className="mx-auto mt-4 max-h-[70vh] w-full max-w-sm object-contain" />
+            <p className="mt-3 text-sm text-slate-600">Verify the amount and merchant details before you send payment.</p>
+          </section>
+        </div>
+      )}
     </main>
   );
 }
