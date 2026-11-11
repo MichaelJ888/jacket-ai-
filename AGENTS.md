@@ -473,3 +473,6 @@ px vercel ls.
 - Stabilized the free mock designer: selection/color/logo-size changes rerender, stale async image loads cannot replace a newer design, and missing media has a visible fallback.
 - Verified: homepage Playwright smoke test 1/1; `npx tsc --noEmit --incremental`; `npm test` 497 pass / 0 fail / 1 skipped (498 total); `npm run lint` 0 errors / 6 warnings; `npm run build` (webpack) passes with 629 image assets; `npm run verify:live` 11/11; `git diff --check` passes.
 - Live verification invokes `/api/cron/samples`, which can send staff Telegram reminders and update alert state for overdue samples. The existing overlay/Supabase architecture was reused; no new provider, worker, dependency, schema, or provider spend was added. Production deployment is pending.
+## Completion log - checkout QR production deployment (2026-11-11)
+- Commit `7ec505a` was pushed to `main`. Production deployment `dpl_3qpTDkchkmax4aAy2cDnnmVgRXjW` reached READY and is aliased to `https://jacket-ai.vercel.app`.
+- Post-deploy smoke check: homepage HTTP 200 with the QR-modal, category-gallery disclosure, and canvas-render status; `/quote` HTTP 200. The public overlay currently has no published payment QR methods, so the owner must upload and publish the real merchant QR before it can appear.
