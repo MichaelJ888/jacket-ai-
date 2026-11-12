@@ -14,12 +14,19 @@ export default function PrivacyPolicyPage() {
         quotation request, we collect the name, company, contact details, and
         message you provide. We also use Google Analytics to understand general
         site traffic, such as pages viewed, general location, and device type.
+        MJIC also records public-page visits in a restricted visitor log,
+        including the visitor IP address, requested page path, browser
+        user-agent, referring site or campaign source, and coarse location or
+        language clues supplied by the hosting platform. Query strings,
+        cookies, authorization headers, and other request headers are not
+        stored.
       </p>
       <p>
         <strong>How we use it:</strong> to respond to your inquiry, prepare
-        quotations, and process confirmed orders. The existing website notice
-        states that MJIC does not sell or rent this information to third
-        parties.
+        quotations, process confirmed orders, and understand or protect
+        website traffic. Visitor log access is restricted to server-side
+        service credentials. The existing website notice states that MJIC does
+        not sell or rent this information to third parties.
       </p>
       <p>
         <strong>Payment information:</strong> the existing website notice says
@@ -39,8 +46,8 @@ export default function PrivacyPolicyPage() {
         <strong>Required owner review:</strong> this draft is based on the
         current website notice and does not yet describe the Messenger and
         automated-reply data flows, all service providers, data retention, or
-        other app-specific processing. Verify and complete those details before
-        submitting this URL to Meta.
+        the retention period for visitor logs. Verify and complete those
+        details before submitting this URL to Meta.
       </p>
     </PolicyDraftPage>
   );

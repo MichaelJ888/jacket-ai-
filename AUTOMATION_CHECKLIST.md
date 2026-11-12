@@ -56,6 +56,7 @@ Read this before starting any new automation, webhook, or deployment task. Refer
 - [ ] Local `.env.local` Supabase service-role key has been observed returning 401 against the live project — verify against Vercel's env value before trusting local test results.
 
 ## Goal 2 routes (sales closer, CRM, autoposter)
+- Public page navigations are logged by the Next.js 16 `proxy.ts` into `public.visitor_logs` via a deferred service-role write. It stores IP address, user-agent, page path, referring origin/campaign source, and allowlisted coarse location/language headers; cookies, authorization headers, and query strings are excluded. The privacy policy remains a draft until the owner sets and verifies the visitor-log retention period.
 - `/api/health` (+ `/api/test-db` alias): service-role health check, public, JSON status ok/degraded/down.
 - `/api/webhooks/meta`, `/api/webhooks/manychat`: inbound DMs/comments -> `_lib/sales-closer.ts` -> `crm_contacts` / `inbox_messages`.
 - `/api/crm`, `/api/voice`, `/api/content/plan`: Bearer `CRON_SECRET`. Pipeline view/human reply, voice ingestion (client/employee/supplier), content calendar.

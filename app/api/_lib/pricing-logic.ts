@@ -1,5 +1,67 @@
 ﻿export const MOQ_PIECES = 20;
 export const FREE_ADD_ONS = ['metro-manila-delivery', 'digital-mockup', 'first-logo-embroidery'] as const;
+export const SCHOOL_UNIFORM_PRICES = {
+  blouse: 350,
+  skirt: 450,
+  pants: 450,
+  shorts: 200,
+  vest: 300,
+  jumper: 450,
+} as const;
+
+export type SchoolUniformGarment = keyof typeof SCHOOL_UNIFORM_PRICES;
+
+export function quoteUniformOrder(input: {
+  category: 'company_uniform' | 'school_uniform';
+  quantity: number;
+  includeBlazer?: boolean;
+  garments?: readonly SchoolUniformGarment[];
+}) {
+  const minimumSets = input.category === 'company_uniform' ? 50 : 100;
+  const garments = input.category === 'school_uniform'
+    ? [...new Set(input.garments ?? [])]
+    : [];
+  const pricePerSet = input.category === 'company_uniform'
+    ? 1400 + (input.includeBlazer ? 900 : 0)
+    : garments.reduce((total, garment) => total + SCHOOL_UNIFORM_PRICES[garment], 0);
+
+  if (input.category === 'school_uniform' && garments.length === 0) {
+    return {
+      category: input.category,
+      quoteable: false as const,
+      reason: 'Ask which garments are included in each school uniform set before quoting.',
+    };
+  }
+
+  if (!Number.isInteger(input.quantity) || input.quantity < minimumSets) {
+    return {
+      category: input.category,
+      quantity: input.quantity,
+      minimumSets,
+      quoteable: false as const,
+      setsShort: Math.max(0, minimumSets - input.quantity),
+      reason: `The minimum order is ${minimumSets} sets.`,
+    };
+  }
+
+  const total = pricePerSet * input.quantity;
+  const depositRequired = Math.round(total * 0.5 * 100) / 100;
+
+  return {
+    category: input.category,
+    quantity: input.quantity,
+    garments: input.category === 'school_uniform' ? garments : ['blouse', 'pants'],
+    includeBlazer: input.category === 'company_uniform' && Boolean(input.includeBlazer),
+    quoteable: true as const,
+    pricePerSet,
+    grossTotal: total,
+    depositRequired,
+    remainingBalance: total - depositRequired,
+    moqMet: true as const,
+    discountPct: 0,
+    policyNote: 'Category-specific fixed prices; no generic volume discount applied.',
+  };
+}
 
 // Volume curve applied to the market unit price of a style. The MOQ run pays the full market rate; each
 // larger tier takes a bigger share off it so the margin narrows as volume grows (MOQ 20 = ₱1,250/pc, 100 = ₱850/pc).

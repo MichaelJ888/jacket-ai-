@@ -1,6 +1,6 @@
 ﻿import assert from 'node:assert/strict';
 import test from 'node:test';
-import { digitizeQuote, quoteBulkOrder, recommendPrice, volumeDiscountPct, volumeLadder, tierUnitPrice } from './pricing-logic.ts';
+import { digitizeQuote, quoteBulkOrder, quoteUniformOrder, recommendPrice, volumeDiscountPct, volumeLadder, tierUnitPrice } from './pricing-logic.ts';
 
 test('digitizeQuote converts stitches to machine time and cost per piece', () => {
   const q = digitizeQuote({ stitchCount: 7000, machineRatePerHour: 300, quantity: 100, garmentCostPerPiece: 200 });
@@ -46,6 +46,44 @@ test('quoteBulkOrder sanitizes invalid input', () => {
   assert.equal(quoteBulkOrder(500, -5).pieces, 0);
 });
 
+test('company uniform quotes enforce 50 sets and include optional blazer pricing without generic discounts', () => {
+  const belowMinimum = quoteUniformOrder({ category: 'company_uniform', quantity: 49 });
+  assert.equal(belowMinimum.quoteable, false);
+  if (!belowMinimum.quoteable) assert.equal(belowMinimum.setsShort, 1);
+
+  const quote = quoteUniformOrder({ category: 'company_uniform', quantity: 50, includeBlazer: true });
+  assert.equal(quote.quoteable, true);
+  if (quote.quoteable) {
+    assert.equal(quote.pricePerSet, 2300);
+    assert.equal(quote.grossTotal, 115000);
+    assert.equal(quote.depositRequired, 57500);
+    assert.equal(quote.discountPct, 0);
+  }
+});
+
+test('school uniform quotes require selected garments and enforce 100 sets at fixed piece prices', () => {
+  const missingGarments = quoteUniformOrder({ category: 'school_uniform', quantity: 100 });
+  assert.equal(missingGarments.quoteable, false);
+
+  const belowMinimum = quoteUniformOrder({ category: 'school_uniform', quantity: 99, garments: ['blouse', 'skirt'] });
+  assert.equal(belowMinimum.quoteable, false);
+  if (!belowMinimum.quoteable) assert.equal(belowMinimum.minimumSets, 100);
+
+  const quote = quoteUniformOrder({
+    category: 'school_uniform',
+    quantity: 100,
+    garments: ['blouse', 'skirt', 'blouse'],
+  });
+  assert.equal(quote.quoteable, true);
+  if (quote.quoteable) {
+    assert.deepEqual(quote.garments, ['blouse', 'skirt']);
+    assert.equal(quote.pricePerSet, 800);
+    assert.equal(quote.grossTotal, 80000);
+    assert.equal(quote.depositRequired, 40000);
+    assert.equal(quote.discountPct, 0);
+  }
+});
+
 test('MOQ run pays the full market rate (cost ~300 -> 1,250/pc)', () => {
   const quote = quoteBulkOrder(1250, 20, 300);
   assert.equal(quote.unitPrice, 1250);
@@ -80,5 +118,4 @@ test('recommendPrice raises a price that has fallen under the cost floor', () =>
   assert.equal(result.suggested, 840);
   assert.equal(result.action, 'RAISE');
 });
-
 

@@ -26,6 +26,25 @@ alter table public.chat_history enable row level security;
 revoke all on public.leads from anon, authenticated;
 revoke all on public.chat_history from anon, authenticated;
 
+create table if not exists public.visitor_logs (
+  id uuid primary key default gen_random_uuid(),
+  ip_address inet,
+  page_path text not null,
+  user_agent text,
+  traffic_source text not null,
+  referrer text,
+  country text,
+  region text,
+  city text,
+  timezone text,
+  request_headers jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists visitor_logs_created_at_idx on public.visitor_logs (created_at desc);
+alter table public.visitor_logs enable row level security;
+revoke all on public.visitor_logs from anon, authenticated;
+
 create table if not exists public.staff_profiles (
   id uuid default gen_random_uuid() primary key,
   staff_name text unique not null,
