@@ -7,6 +7,7 @@ import { SIGNATORIES, TERMS, VALID_DAYS, PAYMENT_DETAILS, type SignatoryKey } fr
 import { resolveFabricClass } from '../../api/_lib/fabric-class';
 import { FABRIC_OPTIONS } from '../../api/_lib/mjic-pricelist';
 import { EMPTY_FORM, applyDesignScan, formatPeso, toRequestBody, type DesignScan, type QuoteForm } from './quotation-logic';
+import { createFormalQuoteDocx } from './quotation-docx';
 
 type Quote = {
   total: number;
@@ -23,7 +24,7 @@ type Quote = {
   paymentTerms: string;
   signatory: { key: SignatoryKey; name: string; title: string; image: string };
 };
-type SaveResult = { quoteId: string; createdAt: string; quote: Quote };
+type SaveResult = { quoteId: string; quoteNumber: string | null; createdAt: string; quote: Quote };
 
 const FIELD = 'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-zinc-900 focus:outline-none';
 const LABEL = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-600';
@@ -35,6 +36,7 @@ export default function QuotationPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState<SaveResult | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const set = <K extends keyof QuoteForm>(key: K, value: QuoteForm[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -78,7 +80,30 @@ export default function QuotationPage() {
       setError(data?.error || 'Could not save the quote.');
       return;
     }
-    setResult({ quoteId: data.quoteId, createdAt: data.createdAt, quote: data.quote });
+    setResult({ quoteId: data.quoteId, quoteNumber: data.quoteNumber || null, createdAt: data.createdAt, quote: data.quote });
+    setPreviewOpen(true);
+  }
+
+  function downloadDocx() {
+    if (!result) return;
+    const bytes = createFormalQuoteDocx({
+      quoteNumber: result.quoteNumber,
+      customerName: form.customerName,
+      customerContact: form.customerContact,
+      productName: form.productName,
+      createdAt: result.createdAt,
+      quote: result.quote,
+      terms: TERMS,
+      paymentDetails: PAYMENT_DETAILS,
+    });
+    const buffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(buffer).set(bytes);
+    const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${result.quoteNumber || 'MJIC-Formal-Quotation'}.docx`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   const q = result?.quote;
@@ -150,15 +175,26 @@ export default function QuotationPage() {
 
         {error && <p className="text-sm text-red-700 md:col-span-2">{error}</p>}
         <button type="submit" disabled={saving} className="rounded-lg bg-zinc-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 md:col-span-2">
-          {saving ? 'Calculating and saving…' : 'Calculate, save to CRM, and generate quote'}
+          {saving ? 'Creating quotation…' : 'Create Formal Quote'}
         </button>
       </form>
 
-      {q && result && (
-        <section className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 text-zinc-900 shadow-sm print:border-0 print:shadow-none">
-          <div className="flex items-start justify-between gap-4 print:hidden">
-            <p className="text-xs text-zinc-500">Saved as quote {result.quoteId} · CRM contact updated</p>
-            <button type="button" onClick={() => window.print()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm">Print / Save PDF</button>
+      {result && !previewOpen && (
+        <button type="button" onClick={() => setPreviewOpen(true)} className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-800 print:hidden">
+          Reopen quotation preview
+        </button>
+      )}
+
+      {q && result && previewOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/50 p-4 md:p-8 print:static print:overflow-visible print:bg-white print:p-0" role="dialog" aria-modal="true" aria-labelledby="formal-quote-title">
+          <section id="formalQuotePrintArea" className="mx-auto max-w-4xl space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 text-zinc-900 shadow-xl print:max-w-none print:rounded-none print:border-0 print:p-0 print:shadow-none">
+          <div className="flex flex-wrap items-start justify-between gap-3 print:hidden">
+            <p className="text-xs text-zinc-500">Saved as quote {result.quoteNumber || result.quoteId} · CRM contact updated</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => window.print()} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm">Print / Save PDF</button>
+              <button type="button" onClick={downloadDocx} className="rounded-lg bg-[#0B1E3D] px-3 py-1.5 text-sm font-semibold text-white">Download Formal Quotation (.docx)</button>
+              <button type="button" onClick={() => setPreviewOpen(false)} className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm">Close preview</button>
+            </div>
           </div>
           <header>
             <div className="flex flex-wrap items-center gap-4 border-b-2 border-[#B8912F] pb-3">
@@ -171,13 +207,14 @@ export default function QuotationPage() {
                 className="h-auto w-36 sm:w-44"
               />
               <div>
-                <h2 className="text-lg font-bold text-[#0B1E3D]">MICHAEL JEFFREY INTERNATIONAL CORPORATION</h2>
+                <h2 id="formal-quote-title" className="text-lg font-bold text-[#0B1E3D]">MICHAEL JEFFREY INTERNATIONAL CORPORATION</h2>
                 <p className="text-sm font-semibold text-[#9C7521]">Custom Jackets and more</p>
                 <p className="mt-1 text-xs text-zinc-600">CG Venezuela Enterprises · Create. Enhance. and Sustain.</p>
                 <p className="text-xs text-zinc-600">22 Bayabas St., Elmar&apos;s Subdivision, Cupang, Antipolo City</p>
               </div>
             </div>
             <p className="mt-2 text-sm">Prepared for: <strong>{form.customerName}</strong> · {new Date(result.createdAt).toLocaleDateString('en-PH')} · Valid for {VALID_DAYS} days</p>
+            {result.quoteNumber && <p className="text-sm">Quotation number: <strong>{result.quoteNumber}</strong></p>}
           </header>
           <table className="w-full text-sm">
             <thead className="border-b text-left text-xs uppercase text-zinc-600">
@@ -210,7 +247,12 @@ export default function QuotationPage() {
             <p className="border-t border-zinc-400 pt-1 text-sm font-semibold">{sig.name}</p>
             <p className="text-xs text-zinc-600">{sig.title}</p>
           </div>
-        </section>
+          <div className="flex flex-wrap justify-between gap-3 border-t border-zinc-200 pt-4 text-sm print:hidden">
+            <Link href="/" className="rounded-lg border border-zinc-300 px-3 py-2 font-semibold text-zinc-800">Back to MJIC Landing Page</Link>
+            <button type="button" onClick={() => setPreviewOpen(false)} className="rounded-lg px-3 py-2 text-zinc-600">Return to quote form</button>
+          </div>
+          </section>
+        </div>
       )}
     </main>
   );

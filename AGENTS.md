@@ -401,6 +401,7 @@ px vercel ls.
 
 ## Completion log - test-run content-plan + boost-advisor check (2026-11-06)
 - No code change, no deploy. Prod `GET /api/cron/content-plan` (bearer auth): HTTP 200, `skipped: calendar already full` (56 upcoming rows in 5 days, threshold 40). No new rows generated.
+
 - Queue slot audit (read-only, next 5 days): 01:00 UTC video (FB/IG READY, TikTok/YouTube AWAITING_VIDEO), 05:30 picture (FB/IG READY), 10:00 video (same as 01:00), 13:00 picture (FB/IG READY). Strict video/picture alternation matches `POSTING_SLOTS_UTC`. Video-clip source is `mjic-video-ads` via the planner, not re-verified per clip in this pass.
 - `boost-advisor`: not called live (no dry-run; a GET sends a real Telegram message and writes a heartbeat). Verified in code: budget ₱350/day, 2 days, total ₱700, approval button `APPROVE BOOST ₱700`, 9:00 AM PHT header. Ranking and format covered by existing unit tests.
 - Verified: `npx tsc --noEmit --incremental` exit 0; `npm test` 486 pass / 0 fail / 1 skipped; `npm run lint` 0 errors, 6 pre-existing warnings; `npm run verify:live` 11/11; `/api/health` = `ok` (all six checks ok, criticalErrors24h 0, retryQueueBacklog 0).
@@ -467,15 +468,33 @@ px vercel ls.
 - The build's image-library prebuild reports 629 assets. No type mismatch, broken static link, or UI token defect was found, so no application-code repair was warranted.
 - No production cron, customer messaging, Meta mutation/publishing, or billable AI generation was invoked. No provider, worker, dependency, schema, or runtime architecture change was introduced.
 - Release requested: commit this verification record with `feat(mjic): autonomous system health verification and self-healing update`, push `main`, and trigger/verify the production deployment. This is documentation-only and does not change application runtime behavior.
+
+## Completion log - formal quote export and public feed honesty (2026-11-11)
+- `/admin/quotation`: creating a quote now opens a styled preview modal with print/PDF, browser-generated `.docx`, quote number, and landing-page navigation. Existing MJIC terms and payment details remain unchanged; DOCX uses the already-installed `fflate` package.
+- Removed the synthetic "Client # ordered" widget and its script. The real "Latest From the Floor" feed remains backed by `/api/updates`.
+- Verified: focused DOCX test passes; `npm test` 497 pass / 0 fail / 1 skipped (498 total); `npx tsc --noEmit --incremental` exit 0; `npm run lint` 0 errors / 6 existing warnings; `npm run build` (webpack) passes; `git diff --check` passes.
+- No new dependency, AI provider, schema, or provider spend. Production verification and deployment were not run; `verify:live` invokes the sample-alert cron, and these changes are not deployed.
+- Remaining input/scope: approved CG Venezuela template details, recipient-specific payment QR assets, verified five-angle product photography, and a privacy-reviewed public sample/completion feed are not present. No quote-template/legal data or payment QR was fabricated.
+
 ## Completion log - checkout QR, apparel gallery, and canvas stabilization (2026-11-11)
 - Checkout and `/quote` show available payment QR codes from the existing published `paymentQR` site overlay. No merchant QR asset exists in the repository; the owner must upload and publish the real QR in the site editor. Existing account details remain the fallback.
 - Catalogue modal lazily presents up to five category-reference photos from the registered image library. No verified Korean-model, same-item five-angle photo set was found; the UI explicitly avoids claiming the reference photos are alternate angles of the exact item.
 - Stabilized the free mock designer: selection/color/logo-size changes rerender, stale async image loads cannot replace a newer design, and missing media has a visible fallback.
 - Verified: homepage Playwright smoke test 1/1; `npx tsc --noEmit --incremental`; `npm test` 497 pass / 0 fail / 1 skipped (498 total); `npm run lint` 0 errors / 6 warnings; `npm run build` (webpack) passes with 629 image assets; `npm run verify:live` 11/11; `git diff --check` passes.
 - Live verification invokes `/api/cron/samples`, which can send staff Telegram reminders and update alert state for overdue samples. The existing overlay/Supabase architecture was reused; no new provider, worker, dependency, schema, or provider spend was added. Production deployment is pending.
+
 ## Completion log - checkout QR production deployment (2026-11-11)
 - Commit `7ec505a` was pushed to `main`. Production deployment `dpl_3qpTDkchkmax4aAy2cDnnmVgRXjW` reached READY and is aliased to `https://jacket-ai.vercel.app`.
 - Post-deploy smoke check: homepage HTTP 200 with the QR-modal, category-gallery disclosure, and canvas-render status; `/quote` HTTP 200. The public overlay currently has no published payment QR methods, so the owner must upload and publish the real merchant QR before it can appear.
+
+## Completion log - social connector and Studio capability audit (2026-11-12)
+- `/admin` Connect tab now offers an on-demand live health check for each connected Meta Page, showing token, webhook, and required-field results from the existing protected `/api/meta/connections/health` route. Instagram link state is shown separately. Checks are user-triggered to avoid a fan-out of Graph API requests across tenant Pages at dashboard load.
+- Confirmed existing webhook leadgen accepts only the configured `META_PAGE_ID`, rejects a conflict with `META_CGV_PAGE_ID`, and writes CRM attribution against that exact Page. No webhook behavior change was needed.
+- Existing Studio already has its editor password/OTP gate, Replicate face anonymization, background removal, logo/placeholder patch, enhancement, batch submission, local product descriptions, and Supabase-backed jobs. Existing publisher supports Facebook/Instagram, TikTok, and YouTube. Shopee, Lazada, X, LinkedIn, multi-angle generation, and Studio video/audio production are not implemented; no status was fabricated as connected.
+- Existing subcontractor directory/import tools were found. No web scraper or unattended cold outreach was added: there is no approved supplier source/contact list or consent basis, and Resend is not configured. A vetted, authorized list and outreach policy are prerequisites for any messaging pipeline.
+- Verified: `npx tsc --noEmit --incremental` clean; `npm test` 497 pass / 0 fail / 1 skipped; `npm run lint` 0 errors / 6 existing warnings; `npm run build` (webpack) passes; `npm run verify:live` 11/11.
+- The requested live verifier invokes `/api/cron/samples`, which can send overdue-sample Telegram alerts and updates sample alert state; the command returned HTTP 200, but does not report whether an alert was sent. No Meta publishing, account mutation, or billable AI generation was invoked.
+- No new dependency, provider, schema, provider spend, or cloud worker. Release was not pushed or deployed: the remaining platform/Studio/outreach work depends on provider app credentials/approval and owner-provided data, and the worktree already contains unrelated uncommitted changes that must not be swept into this release.
 
 ## Completion log - social connectors, vetted outreach, and Studio tools (2026-11-12)
 - Admin now shows all eight requested social platforms, reuses MJIC Meta OAuth/live checks, and labels unsupported or unchecked integrations as not linked/unverified rather than active. Setup drawers link to official platform portals.

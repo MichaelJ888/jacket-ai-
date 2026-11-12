@@ -22,6 +22,21 @@ type Overview = {
 };
 type KnowledgeItem = { id: string; category: string; title: string; content: string; file_name: string | null; mime_type: string | null; created_at: string; asset_url: string | null };
 type MetaPageSubscriptionResult = { name: string; subscribed: boolean; leadgenRequested: boolean; error?: string };
+type MetaHealthCheck = { id: string; label: string; ok: boolean; hint?: string };
+type MetaPageHealth = { healthy: boolean; checks: MetaHealthCheck[] };
+
+function isMetaPageHealth(value: unknown): value is MetaPageHealth {
+  if (typeof value !== "object" || value === null) return false;
+  const result = value as Record<string, unknown>;
+  return typeof result.healthy === "boolean"
+    && Array.isArray(result.checks)
+    && result.checks.every((check) => {
+      if (typeof check !== "object" || check === null) return false;
+      const item = check as Record<string, unknown>;
+      return typeof item.id === "string" && typeof item.label === "string" && typeof item.ok === "boolean"
+        && (item.hint === undefined || typeof item.hint === "string");
+    });
+}
 
 const STYLES = ["windbreaker", "varsity", "corporate", "bomber"];
 const input = "rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900";
@@ -109,6 +124,7 @@ export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
   const [tab, setTab] = useState<"dashboard" | "architecture" | "prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "subcons" | "coo" | "recipients" | "credits">("dashboard");
   const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
+  const [pageHealth, setPageHealth] = useState<Record<string, { status: "checking" | "connected" | "error"; checks: MetaHealthCheck[]; message?: string }>>({});
   const [oauthConfigured, setOauthConfigured] = useState(true);
   const [setup, setSetup] = useState<Array<{ id: string; label: string; ok: boolean; manual?: boolean; hint?: string; link?: string }>>([]);
   const [tenants, setTenants] = useState<Array<{ id: string; name: string | null; email: string | null; plan: string }>>([]);
@@ -137,7 +153,6 @@ export default function AdminPage() {
 
   useEffect(() => {
     const saved = Number(localStorage.getItem("mjic_admin_panel_size"));
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved === 25 || saved === 50 || saved === 75 || saved === 100) setPanelSize(saved);
   }, []);
 
@@ -221,11 +236,34 @@ export default function AdminPage() {
 
   const loadPages = useCallback(async (auth = token) => {
     const r = await call("/api/meta/connections", {}, auth);
-    if (r.ok) { setPages(r.data.pages); setOauthConfigured(r.data.oauthConfigured); }
+    if (r.ok) { setPages(r.data.pages); setPageHealth({}); setOauthConfigured(r.data.oauthConfigured); }
     const [s, t] = await Promise.all([call("/api/admin/meta-setup", {}, auth), call("/api/admin/tenants", {}, auth)]);
     if (s.ok) setSetup(s.data.checks);
     if (t.ok) { setTenants(t.data.tenants); setPlans(Object.keys(t.data.plans)); }
   }, [call, token]);
+
+  async function checkMetaPageHealth(pageId: string) {
+    setPageHealth((current) => ({ ...current, [pageId]: { status: "checking", checks: [] } }));
+    try {
+      const result = await call(`/api/meta/connections/health?pageId=${encodeURIComponent(pageId)}`);
+      if (!result.ok || !isMetaPageHealth(result.data)) {
+        setPageHealth((current) => ({
+          ...current,
+          [pageId]: { status: "error", checks: [], message: result.data.error || `Health check failed (HTTP ${result.status}).` },
+        }));
+        return;
+      }
+      setPageHealth((current) => ({
+        ...current,
+        [pageId]: { status: result.data.healthy ? "connected" : "error", checks: result.data.checks },
+      }));
+    } catch (error) {
+      setPageHealth((current) => ({
+        ...current,
+        [pageId]: { status: "error", checks: [], message: error instanceof Error ? error.message : "Health check failed." },
+      }));
+    }
+  }
 
   async function registerCallbacks() {
     const r = await call("/api/admin/meta-setup", { method: "POST" });
@@ -293,7 +331,6 @@ export default function AdminPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("meta")) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTab("connect");
       setMessage(params.get("meta") === "connected"
         ? `Connected ${params.get("pages")} Page(s). ${params.get("failed") !== "0" ? `${params.get("failed")} could not auto-subscribe the webhook.` : "Webhooks subscribed automatically."}`
@@ -488,21 +525,44 @@ export default function AdminPage() {
             ))}
             {!tenants.length && <li className="text-xs text-zinc-500">No buyers yet.</li>}
           </ul>          <ul className="mt-4 space-y-2">
-            {pages.map((page) => (
-              <li key={page.page_id} className="flex items-center justify-between rounded border border-zinc-200 p-3 text-sm">
-                <span>
-                  <strong>{page.page_name || page.page_id}</strong>
-                  {page.ig_user_id && <span className="ml-2 rounded bg-pink-100 px-2 py-0.5 text-xs">Instagram linked</span>}
-                  <span className={`ml-2 rounded px-2 py-0.5 text-xs ${page.webhook_subscribed ? "bg-green-100" : "bg-red-100"}`}>{page.webhook_subscribed ? "Webhook active" : `Webhook failed${page.subscribe_error ? `: ${page.subscribe_error}` : ""}`}</span>
-                </span>
-                <button className="text-red-600 underline" onClick={() => disconnectMeta(page.page_id)}>Disconnect</button>
-              </li>
-            ))}
+            {pages.map((page) => {
+              const health = pageHealth[page.page_id];
+              const status = health?.status === "checking" ? "Checking..."
+                : health?.status === "connected" ? "Connected"
+                  : health?.status === "error" ? "Error"
+                    : "Not checked";
+              const tone = health?.status === "connected" ? "bg-green-100 text-green-800"
+                : health?.status === "error" ? "bg-red-100 text-red-800"
+                  : "bg-amber-100 text-amber-800";
+              return (
+                <li key={page.page_id} className="flex items-center justify-between rounded border border-zinc-200 p-3 text-sm">
+                  <span>
+                    <strong>{page.page_name || page.page_id}</strong>
+                    <span className={`ml-2 rounded px-2 py-0.5 text-xs ${page.ig_user_id ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}`}>
+                      {page.ig_user_id ? "Instagram linked" : "Instagram not linked"}
+                    </span>
+                    <span className={`ml-2 rounded px-2 py-0.5 text-xs ${page.webhook_subscribed ? "bg-green-100" : "bg-red-100"}`}>{page.webhook_subscribed ? "Webhook active" : `Webhook failed${page.subscribe_error ? `: ${page.subscribe_error}` : ""}`}</span>
+                    <span className="ml-2 inline-flex items-center gap-2">
+                      <span className={`rounded px-2 py-0.5 text-xs ${tone}`} role="status">{status}</span>
+                      <button type="button" className="text-xs underline" disabled={health?.status === "checking"} onClick={() => void checkMetaPageHealth(page.page_id)}>
+                        Check health
+                      </button>
+                    </span>
+                    {health?.checks.map((check) => (
+                      <span key={check.id} className={`ml-2 inline-block text-xs ${check.ok ? "text-green-700" : "text-red-700"}`} title={check.hint}>
+                        {check.ok ? "✓" : "✗"} {check.label}
+                      </span>
+                    ))}
+                    {health?.message && <span className="ml-2 text-xs text-red-700">{health.message}</span>}
+                  </span>
+                  <button className="text-red-600 underline" onClick={() => disconnectMeta(page.page_id)}>Disconnect</button>
+                </li>
+              );
+            })}
             {!pages.length && <li className="text-sm text-zinc-500">No Pages connected yet.</li>}
           </ul>
         </section>
       )}
-
       {tab === "subcons" && <SubconOutreachPanel token={token} />}
 
       {tab === "knowledge" && (

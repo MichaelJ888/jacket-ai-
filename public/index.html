@@ -4093,79 +4093,7 @@ async sendChat(){
   }
 }
 
-function fictionalLiveOrders() {
-  return {
-    showToast: false,
-    currentClient: 125,
-    maxClient: 8888888888,
-    currentOrderText: '',
-    materials: ['Microfiber', 'Michael Angelo', 'Diamond Ripstop', 'Cotton Fleece', 'Taslan'],
-
-    generateRandomOrder() {
-      const qtyOptions = [20, 50, 100, 150, 200, 300, 500];
-      const qty = qtyOptions[Math.floor(Math.random() * qtyOptions.length)];
-      const material = this.materials[Math.floor(Math.random() * this.materials.length)];
-      const logoCount = Math.floor(Math.random() * 3) + 1;
-      const basePrices = {Microfiber:1200, 'Michael Angelo':1200, 'Diamond Ripstop':1200, 'Cotton Fleece':1200, Taslan:1600};
-      const tierDiscount = qty >= 500 ? 0.85 : qty >= 200 ? 0.92 : qty >= 100 ? 0.98 : 1;
-      const fabricPremium = material === 'Taslan' ? 400 : material === 'Cotton Fleece' ? 150 : 0;
-      const logoCost = logoCount === 1 ? 0 : logoCount === 2 ? 60 : 120;
-      const unitPrice = Math.round((basePrices[material] * tierDiscount) + fabricPremium + logoCost);
-      this.currentOrderText = `ordered ${qty} pcs ${material} jackets (${logoCount} logo${logoCount > 1 ? 's' : ''}) at ₱${unitPrice.toLocaleString()} each.`;
-    },
-
-    playNotificationSound() {
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(587.33, audioCtx.currentTime);
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-      } catch(e) {}
-    },
-
-    startLiveOrders() {
-      const runCycle = () => {
-        this.generateRandomOrder();
-        this.showToast = true;
-        this.playNotificationSound();
-
-        setTimeout(() => {
-          this.showToast = false;
-        }, 7000);
-
-        this.currentClient = this.currentClient >= this.maxClient ? 125 : this.currentClient + 1;
-
-        const nextInterval = Math.floor(Math.random() * (300000 - 120000 + 1)) + 120000;
-        setTimeout(runCycle, nextInterval);
-      };
-
-      setTimeout(runCycle, 5000);
-    }
-  };
-}
 </script>
-<!-- Fictional Live Order Counter Notification Widget -->
-<div x-data="fictionalLiveOrders()" x-init="startLiveOrders()" x-show="showToast" x-transition 
-     class="fixed bottom-5 left-5 z-50 bg-white border border-slate-200 shadow-2xl rounded-xl p-3.5 max-w-sm flex items-center gap-3.5" 
-     style="display: none;">
-  <div class="bg-emerald-100 text-emerald-600 p-2.5 rounded-full flex-shrink-0">
-    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-    </svg>
-  </div>
-  <div class="text-xs">
-    <p class="font-bold text-navy-900" x-text="'Client #' + currentClient + ' Ordered!'"></p>
-    <p class="text-slate-600 mt-0.5" x-text="currentOrderText"></p>
-    <span class="text-[10px] text-emerald-600 font-semibold uppercase tracking-wider mt-1 block">● JUST NOW</span>
-  </div>
-  <button @click="showToast = false" class="text-slate-400 hover:text-slate-600 ml-auto">✕</button>
-</div>
 <!-- ============ FAQ & INSTANT ANSWERS DRAWER ============ -->
 <button type="button" x-show="!faqDrawerOpen" @click="faqDrawerOpen = true" aria-label="Open FAQ"
         class="fixed bottom-24 left-5 z-40 bg-navy hover:bg-navy-700 text-white text-sm font-semibold px-4 py-3 rounded-full shadow-lg">FAQ</button>
@@ -4194,7 +4122,6 @@ function fictionalLiveOrders() {
     </div>
   </aside>
 </div>
-<script src="/live-ticker.js" defer></script>
 <script src="/site-cms.js" defer></script>
 <script src="/journey-audio.js"></script>
 </body>
