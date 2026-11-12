@@ -26,7 +26,7 @@ const STUDIO_ORIGINAL_EXIF = {
   },
 };
 
-export const STUDIO_JOB_COLUMNS = 'id, source_url, face_url, logo_url, output_url, status, error, enhance_scale, product_title, category, fabric, description, in_catalog, featured_at, ad_status, ad_url, created_at, updated_at, decided_at';
+export const STUDIO_JOB_COLUMNS = 'id, source_url, face_url, logo_url, output_url, status, error, enhance_scale, product_title, category, fabric, description, view_preset, seo_caption, in_catalog, featured_at, ad_status, ad_url, created_at, updated_at, decided_at';
 
 export type StudioJob = {
   id: string;
@@ -54,6 +54,8 @@ export async function createStudioJob(supabase: Supabase, input: { sourceUrl: st
       category: input.metadata?.category ?? null,
       fabric: input.metadata?.fabric ?? null,
       description: input.metadata?.description ?? null,
+      view_preset: input.metadata?.viewPreset ?? 'front',
+      seo_caption: input.metadata?.seoCaption ?? null,
       status: 'queued',
       webhook_token: randomUUID(),
     })

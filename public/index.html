@@ -1483,10 +1483,20 @@
           </div>
 
           <div x-show="allMedia(selectedProduct).length > 1" class="flex gap-2 overflow-x-auto p-3">
-            <template x-for="(m, i) in allMedia(selectedProduct)" :key="i">
+            <template x-for="(m, i) in allMedia(selectedProduct).slice(0, showMoreCatalogueGallery[selectedProduct.id] ? undefined : 5)" :key="i">
               <button type="button" @click="mediaIndex = i" :aria-label="'Show reference photo '+(i+1)+' for '+selectedProduct.title" :aria-pressed="mediaIndex===i" class="shrink-0 w-16 h-16 rounded border-2 overflow-hidden relative" :class="mediaIndex===i ? 'border-gold-600' : 'border-transparent opacity-70 hover:opacity-100'">
                 <img x-show="m.type==='image'" :src="m.src" class="w-full h-full object-cover">
                 <div x-show="m.type!=='image'" class="w-full h-full bg-navy flex items-center justify-center"><i data-lucide="play" class="w-4 h-4 text-white"></i></div>
+              </button>
+            </template>
+          </div>
+          <div class="px-3 pb-2">
+            <button type="button" x-show="allMedia(selectedProduct).length > 5" @click="showMoreCatalogueGallery[selectedProduct.id] = !showMoreCatalogueGallery[selectedProduct.id]" :aria-expanded="Boolean(showMoreCatalogueGallery[selectedProduct.id])" class="rounded border border-navy/20 px-3 py-1.5 text-xs font-semibold text-navy hover:bg-navy/5" x-text="showMoreCatalogueGallery[selectedProduct.id] ? 'Show fewer designs / angles' : 'Show more designs / angles'"></button>
+          </div>
+          <div x-show="showMoreCatalogueGallery[selectedProduct.id]" class="grid grid-cols-2 gap-2 px-3 pb-3 sm:grid-cols-4">
+            <template x-for="(m, i) in allMedia(selectedProduct)" :key="'grid-'+i">
+              <button x-show="m.type==='image'" type="button" @click="mediaIndex = i" :aria-label="'Show design reference '+(i+1)+' for '+selectedProduct.title" class="aspect-square overflow-hidden rounded border border-navy/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold-500">
+                <img :src="m.src" :alt="selectedProduct.title+' category reference '+(i+1)" loading="lazy" class="h-full w-full object-cover">
               </button>
             </template>
           </div>
@@ -2273,6 +2283,7 @@ function mjApp(){
     paymentQRModal: {label:'', src:''},
     catalogueGalleryById: {},
     catalogueGalleryState: {},
+    showMoreCatalogueGallery: {},
     mockup: {productId:'', color:'Navy', logos:[], fabricClass:'B', logoMethod:'embroidery', qty:20, addons:{reversible:false, reflector:false, hood:false, netLining:false}, addNames:false, sampleName:'JUAN DELA CRUZ', rushOrder:false},
     mockupRenderVersion: 0,
     mockupRendering: false,
@@ -3198,6 +3209,7 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
     openModal(p){
       this.selectedProduct = p;
       this.mediaIndex = 0;
+      this.showMoreCatalogueGallery[p.id] = false;
       void this.loadCatalogueGallery(p);
     },
     openPaymentQR(method){
@@ -3245,7 +3257,7 @@ mug2:'/images/CG%20Stainless%20Steel%20Travel%20Mug/images.jpg'
         const library = await response.json();
         if(!Array.isArray(library.items)) throw new Error('Image library format is invalid.');
         const occupied = new Set([p.img, ...(p.gallery || []).map(item=>item.src)].filter(Boolean));
-        const limit = Math.max(0, 5 - (p.img ? 1 : 0) - (p.gallery || []).length);
+        const limit = Math.max(0, 24 - (p.img ? 1 : 0) - (p.gallery || []).length);
         const photos = [];
         for(const folder of folders){
           for(const item of library.items){

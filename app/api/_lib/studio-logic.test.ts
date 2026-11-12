@@ -2,11 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildAutoStudioDescription,
+  buildStudioSeoCaption,
   buildEnhanceInput,
   buildFaceSwapInput,
   isAllowedStudioAssetUrl,
   logoPlacementLeftChest,
   parseStudioCallback,
+  parseStudioMetadata,
   studioImageExtension,
 } from './studio-logic.ts';
 
@@ -21,6 +23,26 @@ test('builds a factual editable product description from supplied fields only', 
     buildAutoStudioDescription('Canvas Tote', 'bag', ''),
     'Custom bag item: Canvas Tote. A flexible option for teams, schools, and events. Add your logo and request a quotation for details.',
   );
+});
+
+test('builds a local SEO caption using category tags without external trend data', () => {
+  const caption = buildStudioSeoCaption('Navy Team Jacket', 'jacket', 'Twill', 'Made for a school team.');
+  assert.match(caption, /Navy Team Jacket/);
+  assert.match(caption, /Twill/);
+  assert.match(caption, /#MJIC/);
+  assert.match(caption, /#CustomJackets/);
+});
+
+test('validates manually assigned view presets and keeps SEO copy with the job metadata', () => {
+  const metadata = parseStudioMetadata({
+    productTitle: 'Navy Jacket',
+    category: 'jacket',
+    viewPreset: 'back',
+    seoCaption: 'Custom navy jackets #MJIC',
+  });
+  assert.equal(metadata?.viewPreset, 'back');
+  assert.equal(metadata?.seoCaption, 'Custom navy jackets #MJIC');
+  assert.equal(parseStudioMetadata({ productTitle: 'Navy Jacket', category: 'jacket', viewPreset: 'invented' }), null);
 });
 
 test('parseStudioCallback reads approve and reject payloads', () => {

@@ -73,3 +73,38 @@ body {
 }
 .neon-admin input::placeholder,
 .neon-admin textarea::placeholder { color: #71717a; }
+
+.architecture-flow svg .flowchart-link {
+  stroke-dasharray: 8 6;
+  animation: architecture-flow-dash 1.8s linear infinite;
+}
+
+.architecture-flow svg .node.healthy > rect,
+.architecture-flow svg .node.healthy > polygon {
+  animation: architecture-node-pulse 2.4s ease-in-out infinite;
+}
+
+.architecture-flow svg .node.degraded > rect,
+.architecture-flow svg .node.degraded > polygon {
+  animation: architecture-node-alert 1.4s ease-in-out infinite;
+}
+
+@keyframes architecture-flow-dash {
+  to { stroke-dashoffset: -28; }
+}
+
+@keyframes architecture-node-pulse {
+  50% { filter: drop-shadow(0 0 7px rgba(34, 197, 94, 0.65)); }
+}
+
+@keyframes architecture-node-alert {
+  50% { filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.7)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .architecture-flow svg .flowchart-link,
+  .architecture-flow svg .node.healthy > rect,
+  .architecture-flow svg .node.healthy > polygon,
+  .architecture-flow svg .node.degraded > rect,
+  .architecture-flow svg .node.degraded > polygon { animation: none; }
+}

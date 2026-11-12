@@ -476,3 +476,11 @@ px vercel ls.
 ## Completion log - checkout QR production deployment (2026-11-11)
 - Commit `7ec505a` was pushed to `main`. Production deployment `dpl_3qpTDkchkmax4aAy2cDnnmVgRXjW` reached READY and is aliased to `https://jacket-ai.vercel.app`.
 - Post-deploy smoke check: homepage HTTP 200 with the QR-modal, category-gallery disclosure, and canvas-render status; `/quote` HTTP 200. The public overlay currently has no published payment QR methods, so the owner must upload and publish the real merchant QR before it can appear.
+
+## Completion log - social connectors, vetted outreach, and Studio tools (2026-11-12)
+- Admin now shows all eight requested social platforms, reuses MJIC Meta OAuth/live checks, and labels unsupported or unchecked integrations as not linked/unverified rather than active. Setup drawers link to official platform portals.
+- Studio stores per-source Front/Side/Back/Detail labels, creates local SEO captions/hashtag suggestions (not live trend data), and exports a browser-generated vertical slideshow with synthesized audio. Angle labels do not fabricate missing views; MP4/WebM output stays local.
+- Subcontractor outreach requires an active record, vetting evidence, explicit email opt-in evidence, no opt-out, manual send confirmation, and Resend configuration. Each send attempt is idempotently logged to CRM; no bulk or scheduled sends.
+- The catalogue modal expands beyond its initial five category-reference photos. Architecture view polls live health and Auto-Pilot status, animates health nodes, and lists the configured PHT daily/weekly/monthly cadence.
+- Verified: TypeScript clean; `npm test` 504 pass / 0 fail / 1 skipped; ESLint 0 errors / 6 existing warnings; webpack production build passes; Playwright 3/3. `npm run db:push` applied the additive Studio and subcon consent/vetting columns.
+- No new provider, worker, dependency, or paid generation request. Resend credentials and non-Meta platform credentials are owner-configured; no email was sent and no social post/account mutation was performed during validation.

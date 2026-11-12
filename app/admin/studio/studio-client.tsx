@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { buildAutoStudioDescription } from '../../api/_lib/studio-logic';
+import { buildAutoStudioDescription, buildStudioSeoCaption, type StudioAnglePreset } from '../../api/_lib/studio-logic';
+import StudioReelExport from './studio-reel-export';
 
 type Job = {
   id: string;
@@ -13,6 +14,8 @@ type Job = {
   product_title: string | null;
   category: string | null;
   description: string | null;
+  view_preset: StudioAnglePreset | null;
+  seo_caption: string | null;
   in_catalog: boolean;
   created_at: string;
 };
@@ -20,6 +23,8 @@ type Job = {
 const CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'giveaway', 'school-uniform', 'bag', 'other'];
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
+const ANGLE_PRESETS: StudioAnglePreset[] = ['front', 'side', 'back', 'detail'];
+const ANGLE_LABEL: Record<StudioAnglePreset, string> = { front: 'Front', side: 'Side', back: 'Back', detail: 'Detail' };
 
 const STATUS_LABEL: Record<string, string> = {
   queued: 'Queued',
@@ -54,6 +59,8 @@ export default function CeoAiStudioClient() {
   const [category, setCategory] = useState('');
   const [fabric, setFabric] = useState('');
   const [description, setDescription] = useState('');
+  const [seoCaption, setSeoCaption] = useState('');
+  const [sourceViews, setSourceViews] = useState<StudioAnglePreset[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
@@ -107,6 +114,7 @@ export default function CeoAiStudioClient() {
     }
     setError('');
     setSources(selected);
+    setSourceViews(selected.map((_, index) => sourceViews[index] ?? 'front'));
   }
 
   async function startBatch() {
@@ -124,13 +132,25 @@ export default function CeoAiStudioClient() {
         const res = await fetch('/api/admin/studio/process', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sourceUrl, faceUrl, logoUrl, enhanceScale: scale, productTitle, category, fabric, description }),
+          body: JSON.stringify({
+            sourceUrl,
+            faceUrl,
+            logoUrl,
+            enhanceScale: scale,
+            productTitle,
+            category,
+            fabric,
+            description,
+            seoCaption,
+            viewPreset: sourceViews[i] ?? 'front',
+          }),
         });
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         if (!res.ok) throw new Error(`${sources[i].name}: ${data.error ?? res.status}`);
       }
       setProgress(`${sources.length} job(s) started. Results appear below as they finish.`);
       setSources([]);
+      setSourceViews([]);
       loadJobs();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Batch failed');
@@ -242,6 +262,33 @@ export default function CeoAiStudioClient() {
             <button type="button" disabled={!productTitle.trim() || !category} className="shrink-0 rounded border border-zinc-300 px-2 py-1 font-semibold text-zinc-800 hover:bg-zinc-100 disabled:opacity-50" onClick={() => setDescription(buildAutoStudioDescription(productTitle, category, fabric).slice(0, 600))}>Auto-write description</button>
           </span>
         </label>
+        <section className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <label htmlFor="studio-seo-caption" className="text-sm font-semibold">SEO caption and hashtag suggestions</label>
+            <button type="button" disabled={!productTitle.trim() || !category} className="rounded border border-cyan-800 px-2 py-1 text-xs font-semibold text-cyan-900 disabled:opacity-50" onClick={() => setSeoCaption(buildStudioSeoCaption(productTitle, category, fabric, description))}>Generate locally</button>
+          </div>
+          <textarea id="studio-seo-caption" value={seoCaption} onChange={(event) => setSeoCaption(event.target.value)} maxLength={1200} rows={4} className="mt-2 block w-full rounded border border-zinc-300 px-2 py-2 text-sm font-normal" placeholder="Generate a product caption from the details you entered." />
+          <p className="mt-1 text-xs font-normal text-zinc-600">Hashtags are SEO suggestions, not live trend data. Review and edit before publishing. No external API is called.</p>
+        </section>
+        {sources.length > 0 && (
+          <fieldset className="mt-4 rounded-lg border border-zinc-200 p-3">
+            <legend className="px-1 text-sm font-semibold">Product view labels</legend>
+            <p className="mb-2 text-xs text-zinc-600">Choose the view represented by each uploaded photo. These labels do not synthesize missing product angles.</p>
+            <ul className="space-y-2">
+              {sources.map((source, index) => (
+                <li key={`${source.name}-${source.lastModified}-${index}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="truncate">{source.name}</span>
+                  <select aria-label={`View preset for ${source.name}`} value={sourceViews[index] ?? 'front'} onChange={(event) => {
+                    const selectedView = ANGLE_PRESETS.find((preset) => preset === event.target.value) ?? 'front';
+                    setSourceViews((current) => current.map((view, i) => i === index ? selectedView : view));
+                  }} className="rounded border border-zinc-300 px-2 py-1">
+                    {ANGLE_PRESETS.map((preset) => <option key={preset} value={preset}>{ANGLE_LABEL[preset]}</option>)}
+                  </select>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+        )}
         <div className="mt-4 flex flex-wrap items-center gap-6 text-sm">
           <label className="flex items-center gap-2">
             <input type="checkbox" checked={anonymize} onChange={(e) => setAnonymize(e.target.checked)} />
@@ -282,7 +329,9 @@ export default function CeoAiStudioClient() {
               <p className="text-sm font-semibold">{STATUS_LABEL[job.status] ?? job.status}</p>
               {job.error && <p className="mt-1 text-xs text-red-700">{job.error}</p>}
               {job.product_title && <p className="mt-1 text-xs text-zinc-600">{job.product_title}{job.category ? ` · ${job.category}` : ''}</p>}
+              {job.view_preset && <p className="mt-1 text-xs font-semibold text-cyan-800">View: {ANGLE_LABEL[job.view_preset]}</p>}
               {job.description && <p className="mt-2 text-xs text-zinc-600">{job.description}</p>}
+              {job.seo_caption && <details className="mt-2 text-xs"><summary className="cursor-pointer font-semibold">SEO caption</summary><p className="mt-1 whitespace-pre-wrap text-zinc-600">{job.seo_caption}</p></details>}
               {job.output_url && <a href={`/api/admin/studio/download?id=${encodeURIComponent(job.id)}`} className="mt-3 block w-full rounded border border-cyan-700 px-3 py-2 text-center text-sm font-semibold text-cyan-900 hover:bg-cyan-50">Download image</a>}
               {job.status === 'pending_approval' && (
                 <div className="mt-3 flex gap-2">
@@ -299,6 +348,7 @@ export default function CeoAiStudioClient() {
           ))}
         </div>
       </section>
+      <StudioReelExport jobs={jobs.filter((job) => Boolean(job.output_url))} />
     </main>
   );
 }

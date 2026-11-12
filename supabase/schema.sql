@@ -108,6 +108,8 @@ create table if not exists public.studio_jobs (
   stage_prediction_id text,
   webhook_token text not null,
   error text,
+  view_preset text not null default 'front',
+  seo_caption text,
   created_at timestamptz default now(),
   updated_at timestamptz default now(),
   decided_at timestamptz
@@ -122,6 +124,8 @@ alter table public.studio_jobs add column if not exists product_title text;
 alter table public.studio_jobs add column if not exists category text;
 alter table public.studio_jobs add column if not exists fabric text;
 alter table public.studio_jobs add column if not exists description text;
+alter table public.studio_jobs add column if not exists view_preset text not null default 'front';
+alter table public.studio_jobs add column if not exists seo_caption text;
 alter table public.studio_jobs add column if not exists in_catalog boolean not null default false;
 alter table public.studio_jobs add column if not exists featured_at timestamptz;
 alter table public.studio_jobs add column if not exists ad_status text;
@@ -1074,6 +1078,14 @@ create table if not exists public.subcon_directory (
   id uuid default gen_random_uuid() primary key,
   name text not null unique,
   specialty text,
+  email text,
+  email_opt_in boolean not null default false,
+  email_opt_in_at timestamptz,
+  email_opt_in_evidence text,
+  email_opted_out_at timestamptz,
+  vetted boolean not null default false,
+  vetted_at timestamptz,
+  vetting_evidence text,
   contact_phone text,
   location text,
   daily_capacity_pcs integer check (daily_capacity_pcs is null or daily_capacity_pcs >= 0),
@@ -1083,6 +1095,14 @@ create table if not exists public.subcon_directory (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.subcon_directory add column if not exists email text;
+alter table public.subcon_directory add column if not exists email_opt_in boolean not null default false;
+alter table public.subcon_directory add column if not exists email_opt_in_at timestamptz;
+alter table public.subcon_directory add column if not exists email_opt_in_evidence text;
+alter table public.subcon_directory add column if not exists email_opted_out_at timestamptz;
+alter table public.subcon_directory add column if not exists vetted boolean not null default false;
+alter table public.subcon_directory add column if not exists vetted_at timestamptz;
+alter table public.subcon_directory add column if not exists vetting_evidence text;
 alter table public.subcon_directory enable row level security;
 revoke all on public.subcon_directory from anon, authenticated;
 

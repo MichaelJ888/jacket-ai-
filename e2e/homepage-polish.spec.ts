@@ -23,6 +23,11 @@ test("published payment QR, apparel reference gallery, and live design preview w
   await productCard.getByRole("button", { name: "View Gallery & Details" }).click();
   await expect(page.getByText("Additional photos are category references; they are not verified alternate angles of this exact item.")).toBeVisible();
   await expect(page.locator('button[aria-label^="Show reference photo"]')).toHaveCount(5);
+  const showMore = page.getByRole("button", { name: "Show more designs / angles" });
+  await expect(showMore).toBeVisible();
+  await showMore.click();
+  await expect(page.getByRole("button", { name: "Show fewer designs / angles" })).toHaveAttribute("aria-expanded", "true");
+  expect(await page.locator('button[aria-label^="Show design reference"]').count()).toBeGreaterThan(5);
   await page.locator("body").press("Escape");
 
   const mockup = page.locator("#mockup");

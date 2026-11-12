@@ -78,6 +78,12 @@ export function studioJobPath(prefix: string, extension: string, id: string) {
 }
 
 export const STUDIO_CATEGORIES = ['uniform', 'jacket', 'polo', 'corporate-wear', 'sports-jersey', 'giveaway', 'school-uniform', 'bag', 'other'] as const;
+export const STUDIO_ANGLE_PRESETS = ['front', 'side', 'back', 'detail'] as const;
+export type StudioAnglePreset = (typeof STUDIO_ANGLE_PRESETS)[number];
+
+export function isStudioAnglePreset(value: unknown): value is StudioAnglePreset {
+  return typeof value === 'string' && (STUDIO_ANGLE_PRESETS as readonly string[]).includes(value);
+}
 
 // Daily ad theme rotation. Five themes repeat in order by Manila calendar day (Day 6 = Day 1 again).
 export const STUDIO_AD_THEMES = [
@@ -97,7 +103,14 @@ export function studioThemeForDay(manilaDate: string): StudioAdTheme {
   return STUDIO_AD_THEMES[((epochDay % STUDIO_AD_THEMES.length) + STUDIO_AD_THEMES.length) % STUDIO_AD_THEMES.length];
 }
 
-export type StudioMetadata = { productTitle: string; category: string; fabric: string | null; description: string | null };
+export type StudioMetadata = {
+  productTitle: string;
+  category: string;
+  fabric: string | null;
+  description: string | null;
+  viewPreset: StudioAnglePreset;
+  seoCaption: string | null;
+};
 
 export function buildAutoStudioDescription(productTitle: string, category: string, fabric: string): string {
   const itemType = category.trim().replace(/-/g, ' ');
@@ -105,16 +118,48 @@ export function buildAutoStudioDescription(productTitle: string, category: strin
   return `Custom ${itemType} item: ${productTitle.trim()}.${material} A flexible option for teams, schools, and events. Add your logo and request a quotation for details.`;
 }
 
+export function buildStudioSeoCaption(productTitle: string, category: string, fabric: string, description: string): string {
+  const cleanTitle = productTitle.trim().slice(0, 120);
+  const cleanDescription = description.trim().slice(0, 500);
+  const cleanFabric = fabric.trim().slice(0, 100);
+  const categoryTags: Record<string, string[]> = {
+    jacket: ['#CustomJackets', '#VarsityJackets'],
+    uniform: ['#CompanyUniforms', '#Workwear'],
+    'corporate-wear': ['#CorporateWear', '#CompanyUniforms'],
+    polo: ['#CustomPolos', '#CorporateApparel'],
+    'sports-jersey': ['#CustomJerseys', '#Teamwear'],
+    'school-uniform': ['#SchoolUniforms', '#CampusWear'],
+    giveaway: ['#CorporateGiveaways', '#PromotionalProducts'],
+    bag: ['#CustomBags', '#BrandedMerchandise'],
+    other: ['#CustomApparel', '#BrandedMerchandise'],
+  };
+  const hashtags = [...new Set(['#MJIC', '#MadeInThePhilippines', ...(categoryTags[category] ?? categoryTags.other)])];
+  const detail = cleanDescription || `Custom ${category.replace(/-/g, ' ')} production by MJIC.`;
+  const material = cleanFabric ? ` Fabric: ${cleanFabric}.` : '';
+  return `${cleanTitle}. ${detail}${material}\n\n${hashtags.join(' ')}`;
+}
+
 // Catalog and ads need a real title and category; fabric and description are optional.
-export function parseStudioMetadata(input: { productTitle?: unknown; category?: unknown; fabric?: unknown; description?: unknown }): StudioMetadata | null {
+export function parseStudioMetadata(input: {
+  productTitle?: unknown;
+  category?: unknown;
+  fabric?: unknown;
+  description?: unknown;
+  viewPreset?: unknown;
+  seoCaption?: unknown;
+}): StudioMetadata | null {
   const clean = (value: unknown, max: number) => (typeof value === 'string' ? value.trim().slice(0, max) : '');
   const productTitle = clean(input.productTitle, 120);
   const category = clean(input.category, 40).toLowerCase();
-  if (!productTitle || !(STUDIO_CATEGORIES as readonly string[]).includes(category)) return null;
+  const viewPreset = input.viewPreset === undefined ? 'front' : input.viewPreset;
+  if (!productTitle || !(STUDIO_CATEGORIES as readonly string[]).includes(category)
+    || !isStudioAnglePreset(viewPreset)) return null;
   return {
     productTitle,
     category,
     fabric: clean(input.fabric, 120) || null,
     description: clean(input.description, 600) || null,
+    viewPreset,
+    seoCaption: clean(input.seoCaption, 1200) || null,
   };
 }
