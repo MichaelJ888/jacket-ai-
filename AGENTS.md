@@ -503,3 +503,6 @@ px vercel ls.
 - The catalogue modal expands beyond its initial five category-reference photos. Architecture view polls live health and Auto-Pilot status, animates health nodes, and lists the configured PHT daily/weekly/monthly cadence.
 - Verified: TypeScript clean; `npm test` 504 pass / 0 fail / 1 skipped; ESLint 0 errors / 6 existing warnings; webpack production build passes; Playwright 3/3. `npm run db:push` applied the additive Studio and subcon consent/vetting columns.
 - No new provider, worker, dependency, or paid generation request. Resend credentials and non-Meta platform credentials are owner-configured; no email was sent and no social post/account mutation was performed during validation.
+
+## Completion log - homepage conversion flow (2026-11-13)
+- Moved the client list before procurement tools, placed catalog before production workflow/compliance and the client journey, then live updates, FAQs, and contact; non-core weather/sports/news now follow the footer, with routes, quotes, and visitor tracking unchanged.

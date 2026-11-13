@@ -408,8 +408,8 @@
   </div>
 </section>
 
-<!-- ============ KEY PAGES (prominent, directly under hero) ============ -->
-<section class="bg-white border-b hairline py-8">
+<!-- ============ PRODUCTION WORKFLOW & CAPABILITIES LINKS ============ -->
+<section id="production-links" class="bg-white border-b hairline py-8">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 grid gap-4 sm:grid-cols-3">
     <a href="/production-workflow" target="_top" class="group flex items-center justify-between gap-3 bg-navy text-gold-400 hover:bg-gold hover:text-navy font-display font-bold text-xl sm:text-2xl px-7 py-7 rounded-xl shadow-lg transition-all duration-300 hover:-translate-y-1">
       <span class="flex items-center gap-3"><i data-lucide="workflow" class="w-7 h-7"></i> Production Workflow</span>
@@ -427,7 +427,7 @@
 </section>
 
 <!-- ============ TOOLS QUICK-NAV ============ -->
-<section class="bg-white border-b hairline py-10">
+<section id="tools-quick-nav" class="bg-white border-b hairline py-10">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
     <p class="text-center text-xs uppercase tracking-wider text-navy-400 font-semibold mb-5">Free Tools Built Into This Website</p>
     <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -504,7 +504,7 @@
   </div>
 </section>
 
-<!-- ============ CLIENT LIST (trust signals, directly under #trust) ============ -->
+<!-- ============ CLIENT LIST (trust signals) ============ -->
 <section id="clients" x-show="showClientList" x-cloak class="border-b hairline">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 py-14">
     <p class="text-xs uppercase tracking-wider text-navy-400 font-semibold mb-5">Companies we've worked with</p>
@@ -863,7 +863,7 @@
   <p x-show="filteredProducts.length===0" class="text-center text-navy-400 py-16 text-sm">No products match your search. Try a different keyword or category.</p>
 </section>
 
-<section class="border-y hairline bg-navy-50/60">
+<section id="studio-cta" class="border-y hairline bg-navy-50/60">
   <div class="mx-auto flex max-w-[1600px] flex-col gap-5 px-6 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-10 lg:px-14">
     <div>
       <p class="mb-1 text-xs font-bold uppercase tracking-widest text-gold-600">MJIC staff access</p>
@@ -873,18 +873,6 @@
     <a href="/catalogue-enhancer" target="_top" rel="noopener" class="inline-flex shrink-0 items-center justify-center rounded-md bg-navy px-5 py-3 text-sm font-bold text-white transition hover:bg-navy-600">Open secure AI Studio</a>
   </div>
 </section>
-
-<script>
-  (function () {
-    const journey = document.getElementById('mjic-client-journey');
-    const wizard = document.getElementById('order-wizard');
-    if (!journey || !wizard) {
-      console.error('MJIC page layout: client journey or order wizard section is missing.');
-      return;
-    }
-    journey.insertAdjacentElement('afterend', wizard);
-  })();
-</script>
 
 <!-- ============ STUDIO COLLECTION (approved CEO AI Studio photos, loaded from /api/studio/catalog) ============ -->
 <section id="studio-collection" class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 pb-20" hidden>
@@ -950,7 +938,7 @@
         </div>
 
         <div x-show="quoteItems.length===0" class="text-sm text-navy-400 border border-dashed hairline rounded-md py-10 text-center">
-          No items yet — add products from the catalog above, or pick a quantity tier directly below.
+          No items yet — add products from the catalog below, or pick a quantity tier directly here.
         </div>
 
         <div class="space-y-4">
@@ -1072,7 +1060,7 @@
 </div>
 
 <!-- ============ PRODUCTION UPDATES FEED ============ -->
-<section class="bg-navy-50/50 border-b hairline">
+<section id="production-feed" class="bg-navy-50/50 border-b hairline">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 py-20">
     <div class="flex flex-wrap items-end justify-between gap-4 mb-10">
       <div>
@@ -1148,7 +1136,7 @@
 </section>
 
 <!-- ============ WORLD & PH NEWS TICKER ============ -->
-<section class="bg-navy-900 border-t border-white/10 py-5 overflow-hidden">
+<section id="news-ticker" class="bg-navy-900 border-t border-white/10 py-5 overflow-hidden">
   <div class="flex items-center">
     <span class="shrink-0 bg-gold text-navy text-[10px] font-bold px-3 py-1.5 uppercase tracking-wide ml-2 rounded-sm z-10">Live Headlines</span>
     <div class="flex whitespace-nowrap news-track ml-4" style="animation-duration:240s;">
@@ -1185,7 +1173,7 @@
 </section>
 
 <!-- ============ WEEKLY WEATHER ============ -->
-<section class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 py-14 border-t hairline">
+<section id="weather" class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14 py-14 border-t hairline">
   <p class="text-gold-600 font-semibold text-sm mb-2">Weather Forecast</p>
   <div class="flex flex-wrap items-center justify-between gap-3 mb-6">
     <h2 class="font-display font-bold text-navy text-2xl tracking-tight">This week in <span x-text="weatherCity"></span></h2>
@@ -1272,12 +1260,12 @@
 </section>
 
 <!-- ============ BONUS FEATURES ============ -->
-<div class="bg-navy pt-16 pb-2 text-center">
+<div id="bonus-features" class="bg-navy pt-16 pb-2 text-center">
   <p class="font-display font-bold text-gold-400 text-3xl sm:text-4xl tracking-[0.2em] uppercase">Bonus Features</p>
 </div>
 
 <!-- ============ ALEX EALA MATCH COUNTDOWN ============ -->
-<section class="bg-navy py-16" :class="ealaNextMatch.isLive ? 'ring-4 ring-red-500/60' : ''">
+<section id="eala" class="bg-navy py-16" :class="ealaNextMatch.isLive ? 'ring-4 ring-red-500/60' : ''">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
     <div class="grid lg:grid-cols-5 gap-8 items-center border rounded-lg p-8 sm:p-10" :class="ealaNextMatch.isLive ? 'border-red-500 bg-red-500/5 animate-pulse' : 'border-white/10'">
       <div class="lg:col-span-2" x-show="siteSettings.ealaPhoto" x-cloak>
@@ -1315,7 +1303,7 @@
 </section>
 
 <!-- ============ NBA & GILAS COUNTDOWN (bonus section) ============ -->
-<section class="bg-navy-50/60 border-y hairline py-16 relative overflow-hidden" :style="'background-image:linear-gradient(rgba(238,241,246,.94),rgba(238,241,246,.94)),url(\''+(nbaSlides[0] ? nbaSlides[0].src : '/images/sports/nba-3.svg')+'\');background-size:cover;background-position:center'">
+<section id="basketball" class="bg-navy-50/60 border-y hairline py-16 relative overflow-hidden" :style="'background-image:linear-gradient(rgba(238,241,246,.94),rgba(238,241,246,.94)),url(\''+(nbaSlides[0] ? nbaSlides[0].src : '/images/sports/nba-3.svg')+'\');background-size:cover;background-position:center'">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
     <p class="text-gold-600 font-semibold text-sm mb-2 flex items-center gap-2"><i data-lucide="trophy" class="w-4 h-4"></i> Bonus — Basketball Fans</p>
     <h3 class="font-display font-bold text-navy text-2xl sm:text-3xl mb-6">Pick a team, see their next game.</h3>
@@ -1396,7 +1384,7 @@
 </section>
 
 <!-- ============ FOOTER ============ -->
-<footer class="border-t hairline py-10">
+<footer id="footer" class="border-t hairline py-10">
   <div class="max-w-[1600px] mx-auto px-6 sm:px-10 lg:px-14">
     <div class="flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-navy-400 mb-4">
       <p>&copy; <span x-text="new Date().getFullYear()"></span> Customized Jackets and More. All rights reserved.</p>
@@ -4124,5 +4112,43 @@ async sendChat(){
 </div>
 <script src="/site-cms.js" defer></script>
 <script src="/journey-audio.js"></script>
+<script>
+  (function () {
+    const sectionOrder = [
+      'top',
+      'clients',
+      'testimonials',
+      'tools-quick-nav',
+      'order-wizard',
+      'fabrics',
+      'mockup',
+      'quote',
+      'catalog',
+      'studio-cta',
+      'studio-collection',
+      'production-links',
+      'trust',
+      'mjic-client-journey',
+      'production-feed',
+      'faq',
+      'contact',
+      'footer',
+      'weather',
+      'bonus-features',
+      'eala',
+      'basketball',
+      'news-ticker'
+    ].map((id) => document.getElementById(id));
+
+    if (sectionOrder.some((section) => !section)) {
+      console.error('MJIC page layout: a required homepage section is missing.');
+      return;
+    }
+
+    for (let index = 1; index < sectionOrder.length; index += 1) {
+      sectionOrder[index - 1].insertAdjacentElement('afterend', sectionOrder[index]);
+    }
+  })();
+</script>
 </body>
 </html>

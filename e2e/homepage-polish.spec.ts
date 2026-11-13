@@ -12,6 +12,36 @@ test("published payment QR, apparel reference gallery, and live design preview w
   );
 
   await page.goto("/");
+  const conversionFlow = [
+    "top",
+    "clients",
+    "testimonials",
+    "tools-quick-nav",
+    "order-wizard",
+    "fabrics",
+    "mockup",
+    "quote",
+    "catalog",
+    "studio-cta",
+    "studio-collection",
+    "production-links",
+    "trust",
+    "mjic-client-journey",
+    "production-feed",
+    "faq",
+    "contact",
+    "footer",
+    "weather",
+    "bonus-features",
+    "eala",
+    "basketball",
+    "news-ticker",
+  ];
+  const renderedFlow = await page
+    .locator(conversionFlow.map((id) => `#${id}`).join(","))
+    .evaluateAll((sections) => sections.map((section) => section.id));
+  expect(renderedFlow).toEqual(conversionFlow);
+
   const checkout = page.locator("#quote");
 
   await checkout.getByRole("button", { name: "View full-size QR" }).click();
