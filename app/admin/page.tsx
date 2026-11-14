@@ -11,6 +11,7 @@ import SourcePreviewDrawer from "./source-preview-drawer";
 import ArchitecturePanel from "./architecture-panel";
 import SocialConnectionsPanel from "./social-connections-panel";
 import SubconOutreachPanel from "./subcon-outreach-panel";
+import MasterBlueprintDrawer from "./_components/MasterBlueprintDrawer";
 
 type Price = { key: string; name: string; category: string; unit: string; unit_cost: number; supplier_name: string | null; updated_at: string };
 type Overview = {
@@ -122,7 +123,7 @@ function highlightHtml(source: string) {
 export default function AdminPage() {
   const [token, setToken] = useState("");
   const [authed, setAuthed] = useState(false);
-  const [tab, setTab] = useState<"dashboard" | "architecture" | "prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "subcons" | "coo" | "recipients" | "credits">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "architecture" | "blueprint" | "prices" | "book" | "teach" | "knowledge" | "overview" | "connect" | "subcons" | "coo" | "recipients" | "credits">("dashboard");
   const [pages, setPages] = useState<Array<{ page_id: string; page_name: string | null; ig_user_id: string | null; webhook_subscribed: boolean; subscribe_error: string | null }>>([]);
   const [pageHealth, setPageHealth] = useState<Record<string, { status: "checking" | "connected" | "error"; checks: MetaHealthCheck[]; message?: string }>>({});
   const [oauthConfigured, setOauthConfigured] = useState(true);
@@ -485,9 +486,9 @@ export default function AdminPage() {
       )}
       <MainGoalsPanel token={token} />
       <>
-      <nav className="mb-4 flex gap-2">
+      <nav className="mb-4 flex flex-wrap gap-2">
 
-        {([["dashboard", "Dashboard"], ["architecture", "Architecture"], ["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["knowledge", "Knowledge Base"], ["overview", "Overview"], ["connect", "Social connections"], ["subcons", "Subcon outreach"], ["coo", "COO & all customers"], ["recipients", "Telegram recipients"], ["credits", "AI credits"]] as const).map(([id, label]) => (
+        {([["dashboard", "Dashboard"], ["architecture", "Architecture"], ["blueprint", "End-to-End Master Blueprint"], ["prices", "Material prices"], ["book", "Selling prices"], ["teach", "Teach the AI"], ["knowledge", "Knowledge Base"], ["overview", "Overview"], ["connect", "Social connections"], ["subcons", "Subcon outreach"], ["coo", "COO & all customers"], ["recipients", "Telegram recipients"], ["credits", "AI credits"]] as const).map(([id, label]) => (
           <button key={id} className={`rounded px-3 py-1 text-sm ${tab === id ? "bg-zinc-900 text-white" : "bg-zinc-200"}`} onClick={() => setTab(id)}>{label}</button>
         ))}
       </nav>
@@ -495,6 +496,7 @@ export default function AdminPage() {
 
       {tab === "dashboard" && <AnalyticsDashboard token={token} />}
       {tab === "architecture" && <ArchitecturePanel token={token} />}
+      {tab === "blueprint" && <MasterBlueprintDrawer />}
       {tab === "coo" && <CooPanel token={token} />}
       {tab === "recipients" && <RecipientsPanel token={token} />}
       {tab === "credits" && <CreditsPanel token={token} />}
