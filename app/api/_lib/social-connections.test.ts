@@ -4,6 +4,7 @@ import { socialConnection, socialProviderConfigured } from './social-connections
 
 test('marks only verified provider credentials as configured', () => {
   assert.equal(socialProviderConfigured('tiktok', new Set(['TIKTOK_ACCESS_TOKEN'])), true);
+  assert.equal(socialProviderConfigured('tiktok', new Set(['TIKTOK_CLIENT_KEY', 'TIKTOK_CLIENT_SECRET'])), true);
   assert.equal(socialProviderConfigured('tiktok', new Set()), false);
   assert.equal(socialProviderConfigured('youtube', new Set([
     'YOUTUBE_CLIENT_ID',

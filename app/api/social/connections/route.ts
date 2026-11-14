@@ -50,7 +50,11 @@ export async function GET(request: Request) {
         return socialConnection(
           provider,
           configured ? 'unverified' : 'not_linked',
-          configured ? 'Publishing credentials are present; live token validity has not been checked.' : 'Not linked. Platform credentials are not configured.',
+          configured
+            ? provider === 'tiktok'
+              ? 'TikTok OAuth app credentials are present; live account token validity has not been checked.'
+              : 'Publishing credentials are present; live token validity has not been checked.'
+            : 'Not linked. Platform credentials are not configured.',
           configured,
         );
       }

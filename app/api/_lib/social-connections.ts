@@ -112,7 +112,10 @@ export function socialProviderConfigured(provider: SocialProvider, configuredNam
   if (provider === 'facebook' || provider === 'instagram') {
     return configuredNames.has('META_APP_ID') && configuredNames.has('META_APP_SECRET');
   }
-  if (provider === 'tiktok') return configuredNames.has('TIKTOK_ACCESS_TOKEN');
+  if (provider === 'tiktok') {
+    return configuredNames.has('TIKTOK_ACCESS_TOKEN')
+      || (configuredNames.has('TIKTOK_CLIENT_KEY') && configuredNames.has('TIKTOK_CLIENT_SECRET'));
+  }
   if (provider === 'youtube') {
     return ['YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET', 'YOUTUBE_REFRESH_TOKEN'].every((name) => configuredNames.has(name));
   }

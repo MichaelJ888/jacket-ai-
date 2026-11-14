@@ -17,6 +17,7 @@ import { getPageToken } from './meta-pages';
 import { checkMetaPublishing, metaPublishFailure, type MetaPlatform } from './meta-publishing';
 import { recordMetaPublishingHealth } from './meta-publishing-alerts';
 import { isMetaImageRejection, resolveMetaImage } from './meta-media';
+import { getTikTokAccessToken } from './tiktok-oauth';
 import type { MetaImagePlatform } from './meta-media-rules';
 import { seoHashtags } from './coo-seo.ts';
 import { SAMPLE_JACKET_IMAGES } from './mjic-prompt';
@@ -434,8 +435,8 @@ async function publishYoutube(row: CalendarRow, storagePath: string | null) {
 }
 
 async function publishTiktok(row: CalendarRow, mediaUrl: string | null) {
-  const token = process.env.TIKTOK_ACCESS_TOKEN;
-  if (!token) throw new MissingCredentials('TIKTOK_ACCESS_TOKEN (Content Posting API)');
+  const token = await getTikTokAccessToken();
+  if (!token) throw new MissingCredentials('TikTok OAuth connection or TIKTOK_ACCESS_TOKEN (Content Posting API)');
   if (row.media_type !== 'video' || !mediaUrl) throw new Error('TikTok needs a video');
   const response = await fetch('https://open.tiktokapis.com/v2/post/publish/video/init/', {
     method: 'POST',
@@ -627,8 +628,16 @@ export async function requeueCredentialBlocked(validateMeta = createMetaPublishi
     restored += (parked.data?.length || 0) + (tokenFailed.data?.length || 0);
   }
   for (const platform of ['youtube', 'tiktok'] as const) {
-    const envSet = platform === 'youtube' ? process.env.YOUTUBE_REFRESH_TOKEN : process.env.TIKTOK_ACCESS_TOKEN;
-    if (!envSet) continue;
+    if (platform === 'youtube') {
+      if (!process.env.YOUTUBE_REFRESH_TOKEN) continue;
+    } else {
+      try {
+        if (!await getTikTokAccessToken()) continue;
+      } catch (error) {
+        console.error('Could not validate TikTok credentials while requeuing posts:', error instanceof Error ? error.message : 'Unknown error');
+        continue;
+      }
+    }
     const parked = await supabase.from('content_calendar').update({ status: 'READY', error: null, attempts: 0 }).eq('status', 'NEEDS_CREDENTIALS').eq('platform', platform).gte('scheduled_at', recent).select('id');
     restored += parked.data?.length || 0;
   }

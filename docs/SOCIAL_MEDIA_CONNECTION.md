@@ -30,6 +30,7 @@ local `.env.local` only for local development.
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only access to store Page connections. Secret. |
 | `APP_BASE_URL` | Optional canonical public origin; production defaults to the Vercel production URL or `https://jacket-ai.vercel.app`. |
+| `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | TikTok Login Kit app credentials. Secrets are server-only. |
 
 Do not set `META_PAGE_ACCESS_TOKEN` for a new OAuth-connected Page unless a
 specific legacy integration requires it. OAuth stores each Page's token in
@@ -49,6 +50,8 @@ For production, register these exact URLs:
   `https://jacket-ai.vercel.app/api/webhooks/meta`
 - Deauthorization callback:
   `https://jacket-ai.vercel.app/api/meta/deauthorize`
+- TikTok OAuth callback:
+  `https://jacket-ai.vercel.app/api/tiktok/oauth/callback`
 
 The OAuth redirect is derived from `APP_BASE_URL` when configured. If the
 production domain changes, update both `APP_BASE_URL` and the allowlisted
@@ -97,11 +100,19 @@ The application also has publishing paths for YouTube and TikTok, but those
 platforms do not use Facebook/Instagram Graph API credentials. Configure and
 verify each platform's own integration and calendar rows before expecting
 cross-platform publishing. A Meta Page connection alone cannot authorize
-YouTube or TikTok. YouTube uses `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`,
-and `YOUTUBE_REFRESH_TOKEN`. TikTok uses `TIKTOK_ACCESS_TOKEN` and optionally
-`TIKTOK_PRIVACY_LEVEL`; its current default is `SELF_ONLY`, so it is not public
-by default. Use the existing scheduler and publisher; do not bypass the
-per-platform posting limits or publish directly from a browser.
+YouTube or TikTok. YouTube uses `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, and
+`YOUTUBE_REFRESH_TOKEN`. TikTok's admin OAuth start is
+`POST /api/tiktok/oauth/start` with an admin bearer token; open the returned URL
+in the same browser to authorize. The callback stores access and refresh tokens
+in the RLS-locked `system_settings` table, and the publisher refreshes the access
+token as needed. Legacy `TIKTOK_ACCESS_TOKEN` remains supported and takes
+precedence. Configure `TIKTOK_CLIENT_KEY` and `TIKTOK_CLIENT_SECRET` in Vercel,
+register the exact callback URI above, and request `user.info.basic` and
+`video.publish` scopes. TikTok requires verified media URL domains and may
+require app review/audit for public posts. `TIKTOK_PRIVACY_LEVEL` defaults to
+`SELF_ONLY`, so posts are not public by default. Use the existing scheduler and
+publisher; do not bypass per-platform posting limits or publish directly from a
+browser.
 
 ## 6. Safe verification checklist
 
