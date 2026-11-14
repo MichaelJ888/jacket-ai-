@@ -37,6 +37,8 @@ function matchesFilter(item: BlueprintItem, filter: Filter, query: string) {
     item.magagawa,
     item.kayaGawin,
     item.epekto,
+    ...item.stepByStep,
+    ...(item.copyValues?.flatMap(({ label, value }) => [label, value]) ?? []),
   ]
     .join(" ")
     .toLocaleLowerCase();
