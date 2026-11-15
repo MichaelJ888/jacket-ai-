@@ -508,3 +508,4 @@ px vercel ls.
 - Moved the client list before procurement tools, placed catalog before production workflow/compliance and the client journey, then live updates, FAQs, and contact; non-core weather/sports/news now follow the footer, with routes, quotes, and visitor tracking unchanged.
 - 2026-11-14 — Added a static Taglish end-to-end MJIC blueprint to `/admin`; no API, schema, pricing, provider, or runtime AI changes.
 - 2026-11-15 - Blueprint search now indexes detailed steps and copyable setup labels/values; no API, schema, pricing, provider, or runtime AI changes.
+- 2026-11-15 - `/admin` blueprint now tracks requested features with 60-second `/api/health` config indicators, browser-only custom tasks, `RESEND_FROM` format validation, and a static v0 prompt card. Sender validation tests added; no AI calls, emails, schema changes, or live deployment. Existing COO/editor/Telegram/mockup paths were retained; no `app` cart component exists.

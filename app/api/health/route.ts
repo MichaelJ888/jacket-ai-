@@ -14,9 +14,12 @@ const OPTIONAL_ENV = [
   'META_IG_USER_ID',
   'WHATSAPP_PHONE_NUMBER_ID',
   'YOUTUBE_REFRESH_TOKEN',
+  'LALAMOVE_API_URL',
   'LALAMOVE_API_TOKEN',
+  'EMBROIDERY_DIGITIZE_API_URL',
   'EMBROIDERY_DIGITIZE_API_KEY',
   'RESEND_API_KEY',
+  'RESEND_FROM',
 ];
 
 // Public by design: returns only booleans, counts and timings, never secrets or row data.

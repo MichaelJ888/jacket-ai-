@@ -14,6 +14,10 @@ export type BlueprintItem = {
   epekto: string;
   stepByStep: readonly string[];
   copyValues?: readonly { label: string; value: string }[];
+  nextSteps?: readonly string[];
+  verdict?: string;
+  healthKeys?: readonly string[];
+  compactDetails?: boolean;
 };
 
 export type BlueprintPhase = {
@@ -23,7 +27,7 @@ export type BlueprintPhase = {
   items: readonly BlueprintItem[];
 };
 
-export const MJIC_MASTER_BLUEPRINT = [
+const CORE_MJIC_MASTER_BLUEPRINT = [
   {
     id: "infrastructure",
     title: "Phase 1 · Core Infrastructure & Security",
@@ -489,6 +493,257 @@ export const MJIC_MASTER_BLUEPRINT = [
         copyValues: [{ label: "Data table", value: "visitor_logs" }],
       },
     ],
+  },
+] as const satisfies readonly BlueprintPhase[];
+
+type TrackedFeature = Pick<
+  BlueprintItem,
+  "id" | "title" | "status" | "summary" | "nextSteps" | "verdict" | "healthKeys"
+>;
+
+function trackedFeature(feature: TrackedFeature): BlueprintItem {
+  return {
+    ...feature,
+    size: feature.status === "pending" ? "major" : "micro",
+    paraSaan: feature.summary,
+    purpose: feature.verdict ?? feature.summary,
+    magagawa: feature.summary,
+    kayaGawin: feature.verdict ?? feature.summary,
+    epekto: feature.verdict ?? feature.summary,
+    stepByStep: feature.nextSteps ?? [],
+    compactDetails: true,
+  };
+}
+
+const REQUESTED_FEATURES: readonly BlueprintItem[] = [
+  trackedFeature({
+    id: "lalamove",
+    title: "Lalamove",
+    status: "done",
+    summary: "May logistics workflow at retry queue para sa Lalamove bookings.",
+    nextSteps: ["I-configure ang LALAMOVE_API_URL at LALAMOVE_API_TOKEN sa server environment.", "Subukan muna ang booking path sa aprubadong test scenario."],
+    verdict: "Nasa code ang workflow; hindi live-ready hangga't kulang ang provider credentials.",
+    healthKeys: ["LALAMOVE_API_URL", "LALAMOVE_API_TOKEN"],
+  }),
+  trackedFeature({
+    id: "embroidery-digitizer",
+    title: "Embroidery Digitizer",
+    status: "done",
+    summary: "May built-in DST/EXP/PES/JEF digitizer at QA sa admin.",
+    nextSteps: ["Gamitin ang built-in digitizer at suriin ang stitch preview.", "External digitizing service ay optional at hiwalay sa built-in path."],
+    verdict: "Built-in digitizer exists; external-provider status is shown separately.",
+    healthKeys: ["EMBROIDERY_DIGITIZE_API_URL", "EMBROIDERY_DIGITIZE_API_KEY"],
+  }),
+  trackedFeature({
+    id: "subcon-outreach",
+    title: "Subcon Outreach",
+    status: "done",
+    summary: "May vetted subcontractor workflow na may opt-in, opt-out, at manual-send guardrails.",
+    nextSteps: ["Panatilihing kumpleto ang vetting at consent evidence.", "I-verify ang RESEND_FROM bago aprubahan ang anumang email."],
+    verdict: "Guarded workflow is implemented; it does not authorize bulk or unattended outreach.",
+    healthKeys: ["RESEND_API_KEY", "RESEND_FROM"],
+  }),
+  trackedFeature({
+    id: "download-html",
+    title: "Download HTML",
+    status: "done",
+    summary: "May admin HTML export preview at copy/download flow.",
+    nextSteps: ["Suriin ang preview at redaction bago mag-download o mag-copy."],
+    verdict: "Implemented behind the existing admin authorization.",
+  }),
+  trackedFeature({
+    id: "ai-logo-creator",
+    title: "AI Logo Creator",
+    status: "done",
+    summary: "May protected logo-concept tool; provider generation requires its configured key.",
+    nextSteps: ["Gamitin lamang ang aprubadong brand assets.", "Huwag mag-trigger ng metered generation para lang mag-test."],
+    verdict: "UI and route exist; provider readiness and generated output are not verified here.",
+  }),
+  trackedFeature({
+    id: "mockup-design-creator",
+    title: "Mockup Design Creator",
+    status: "done",
+    summary: "May browser-based mock designer para sa garment selection, kulay, at logo placement.",
+    nextSteps: ["I-check ang preview sa mobile at desktop.", "Ipakita ang mockup bilang concept, hindi production proof."],
+    verdict: "Local mock design is implemented; no AI generation is implied.",
+  }),
+  trackedFeature({
+    id: "quotation-creators",
+    title: "Quotation Creators",
+    status: "done",
+    summary: "May public quote flow at protected formal quotation builder.",
+    nextSteps: ["Gamitin ang server-side official pricing.", "Kumpirmahin ang legal template details bago magpadala sa customer."],
+    verdict: "Implemented; unsupported pricing remains a sales-confirmation path.",
+  }),
+  trackedFeature({
+    id: "checkout-payment",
+    title: "Checkout & Payment",
+    status: "pending",
+    summary: "Payment details exist, pero wala pang published merchant QR asset sa site overlay.",
+    nextSteps: ["I-upload at i-publish ang tunay na merchant QR sa site editor.", "I-verify ang recipient at amount bago i-announce ang QR as available."],
+    verdict: "Payment guidance exists; QR checkout is not ready until the owner publishes the real asset.",
+  }),
+  trackedFeature({
+    id: "choose-fabric",
+    title: "Choose Fabric",
+    status: "done",
+    summary: "May fabric choices at class rules sa quotation flow.",
+    nextSteps: ["Kumpirmahin ang fabric class sa approved MJIC pricing rules."],
+    verdict: "Implemented in the quote flow; do not infer a class for unknown materials.",
+  }),
+  trackedFeature({
+    id: "bulk-quotation",
+    title: "Bulk Quotation",
+    status: "done",
+    summary: "Tumatanggap ang quotation flow ng order quantities at official price tiers.",
+    nextSteps: ["I-verify ang quantity, MOQ, at applicable price tier bago isumite."],
+    verdict: "Quantity-based quotation is implemented; bulk spreadsheet import is not implied.",
+  }),
+  trackedFeature({
+    id: "product-catalogue",
+    title: "Product Catalogue",
+    status: "done",
+    summary: "May curated public catalogue na may product imagery at category references.",
+    nextSteps: ["Panatilihing updated ang approved catalog assets at product descriptions."],
+    verdict: "Implemented; the repository does not certify the catalogue as a complete master SKU list.",
+  }),
+  trackedFeature({
+    id: "ceo-ai-studio",
+    title: "CEO AI Studio",
+    status: "done",
+    summary: "May protected Catalogue Enhancer workflow na gumagamit ng configured hosted stages.",
+    nextSteps: ["Gamitin lamang ang approved source images.", "Tingnan ang per-job cost/approval before any metered Replicate run."],
+    verdict: "Studio is implemented; provider transformations can incur usage cost.",
+  }),
+  trackedFeature({
+    id: "client-journey-video",
+    title: "Client Journey Video",
+    status: "done",
+    summary: "May client-journey page at user-activated browser audio/video controls.",
+    nextSteps: ["Subukan ang controls sa mobile at panatilihing user-activated ang audio."],
+    verdict: "Implemented in the browser; it does not require a paid model call.",
+  }),
+  trackedFeature({
+    id: "production-updates",
+    title: "Production Updates",
+    status: "done",
+    summary: "May production updates feed na backed ng existing API and records.",
+    nextSteps: ["Mag-post lamang ng accurate, privacy-reviewed production updates."],
+    verdict: "Implemented; public updates must not expose customer-sensitive details.",
+  }),
+  trackedFeature({
+    id: "faqs",
+    title: "FAQs",
+    status: "done",
+    summary: "May customer FAQ content and existing AI FAQ routing.",
+    nextSteps: ["I-review ang sagot laban sa kasalukuyang approved pricing at policies."],
+    verdict: "Implemented; facts must remain grounded in approved MJIC sources.",
+  }),
+  trackedFeature({
+    id: "contact",
+    title: "Contact",
+    status: "done",
+    summary: "May public contact paths at configured MJIC contact details.",
+    nextSteps: ["Panatilihing tugma ang contact channels sa approved business information."],
+    verdict: "Implemented; do not change official contact details without approval.",
+  }),
+  trackedFeature({
+    id: "sports-widgets",
+    title: "Alex Eala & NBA Widgets",
+    status: "done",
+    summary: "May non-core sports widgets na inilagay pagkatapos ng pangunahing storefront content.",
+    nextSteps: ["Panatilihing hiwalay ang sports content sa procurement path."],
+    verdict: "Widgets are present; this tracker does not verify the freshness of live scores.",
+  }),
+  trackedFeature({
+    id: "world-news",
+    title: "World News",
+    status: "done",
+    summary: "May non-core news content outside ng pangunahing procurement flow.",
+    nextSteps: ["Panatilihing optional at clearly secondary ang news content."],
+    verdict: "Page placement is implemented; live news freshness is not checked by this tracker.",
+  }),
+  trackedFeature({
+    id: "ai-swarm",
+    title: "AI Swarm",
+    status: "done",
+    summary: "May bounded swarm-worker and heartbeat monitoring workflows.",
+    nextSteps: ["Panatilihin ang caps, authentication, and approval boundaries."],
+    verdict: "Bounded automation exists; it is not an unrestricted autonomous agent.",
+  }),
+  trackedFeature({
+    id: "ai-coo",
+    title: "Super Intelligent AI COO",
+    status: "done",
+    summary: "May COO command tools, persisted Auto-Pilot setting, and explicit admin controls.",
+    nextSteps: ["Gamitin ang admin toggle para sa Auto-Pilot state.", "Review any action with external or customer impact."],
+    verdict: "Operational COO controls are implemented; irreversible actions are not autonomous.",
+  }),
+  trackedFeature({
+    id: "crm-erp",
+    title: "CRM/ERP",
+    status: "done",
+    summary: "May CRM contacts, orders, costing, logistics, and operations admin workflows.",
+    nextSteps: ["Panatilihing consistent ang CRM contacts at order linkage."],
+    verdict: "Core business modules exist; this is not a claim of a fully integrated ERP suite.",
+  }),
+  trackedFeature({
+    id: "telegram-vercel-ai",
+    title: "Telegram Vercel AI",
+    status: "pending",
+    summary: "Telegram webhook and cloud AI integrations exist, pero walang hiwalay na verified AI bridge command.",
+    nextSteps: ["I-define ang approved Telegram command and response contract.", "Test only with a non-customer, non-billable path before enabling AI replies."],
+    verdict: "Webhook is present; a dedicated Telegram-to-Vercel-AI bridge is not certified as active.",
+  }),
+  trackedFeature({
+    id: "jacket-video-mockup",
+    title: "Jacket Video Mockup",
+    status: "done",
+    summary: "May browser-local WebM mockup renderer para sa approved jacket artwork.",
+    nextSteps: ["Gumamit ng aprubadong artwork at hintayin ang local render matapos.", "Huwag ipagkamali ang draft sa published ad."],
+    verdict: "Browser-only renderer is implemented; no server video-generation route or upload is implied.",
+  }),
+  trackedFeature({
+    id: "social-auto-ads-seo",
+    title: "Social Auto-Ads/SEO",
+    status: "done",
+    summary: "May scheduled social publishing, SEO caption helpers, and platform caps.",
+    nextSteps: ["Suriin ang approval, platform configuration, schedule, and posting cap."],
+    verdict: "Automation is implemented with existing caps; this tracker does not trigger a publish.",
+  }),
+  trackedFeature({
+    id: "ai-swarm-employees",
+    title: "AI Swarm Employees",
+    status: "done",
+    summary: "May heartbeat-based organization and bounded automated jobs.",
+    nextSteps: ["Suriin ang heartbeat status at panatilihin ang human approval para sa consequential work."],
+    verdict: "Virtual seats are monitoring labels, not independent human employees or unrestricted agents.",
+  }),
+  trackedFeature({
+    id: "futuristic-ui-ux",
+    title: "UI/UX Futuristic Design",
+    status: "done",
+    summary: "May responsive MJIC storefront and scoped neon admin presentation.",
+    nextSteps: ["Panatilihin ang keyboard access, contrast, and mobile layouts."],
+    verdict: "Implemented visual system; accessibility and behavior still require regression checks.",
+  }),
+  trackedFeature({
+    id: "ai-website-editor",
+    title: "AI Website Editor",
+    status: "done",
+    summary: "May authenticated visual CMS para sa safe text/image edits and publish.",
+    nextSteps: ["I-preview at i-review ang sanitized draft bago mag-publish."],
+    verdict: "Protected visual editing exists; this does not enable arbitrary source-code patching.",
+  }),
+];
+
+export const MJIC_MASTER_BLUEPRINT = [
+  ...CORE_MJIC_MASTER_BLUEPRINT,
+  {
+    id: "requested-feature-coverage",
+    title: "Phase 6 · Requested Feature Coverage & Live Readiness",
+    description: "Implemented code, owner setup, and health signals are shown separately.",
+    items: REQUESTED_FEATURES,
   },
 ] as const satisfies readonly BlueprintPhase[];
 
