@@ -5,6 +5,7 @@ import { rateLimitResponse } from '../_lib/rate-limit';
 import { buildPublicQuote, PublicQuoteError } from '../_lib/public-quote.ts';
 import { loadPricelist } from '../_lib/pricelist.ts';
 import { queueQuoteEmail } from '../_lib/quote-dispatch.ts';
+import { FABRIC_SPECS, fabricsByWaterResistance, fabricsByBreathability, recommendFabricsForUse } from '../_lib/fabric-specs';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,8 +61,38 @@ export async function POST(req: Request) {
 }
 
 // Returning client: every quote issued to this client token, newest first.
+// Also supports fabric-specs queries for Wave 2 fabric selector.
 export async function GET(req: Request) {
-  const client = new URL(req.url).searchParams.get('client') || '';
+  const url = new URL(req.url);
+  const client = url.searchParams.get('client') || '';
+  const fabricName = url.searchParams.get('fabric');
+  const water = url.searchParams.get('water');
+  const breathe = url.searchParams.get('breathe');
+  const useCase = url.searchParams.get('use');
+
+  // Fabric specs endpoint
+  if (fabricName || water || breathe || useCase) {
+    try {
+      let results: unknown = null;
+      if (fabricName) {
+        results = FABRIC_SPECS[fabricName] || null;
+        if (!results) return NextResponse.json({ ok: false, error: `Fabric "${fabricName}" not found` }, { status: 404 });
+      } else if (water === 'high' || water === 'medium' || water === 'low') {
+        results = fabricsByWaterResistance(water as 'high' | 'medium' | 'low');
+      } else if (breathe === 'high' || breathe === 'medium' || breathe === 'low') {
+        results = fabricsByBreathability(breathe as 'high' | 'medium' | 'low');
+      } else if (useCase) {
+        results = recommendFabricsForUse(useCase);
+      } else {
+        results = FABRIC_SPECS;
+      }
+      return NextResponse.json({ ok: true, fabrics: results });
+    } catch (error) {
+      return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    }
+  }
+
+  // Client quote history endpoint
   if (!isFormalToken(client)) return NextResponse.json({ error: 'Invalid client link' }, { status: 400 });
   const supabase = getSupabaseAdmin();
   if (!supabase) return NextResponse.json({ error: 'Database unavailable' }, { status: 503 });
