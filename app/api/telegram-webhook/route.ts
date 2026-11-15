@@ -44,6 +44,7 @@ import {
   setEmbroideryPickupCommitment,
   sendTelegramDirectMessage,
 } from '../_lib/integrations';
+import { routeWave3Command, buildCommandAck } from '../_lib/telegram-wave3-commands.ts';
 
 export const maxDuration = 60;
 
@@ -323,6 +324,17 @@ export async function POST(req: Request) {
     const freeText = restWords.join(' ').trim();
     let reply = '';
 
+    // Wave 3: Instant response for new AI COO commands
+    const wave3Command = command.toLowerCase().replace(/^\//, '');
+    if (/^(status|stats|deploy|quote|post)$/.test(wave3Command)) {
+      await sendTelegramDirectMessage(String(chatId), buildCommandAck(wave3Command));
+      const wave3Reply = await routeWave3Command(wave3Command, String(chatId), [nameValue, ...restWords].filter(Boolean));
+      if (wave3Reply) {
+        await sendTelegramDirectMessage(String(chatId), wave3Reply);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     if (/^pickup$/i.test(command)) {
       reply = await handlePickupCommand(nameValue || '', freeText);
     } else if (/^(piece|subcon)$/i.test(command) || (/^payroll$/i.test(command) && /^paid$/i.test(nameValue || ''))) {
@@ -347,7 +359,7 @@ export async function POST(req: Request) {
     } else if (/^move$/i.test(command)) {
       reply = await handleOrderMoveCommand(text.slice(text.indexOf(command) + command.length).trim());
     } else if (/^start$/i.test(command)) {
-      reply = 'MJIC Ops Bot ready. Use IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, or CLIENTS.';
+      reply = '🚀 MJIC Wave 3 Ops Bot Ready!\n\nAI COO Commands: /status, /deploy, /quote, /post\n\nTeam Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, CLIENTS.';
     }
 
     if (!reply) {
