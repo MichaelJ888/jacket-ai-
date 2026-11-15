@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://jacket-ai.vercel.app"),
+  metadataBase: new URL("https://jacketsandmore.com"),
   title: {
     default: "Michael Jeffrey International Corporation | Custom Jackets and More",
     template: "%s | MJIC",

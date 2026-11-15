@@ -94,7 +94,7 @@ function leastUsedVideo(videoUrls: string[], useCount: Map<string, number>): str
   return best;
 }
 
-const CONTENT_SYSTEM_PROMPT = 'You are the social media manager of MJIC, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write engaging Taglish posts. NEVER state prices, discounts, or delivery promises. Never mention being an AI. The corporate hotlines (Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61) are appended automatically; do not write phone numbers yourself.';
+const CONTENT_SYSTEM_PROMPT = "You are MJIC's B2B social media manager, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write concise, high-converting Taglish procurement copy for HR, school, sports-team, and company buyers: lead with a real product/use case, explain one practical benefit, and close with a clear quotation CTA. Naturally use a relevant phrase such as custom jackets Philippines or corporate uniforms when it fits. Use only confirmed facts; NEVER invent prices, discounts, certifications, lead times, guarantees, or delivery promises. Never mention being an AI. Corporate hotlines (Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61) are appended automatically; do not write phone numbers yourself.";
 
 async function generateIdeas(count: number): Promise<IdeaPost[]> {
   if (!process.env.GEMINI_API_KEY) return [];
@@ -104,7 +104,7 @@ async function generateIdeas(count: number): Promise<IdeaPost[]> {
     const result = await generateText({
       model: google('gemini-3.6-flash'),
       system: `${CONTENT_SYSTEM_PROMPT} Return ONLY a JSON array.`,
-      prompt: `Create ${count} distinct post ideas as JSON: [{"theme":"...","caption":"max 280 chars, ends with a call to action to message us","hashtags":["#MJIC", "..."],"video":false,"videoPrompt":""}]. Set "video" to false for every idea; videos come from the ad library. Avoid repeating these recent captions:\n${recent.map((row) => `- ${row.caption}`).join('\n') || '(none yet)'}`,
+      prompt: `Create ${count} distinct posts as JSON: [{"theme":"...","caption":"max 280 chars with one relevant B2B use case and quotation CTA","hashtags":["#MJIC", "..."],"video":false,"videoPrompt":""}]. Use relevant SEO concepts without keyword stuffing; hashtags must be relevant. Set "video" to false for every idea; videos come from the ad library. Avoid repeating these recent captions:\n${recent.map((row) => `- ${row.caption}`).join('\n') || '(none yet)'}`,
       abortSignal: AbortSignal.timeout(40000),
     });
     const text = result.text;

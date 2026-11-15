@@ -46,7 +46,7 @@ export function publicOverlay(doc: Record<string, unknown> | null | undefined): 
 // Merges the required B2B keywords into any existing override, keeping earlier ones and dropping duplicates.
 export function buildSeoOverride(existing: Partial<SeoOverride> | null | undefined, now: string): SeoOverride {
   const keywords = Array.from(new Set([...(existing?.keywords ?? []), ...B2B_SEO_KEYWORDS]));
-  const url = 'https://jacket-ai.vercel.app/';
+  const url = 'https://jacketsandmore.com/';
   return {
     keywords,
     jsonLd: {

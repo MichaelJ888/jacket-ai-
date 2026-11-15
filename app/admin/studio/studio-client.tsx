@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { buildAutoStudioDescription, buildStudioSeoCaption, type StudioAnglePreset } from '../../api/_lib/studio-logic';
+import { buildAutoStudioDescription, buildStudioSeoCaption, optimizeStudioCampaignBrief, STUDIO_AD_THEMES, type StudioAnglePreset } from '../../api/_lib/studio-logic';
 import StudioReelExport from './studio-reel-export';
 
 type Job = {
@@ -60,10 +60,34 @@ export default function CeoAiStudioClient() {
   const [fabric, setFabric] = useState('');
   const [description, setDescription] = useState('');
   const [seoCaption, setSeoCaption] = useState('');
+  const [campaignTheme, setCampaignTheme] = useState<(typeof STUDIO_AD_THEMES)[number]['key']>(STUDIO_AD_THEMES[0].key);
+  const [campaignBrief, setCampaignBrief] = useState('');
+  const [exportMessage, setExportMessage] = useState('');
   const [sourceViews, setSourceViews] = useState<StudioAnglePreset[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+
+  function applyCampaignPreset() {
+    const theme = STUDIO_AD_THEMES.find((entry) => entry.key === campaignTheme) ?? STUDIO_AD_THEMES[0];
+    const presetCategory = theme.categories[0];
+    setCategory(presetCategory);
+    const title = productTitle.trim() || theme.label;
+    const presetDescription = description.trim() || buildAutoStudioDescription(title, presetCategory, fabric);
+    setDescription(presetDescription.slice(0, 600));
+    setSeoCaption(buildStudioSeoCaption(title, presetCategory, fabric, presetDescription));
+    setCampaignBrief(optimizeStudioCampaignBrief(title, presetCategory, fabric, presetDescription, theme));
+    setExportMessage("Preset ready. Review details, then start the existing Studio approval workflow to export to catalogue and ads.");
+  }
+
+  async function copyStudioExport(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setExportMessage(`${label} copied.`);
+    } catch (copyError) {
+      setExportMessage(copyError instanceof Error ? `Could not copy ${label}: ${copyError.message}` : `Could not copy ${label}.`);
+    }
+  }
 
   const loadJobs = useCallback(async () => {
     const res = await fetch('/api/admin/studio/jobs', { cache: 'no-store' });
@@ -263,11 +287,30 @@ export default function CeoAiStudioClient() {
           </span>
         </label>
         <section className="mt-4 rounded-lg border border-cyan-200 bg-cyan-50 p-3">
+          <div className="mb-3 flex flex-wrap items-end gap-2">
+            <label className="min-w-0 flex-1 text-sm font-semibold">
+              One-click campaign preset
+              <select value={campaignTheme} onChange={(event) => setCampaignTheme(event.target.value as typeof campaignTheme)} className="mt-1 block w-full rounded border border-zinc-300 px-2 py-1 text-sm font-normal">
+                {STUDIO_AD_THEMES.map((theme) => <option key={theme.key} value={theme.key}>{theme.label}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={applyCampaignPreset} className="rounded border border-cyan-800 px-3 py-2 text-xs font-semibold text-cyan-900">Apply product + campaign preset</button>
+          </div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <label htmlFor="studio-seo-caption" className="text-sm font-semibold">SEO caption and hashtag suggestions</label>
             <button type="button" disabled={!productTitle.trim() || !category} className="rounded border border-cyan-800 px-2 py-1 text-xs font-semibold text-cyan-900 disabled:opacity-50" onClick={() => setSeoCaption(buildStudioSeoCaption(productTitle, category, fabric, description))}>Generate locally</button>
           </div>
           <textarea id="studio-seo-caption" value={seoCaption} onChange={(event) => setSeoCaption(event.target.value)} maxLength={1200} rows={4} className="mt-2 block w-full rounded border border-zinc-300 px-2 py-2 text-sm font-normal" placeholder="Generate a product caption from the details you entered." />
+          <label className="mt-3 block text-sm font-semibold">
+            Optimized campaign brief
+            <textarea value={campaignBrief} onChange={(event) => setCampaignBrief(event.target.value)} maxLength={1000} rows={3} className="mt-1 block w-full rounded border border-zinc-300 px-2 py-2 text-sm font-normal" placeholder="Apply a preset to create a factual campaign brief." />
+          </label>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" disabled={!seoCaption} onClick={() => void copyStudioExport('Social Ads caption', seoCaption)} className="rounded border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-800 disabled:opacity-50">Copy Social Ads caption</button>
+            <button type="button" disabled={!description} onClick={() => void copyStudioExport('Catalogue description', description)} className="rounded border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-800 disabled:opacity-50">Copy Catalogue description</button>
+            <button type="button" disabled={!campaignBrief} onClick={() => void copyStudioExport('Campaign brief', campaignBrief)} className="rounded border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-800 disabled:opacity-50">Copy optimized brief</button>
+          </div>
+          <p className="mt-1 text-xs font-normal text-zinc-600" aria-live="polite">{exportMessage || "Submitting a product job below sends its caption and description through the existing catalogue/ad approval workflow."}</p>
           <p className="mt-1 text-xs font-normal text-zinc-600">Hashtags are SEO suggestions, not live trend data. Review and edit before publishing. No external API is called.</p>
         </section>
         {sources.length > 0 && (

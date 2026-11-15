@@ -67,7 +67,7 @@ const CORE_MJIC_MASTER_BLUEPRINT = [
           "Ilagay ang credentials sa Vercel Environment Variables.",
           "I-deploy ang nasuring code at tingnan ang deployment status.",
         ],
-        copyValues: [{ label: "Production site", value: "https://jacket-ai.vercel.app" }],
+        copyValues: [{ label: "Production site", value: "https://jacketsandmore.com" }],
       },
       {
         id: "supabase-rls",
@@ -153,7 +153,7 @@ const CORE_MJIC_MASTER_BLUEPRINT = [
           "Ilagay ang catalog bago ang production workflow at compliance details.",
           "Ilagay ang journey, updates, FAQs, at contact pagkatapos ng core buying information.",
         ],
-        copyValues: [{ label: "Storefront", value: "https://jacket-ai.vercel.app/" }],
+        copyValues: [{ label: "Storefront", value: "https://jacketsandmore.com/" }],
       },
       {
         id: "mobile-layout",
@@ -189,8 +189,8 @@ const CORE_MJIC_MASTER_BLUEPRINT = [
           "I-update ang text kapag may aprubadong pagbabago sa policy.",
         ],
         copyValues: [
-          { label: "Terms URL", value: "https://jacket-ai.vercel.app/terms" },
-          { label: "Privacy URL", value: "https://jacket-ai.vercel.app/privacy" },
+          { label: "Terms URL", value: "https://jacketsandmore.com/terms" },
+          { label: "Privacy URL", value: "https://jacketsandmore.com/privacy" },
         ],
       },
     ],
@@ -281,8 +281,8 @@ const CORE_MJIC_MASTER_BLUEPRINT = [
           "Subukan gamit ang provider test event at tiyaking tama ang lead response.",
         ],
         copyValues: [
-          { label: "Meta webhook", value: "https://jacket-ai.vercel.app/api/webhooks/meta" },
-          { label: "ManyChat webhook", value: "https://jacket-ai.vercel.app/api/webhooks/manychat" },
+          { label: "Meta webhook", value: "https://jacketsandmore.com/api/webhooks/meta" },
+          { label: "ManyChat webhook", value: "https://jacketsandmore.com/api/webhooks/manychat" },
         ],
       },
     ],
@@ -308,7 +308,7 @@ const CORE_MJIC_MASTER_BLUEPRINT = [
           "Lagyan ng wastong Front, Side, Back, o Detail label.",
           "I-preview at i-export ang slideshow at audio sa browser.",
         ],
-        copyValues: [{ label: "Studio page", value: "https://jacket-ai.vercel.app/catalogue-enhancer" }],
+        copyValues: [{ label: "Studio page", value: "https://jacketsandmore.com/catalogue-enhancer" }],
       },
       {
         id: "vetted-outreach",
@@ -371,7 +371,7 @@ const CORE_MJIC_MASTER_BLUEPRINT = [
           "Patakbuhin muli ang site verification kapag nagbago ang deployment.",
         ],
         copyValues: [
-          { label: "Verification URL", value: "https://jacket-ai.vercel.app/tiktokWJ4ZDZqIKLS7rUBmQabFBXp29uDxjw9P.txt" },
+          { label: "Verification URL", value: "https://jacketsandmore.com/tiktokWJ4ZDZqIKLS7rUBmQabFBXp29uDxjw9P.txt" },
           { label: "Repository file", value: "public/tiktokWJ4ZDZqIKLS7rUBmQabFBXp29uDxjw9P.txt" },
         ],
       },
@@ -469,7 +469,7 @@ const CORE_MJIC_MASTER_BLUEPRINT = [
           "Tapusin ang TikTok consent at kumpirmahin ang callback result sa admin.",
         ],
         copyValues: [
-          { label: "Callback route", value: "https://jacket-ai.vercel.app/api/tiktok/oauth/callback" },
+          { label: "Callback route", value: "https://jacketsandmore.com/api/tiktok/oauth/callback" },
           { label: "OAuth helper", value: "app/api/_lib/tiktok-oauth.ts" },
           { label: "TikTok developer portal", value: "https://developers.tiktok.com/" },
         ],

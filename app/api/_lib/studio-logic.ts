@@ -139,6 +139,19 @@ export function buildStudioSeoCaption(productTitle: string, category: string, fa
   return `${cleanTitle}. ${detail}${material}\n\n${hashtags.join(' ')}`;
 }
 
+export function optimizeStudioCampaignBrief(
+  productTitle: string,
+  category: string,
+  fabric: string,
+  description: string,
+  theme: StudioAdTheme,
+): string {
+  const details = [productTitle.trim(), category.replace(/-/g, ' '), fabric.trim(), description.trim()]
+    .filter(Boolean)
+    .join('; ');
+  return `Create a product-first MJIC B2B campaign for ${theme.label}. Use only these verified product details: ${details || 'details to be confirmed'}. Show the garment and workmanship clearly, keep the composition mobile-readable, and end with a request-a-quotation CTA. Do not invent prices, certifications, lead times, performance claims, or product features.`;
+}
+
 // Catalog and ads need a real title and category; fabric and description are optional.
 export function parseStudioMetadata(input: {
   productTitle?: unknown;

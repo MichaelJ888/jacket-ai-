@@ -13,7 +13,7 @@ export function loadEnvLocal() {
 }
 
 export const PROJECT = () => process.env.VERCEL_PROJECT_ID || 'jacket-ai';
-export const BASE_URL = () => (process.env.APP_BASE_URL || 'https://jacket-ai.vercel.app').replace(/\/$/, '');
+export const BASE_URL = () => (process.env.APP_BASE_URL || 'https://jacketsandmore.com').replace(/\/$/, '');
 
 export async function vercelApi(path, { method = 'GET', body } = {}) {
   const token = process.env.VERCEL_TOKEN;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { auditSeoHtml, TARGET_KEYWORDS } from './seo-audit.ts';
+import { auditSeoHtml, SEO_SITE_ORIGIN, TARGET_KEYWORDS } from './seo-audit.ts';
 
 const GOOD_TITLE = 'Custom Jackets Philippines | Corporate Uniform Manila';
 const GOOD_DESC =
@@ -9,11 +9,15 @@ const GOOD_DESC =
 const GOOD_HTML = `<!doctype html><html lang="en"><head>
 <title>${GOOD_TITLE}</title>
 <meta name="description" content="${GOOD_DESC}">
-<link rel="canonical" href="https://jacket-ai.vercel.app/">
+<link rel="canonical" href="https://jacketsandmore.com/">
 <meta property="og:title" content="Custom Jackets">
 <meta property="og:description" content="Custom jackets">
 <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":"MJIC"},{"@type":["LocalBusiness","Store"]}]}</script>
 </head><body><h1>Customized Jackets</h1><p>${TARGET_KEYWORDS.join(' ')} and more.</p></body></html>`;
+
+test('SEO canonical origin uses the custom production domain', () => {
+  assert.equal(SEO_SITE_ORIGIN, 'https://jacketsandmore.com');
+});
 
 test('a well-formed page passes every structural check', () => {
   const audit = auditSeoHtml(GOOD_HTML);
@@ -26,12 +30,12 @@ test('a well-formed page passes every structural check', () => {
 });
 
 test('placeholder canonical from the old template fails', () => {
-  const html = GOOD_HTML.replace('https://jacket-ai.vercel.app/', 'https://REPLACE-WITH-YOUR-DOMAIN.netlify.app/');
+  const html = GOOD_HTML.replace('https://jacketsandmore.com/', 'https://REPLACE-WITH-YOUR-DOMAIN.netlify.app/');
   assert.equal(auditSeoHtml(html).checks.find((c) => c.id === 'canonical')?.status, 'fail');
 });
 
 test('canonical on a different host warns', () => {
-  const html = GOOD_HTML.replace('https://jacket-ai.vercel.app/', 'https://example.com/');
+  const html = GOOD_HTML.replace('https://jacketsandmore.com/', 'https://example.com/');
   assert.equal(auditSeoHtml(html).checks.find((c) => c.id === 'canonical')?.status, 'warn');
 });
 

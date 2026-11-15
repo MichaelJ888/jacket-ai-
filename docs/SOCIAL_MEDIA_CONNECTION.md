@@ -29,7 +29,7 @@ local `.env.local` only for local development.
 | `META_WEBHOOK_VERIFY_TOKEN` | Private value shared with Meta for webhook handshake verification. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only access to store Page connections. Secret. |
-| `APP_BASE_URL` | Optional canonical public origin; production defaults to the Vercel production URL or `https://jacket-ai.vercel.app`. |
+| `APP_BASE_URL` | Optional canonical public origin; production defaults to `https://jacketsandmore.com`. |
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET` | TikTok Login Kit app credentials. Secrets are server-only. |
 
 Do not set `META_PAGE_ACCESS_TOKEN` for a new OAuth-connected Page unless a
@@ -45,13 +45,13 @@ The CG Venezuela bridge has separate optional variables
 For production, register these exact URLs:
 
 - Valid OAuth redirect URI:
-  `https://jacket-ai.vercel.app/api/meta/oauth/callback`
+  `https://jacketsandmore.com/api/meta/oauth/callback`
 - Page webhook callback:
-  `https://jacket-ai.vercel.app/api/webhooks/meta`
+  `https://jacketsandmore.com/api/webhooks/meta`
 - Deauthorization callback:
-  `https://jacket-ai.vercel.app/api/meta/deauthorize`
+  `https://jacketsandmore.com/api/meta/deauthorize`
 - TikTok OAuth callback:
-  `https://jacket-ai.vercel.app/api/tiktok/oauth/callback`
+  `https://jacketsandmore.com/api/tiktok/oauth/callback`
 
 The OAuth redirect is derived from `APP_BASE_URL` when configured. If the
 production domain changes, update both `APP_BASE_URL` and the allowlisted

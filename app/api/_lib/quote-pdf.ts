@@ -27,9 +27,8 @@ const clean = (value: string) => value.replace(/[^\x20-\x7E]/g, '?');
 const MAX_LOGO_BYTES = 1024 * 1024;
 
 export async function loadQuoteLogo(): Promise<Uint8Array> {
-  const assetOrigin = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'https://jacket-ai.vercel.app';
+  const assetOrigin = process.env.APP_BASE_URL
+    || (process.env.VERCEL_ENV === 'production' ? 'https://jacketsandmore.com' : process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://jacketsandmore.com');
   let response: Response;
   try {
     response = await fetch(new URL('/branding/mjic-official-logo.jpg', assetOrigin), {

@@ -19,7 +19,7 @@ function loadEnvFile(path) {
 }
 
 const env = { ...loadEnvFile(resolve(ROOT, '.env.local')), ...process.env };
-const BASE = (env.VERIFY_BASE_URL || env.APP_BASE_URL || 'https://jacket-ai.vercel.app').replace(/\/$/, '');
+const BASE = (env.VERIFY_BASE_URL || env.APP_BASE_URL || 'https://jacketsandmore.com').replace(/\/$/, '');
 const ADMIN_TOKEN = env.ADMIN_TOKEN || env.ADMIN_PASSWORD;
 const CRON_SECRET = env.CRON_SECRET || env.SCHEDULER_TOKEN;
 

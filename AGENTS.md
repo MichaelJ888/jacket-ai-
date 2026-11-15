@@ -10,7 +10,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # jacket-ai — MJIC business automation
 
-Next.js 16 (App Router) + React 19 + Tailwind 4 + Supabase app automating MJIC's uniform/embroidery business: customer chat, costing, leads, orders, payment verification, Telegram staff bot, cron reminders. Deployed on Vercel (Hobby tier) at https://jacket-ai.vercel.app.
+Next.js 16 (App Router) + React 19 + Tailwind 4 + Supabase app automating MJIC's uniform/embroidery business: customer chat, costing, leads, orders, payment verification, Telegram staff bot, cron reminders. Production domain: https://jacketsandmore.com.
 
 ## Commands
 - `npm run dev` / `npm run lint` — dev server / eslint

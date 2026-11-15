@@ -5,6 +5,9 @@ import { randomBytes } from 'node:crypto';
 import { sanitizeTelegramText } from './telegram-text.ts';
 import { isAtOrBelowReorder, stockCrossingAlert } from './inventory-alerts-logic.ts';
 import { isAnneFirstNameSender, isMsAnneSender, type TelegramSender } from './anne-chat-logic.ts';
+import { estimateStitchCount } from './digitize-estimate.ts';
+
+export { estimateStitchCount } from './digitize-estimate.ts';
 
 export function getSupabaseAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -446,16 +449,6 @@ export async function createPurchaseOrder(order: {
   }
 
   return { data, error: error?.message || null };
-}
-
-// Rough industry heuristic for planning/approval purposes only — the embroiderer's
-// own digitizing software always produces the authoritative stitch count.
-const STITCH_DENSITY_PER_SQ_INCH = 1200;
-
-export function estimateStitchCount(widthInches: number, heightInches: number, densityPerSqInch = STITCH_DENSITY_PER_SQ_INCH) {
-  const width = Number.isFinite(widthInches) && widthInches > 0 ? widthInches : 0;
-  const height = Number.isFinite(heightInches) && heightInches > 0 ? heightInches : 0;
-  return Math.round(width * height * densityPerSqInch);
 }
 
 export async function createEmbroideryJob(job: {

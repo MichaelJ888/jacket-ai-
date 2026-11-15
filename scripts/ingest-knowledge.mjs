@@ -39,7 +39,7 @@ async function main() {
     return;
   }
 
-  const base = typeof args.base === 'string' ? args.base : 'https://jacket-ai.vercel.app';
+  const base = typeof args.base === 'string' ? args.base : 'https://jacketsandmore.com';
   const token = process.env.ADMIN_TOKEN;
   if (!token) throw new Error('ADMIN_TOKEN is not set.');
   const form = new FormData();

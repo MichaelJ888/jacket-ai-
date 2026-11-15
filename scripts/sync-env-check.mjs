@@ -54,7 +54,7 @@ export async function runEnvCheck({ local, env, fetcher = fetch, syncMissingProd
   }
   let coreHealthy = false;
   try {
-    const base = (env.APP_BASE_URL || 'https://jacket-ai.vercel.app').replace(/\/+$/, '');
+    const base = (env.APP_BASE_URL || 'https://jacketsandmore.com').replace(/\/+$/, '');
     const response = await fetcher(`${base}/api/health`, { signal: AbortSignal.timeout(20_000), redirect: 'manual' });
     const data = await response.json();
     coreHealthy = response.ok && data.checks?.database?.ok === true && data.checks?.env?.ok === true;

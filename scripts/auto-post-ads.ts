@@ -10,7 +10,7 @@
 //
 // Env (.env.local auto-loaded):
 //   Preview: NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
-//   Apply:   SCHEDULER_TOKEN or CRON_SECRET, APP_BASE_URL (defaults to https://jacket-ai.vercel.app)
+//   Apply:   SCHEDULER_TOKEN or CRON_SECRET, APP_BASE_URL (defaults to https://jacketsandmore.com)
 import { readFileSync } from 'node:fs';
 
 try {
@@ -24,7 +24,7 @@ try {
 
 const apply = process.argv.includes('--apply');
 const baseArg = process.argv.find((arg) => arg.startsWith('--base='));
-const base = (baseArg ? baseArg.slice('--base='.length) : process.env.APP_BASE_URL || 'https://jacket-ai.vercel.app').replace(/\/$/, '');
+const base = (baseArg ? baseArg.slice('--base='.length) : process.env.APP_BASE_URL || 'https://jacketsandmore.com').replace(/\/$/, '');
 
 // Same policy as content-policy.ts: hard cap 4/platform/24h; CONTENT_MAX_POSTS_PER_DAY can only lower it.
 const HARD_CAP = 4;

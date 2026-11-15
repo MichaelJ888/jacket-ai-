@@ -28,7 +28,7 @@ After-hours-only handling is not possible with carrier codes; do it by turning o
 
 ## Setup you must do (cannot be automated)
 1. Create a Retell account, buy/import a number. **Philippine (+63) numbers are usually not sold directly - use a SIP trunk or Twilio and verify coverage first.**
-2. Create an agent; paste `general_prompt` from `/api/voice-call/prompt`; add the three custom functions with URL `https://jacket-ai.vercel.app/api/voice-call/tools`.
-3. Set the agent/account webhook to `https://jacket-ai.vercel.app/api/voice-call` (events: call_ended, call_analyzed; call_inbound optional).
+2. Create an agent; paste `general_prompt` from `/api/voice-call/prompt`; add the three custom functions with URL `https://jacketsandmore.com/api/voice-call/tools`.
+3. Set the agent/account webhook to `https://jacketsandmore.com/api/voice-call` (events: call_ended, call_analyzed; call_inbound optional).
 4. Vercel env: `RETELL_API_KEY` (the key must be the webhook-enabled key). Redeploy.
 5. Set up call forwarding with your telco to the Retell number.

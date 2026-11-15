@@ -56,9 +56,9 @@ test('Facebook accepts JPEG or PNG at least 200 px per side', () => {
 });
 
 test('toAbsoluteMediaUrl resolves relative paths and rejects unusable references', () => {
-  const origin = 'https://jacket-ai.vercel.app';
-  assert.equal(toAbsoluteMediaUrl('/images/a.jpg', origin), 'https://jacket-ai.vercel.app/images/a.jpg');
-  assert.equal(toAbsoluteMediaUrl('/images/polo%20shirts/x.jpg', origin), 'https://jacket-ai.vercel.app/images/polo%20shirts/x.jpg');
+  const origin = 'https://jacketsandmore.com';
+  assert.equal(toAbsoluteMediaUrl('/images/a.jpg', origin), 'https://jacketsandmore.com/images/a.jpg');
+  assert.equal(toAbsoluteMediaUrl('/images/polo%20shirts/x.jpg', origin), 'https://jacketsandmore.com/images/polo%20shirts/x.jpg');
   assert.equal(toAbsoluteMediaUrl('https://cdn.example.com/p.jpg', origin), 'https://cdn.example.com/p.jpg');
   assert.equal(toAbsoluteMediaUrl('http://example.com/p.jpg', origin), null);
   assert.equal(toAbsoluteMediaUrl('https://localhost:3000/p.jpg', origin), null);

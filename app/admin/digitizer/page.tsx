@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { estimateStitchCount } from '../../api/_lib/digitize-estimate';
+import { closestMjicBrandColor, MJIC_BRAND_PALETTE } from './brand-palette';
 
 type ThreadSummary = { colorIndex: number; hex: string; name: string; stitchCount: number };
 
@@ -26,6 +28,14 @@ type DigitizeResponse = {
   qa?: Qa;
   settings?: { fabric: string; precision: string; autoTune: boolean; angle: number; rowSpacingMm: number; fillStitchMm: number; pullCompMm: number; notes: string[] };
   files?: Record<string, string>;
+  quote?: {
+    quantity: number;
+    machineMinutesPerPiece: number;
+    embroideryCostPerPiece: number;
+    costFloorPerPiece: number;
+    costFloorTotal: number;
+    suggestedUnitPrice: number | null;
+  };
   job?: { id: string; status: string };
   error?: string;
 };
@@ -73,6 +83,7 @@ export default function EmbroideryDigitizerPage() {
   const [clientName, setClientName] = useState('');
   const [placement, setPlacement] = useState('');
   const [orderId, setOrderId] = useState('');
+  const [quantity, setQuantity] = useState('');
   const [fabric, setFabric] = useState('cotton-uniform');
   const [autoTune, setAutoTune] = useState(true);
   const [angle, setAngle] = useState('45');
@@ -116,6 +127,7 @@ export default function EmbroideryDigitizerPage() {
           clientName,
           placement,
           orderId: orderId.trim() || undefined,
+          quantity: quantity ? Number(quantity) : undefined,
           fabric,
           autoTune,
           precision,
@@ -150,6 +162,7 @@ export default function EmbroideryDigitizerPage() {
   }
 
   const qa = result?.qa;
+  const estimatedStitches = estimateStitchCount(Number(widthIn), Number(heightIn) || Number(widthIn));
 
   return (
     <main className="neon-admin min-h-screen bg-gradient-to-br from-indigo-50 via-white to-sky-50 text-slate-900">
@@ -185,7 +198,10 @@ export default function EmbroideryDigitizerPage() {
             <label><span className={label}>Project name</span><input className={input} value={projectName} onChange={(e) => setProjectName(e.target.value)} /></label>
             <label><span className={label}>Client name</span><input className={input} value={clientName} onChange={(e) => setClientName(e.target.value)} /></label>
           </div>
-          <label className="block"><span className={label}>Order ID (UUID, optional — links files to the order)</span><input className={input} value={orderId} onChange={(e) => setOrderId(e.target.value)} /></label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label><span className={label}>Order ID (UUID, optional — attaches digitizing quote)</span><input className={input} value={orderId} onChange={(e) => setOrderId(e.target.value)} /></label>
+            <label><span className={label}>Order quantity (optional)</span><input type="number" min={1} step={1} className={input} value={quantity} onChange={(e) => setQuantity(e.target.value)} /></label>
+          </div>
 
           <details className="rounded-xl border border-indigo-200/20 bg-white/5 p-4">
             <summary className="cursor-pointer text-sm font-semibold text-cyan-200">Advanced settings</summary>
@@ -203,6 +219,7 @@ export default function EmbroideryDigitizerPage() {
             </div>
           </details>
 
+          <p className="text-xs text-slate-500" aria-live="polite">Planning estimate: {estimatedStitches.toLocaleString('en-PH')} stitches (area heuristic only; generated QA count is authoritative).</p>
           <button type="button" disabled={busy} onClick={() => void generate('standard')} className="w-full rounded-lg bg-gradient-to-r from-indigo-600 to-sky-500 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition hover:brightness-110 disabled:opacity-50">
             {busy ? 'Digitizing…' : 'Generate stitch files'}
           </button>
@@ -229,10 +246,27 @@ export default function EmbroideryDigitizerPage() {
                 {qa.threadList.map((t) => (
                   <li key={t.colorIndex} className="flex items-center gap-2">
                     <span className="inline-block h-4 w-4 rounded border border-zinc-300" style={{ background: t.hex }} />
-                    <span>{t.name}</span><span className="text-zinc-500">{t.hex} · {t.stitchCount.toLocaleString('en-PH')} st</span>
+                    <span>{t.name}</span><span className="text-zinc-500">{t.hex} · {t.stitchCount.toLocaleString('en-PH')} st · closest: {closestMjicBrandColor(t.hex)?.name ?? 'unmatched'}</span>
                   </li>
                 ))}
               </ul>
+              <div className="flex flex-wrap gap-3 text-xs">
+                {MJIC_BRAND_PALETTE.map((color) => (
+                  <span key={color.name} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1">
+                    <span className="size-3 rounded-full border border-white/30" style={{ backgroundColor: color.hex }} />
+                    {color.name} {color.hex}
+                  </span>
+                ))}
+              </div>
+              {result?.quote && (
+                <aside className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm">
+                  <strong>Internal digitizing cost estimate</strong>
+                  <p>{result.quote.machineMinutesPerPiece} machine min/piece · PHP {result.quote.embroideryCostPerPiece.toFixed(2)} embroidery/piece · cost floor PHP {result.quote.costFloorPerPiece.toFixed(2)}/piece</p>
+                  {orderId.trim()
+                    ? <p className="text-emerald-200">Saved to linked order{result.quote.quantity ? ` · quantity ${result.quote.quantity}` : ''}.</p>
+                    : <p className="text-amber-100">Enter an order ID to attach this estimate to an order.</p>}
+                </aside>
+              )}
               {qa.warnings.length > 0 && (
                 <ul className="list-disc space-y-1 pl-5 text-sm text-amber-200">{qa.warnings.map((w) => <li key={w}>{w}</li>)}</ul>
               )}
@@ -243,6 +277,15 @@ export default function EmbroideryDigitizerPage() {
                   </a>
                 ))}
               </div>
+              <details className="rounded-lg border border-white/15 p-3 text-sm">
+                <summary className="cursor-pointer font-semibold text-cyan-200">DST / PES spec preview</summary>
+                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                  <dt className="text-zinc-400">DST target</dt><dd>Tajima · {qa.stitchCount.toLocaleString('en-PH')} stitches</dd>
+                  <dt className="text-zinc-400">PES target</dt><dd>Brother · {qa.stitchCount.toLocaleString('en-PH')} stitches</dd>
+                  <dt className="text-zinc-400">Design size</dt><dd>{qa.designWidthMm} × {qa.designHeightMm} mm</dd>
+                  <dt className="text-zinc-400">Thread colors / changes</dt><dd>{qa.threadList.length} / {qa.colorChanges}</dd>
+                </dl>
+              </details>
               <p className="text-xs text-zinc-500">Download links are signed and expire after 7 days.</p>
               {result?.settings && (
                 <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600">

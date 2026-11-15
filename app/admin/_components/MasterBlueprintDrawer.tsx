@@ -9,6 +9,7 @@ import {
   type BlueprintStatus,
 } from "../_data/mjic-master-blueprint";
 import { isValidResendFrom } from "./blueprint-logic";
+import FeatureRegistryPanel from "./FeatureRegistryPanel";
 
 type Filter = "all" | BlueprintStatus | BlueprintSize;
 
@@ -388,6 +389,8 @@ export default function MasterBlueprintDrawer() {
           <span className="text-zinc-500">Configuration indicators expose booleans only, never environment values.</span>
         </div>
       </header>
+
+      <FeatureRegistryPanel />
 
       <section aria-labelledby="blueprint-flow-title" className="rounded-xl border border-zinc-700 bg-zinc-900/80 p-4">
         <h3 id="blueprint-flow-title" className="mb-3 text-base font-semibold text-cyan-200">

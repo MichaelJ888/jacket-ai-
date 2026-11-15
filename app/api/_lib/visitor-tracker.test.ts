@@ -4,7 +4,7 @@ import { createVisitorLog } from './visitor-tracker.ts';
 
 test('visitor logging stores bounded page/source and allowlisted request clues only', () => {
   const request = new Request(
-    'https://jacket-ai.vercel.app/quote?utm_source=campaign&utm_medium=email&token=private',
+    'https://jacketsandmore.com/quote?utm_source=campaign&utm_medium=email&token=private',
     {
       headers: {
         'x-real-ip': '203.0.113.8',
@@ -45,7 +45,7 @@ test('visitor logging stores bounded page/source and allowlisted request clues o
 });
 
 test('invalid IP headers are not stored and absent referrers are direct traffic', () => {
-  const request = new Request('https://jacket-ai.vercel.app/', {
+  const request = new Request('https://jacketsandmore.com/', {
     headers: {
       'x-real-ip': 'not-an-ip',
       'x-forwarded-for': 'spoofed, 10.0.0.1',

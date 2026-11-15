@@ -20,7 +20,11 @@ function chunk(text: string, size = 1900) {
 }
 
 export function publicBaseUrl() {
-  return process.env.APP_BASE_URL || (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : 'https://jacket-ai.vercel.app');
+  if (process.env.APP_BASE_URL) return process.env.APP_BASE_URL.replace(/\/$/, '');
+  if (process.env.VERCEL_ENV !== 'production' && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  }
+  return 'https://jacketsandmore.com';
 }
 
 export async function sendChannelMessage(

@@ -1,6 +1,6 @@
 // On-site SEO audit for the public homepage. Pure functions only (no network), so it is unit-testable.
 
-export const SEO_SITE_ORIGIN = 'https://jacket-ai.vercel.app';
+export const SEO_SITE_ORIGIN = 'https://jacketsandmore.com';
 
 export const TARGET_KEYWORDS = [
   'Custom Jackets Philippines',

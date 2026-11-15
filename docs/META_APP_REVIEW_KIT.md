@@ -3,9 +3,9 @@
 Meta does not allow App Review, Business Verification or the OAuth Redirect URI to be automated. Everything else is prepared here so each is a ~10 minute, one-time paste job. Check progress in **/admin -> Connect tab -> Meta setup doctor**.
 
 ## One-time order of work
-1. **Valid OAuth Redirect URI** - App dashboard -> Facebook Login -> Settings -> add `https://jacket-ai.vercel.app/api/meta/oauth/callback`. (Doctor shows a direct link.)
-2. **Register callbacks** - press the button in the setup doctor (sets the Deauthorize callback to `/api/meta/deauthorize`). Data deletion instructions URL: `https://jacket-ai.vercel.app/data-deletion`.
-3. **App settings -> Basic** - Privacy Policy `https://jacket-ai.vercel.app/privacy`, Terms `https://jacket-ai.vercel.app/terms`, category Business, app icon 1024x1024 (`public/mjic-app-icon-draft.png` is a draft).
+1. **Valid OAuth Redirect URI** - App dashboard -> Facebook Login -> Settings -> add `https://jacketsandmore.com/api/meta/oauth/callback`. (Doctor shows a direct link.)
+2. **Register callbacks** - press the button in the setup doctor (sets the Deauthorize callback to `/api/meta/deauthorize`). Data deletion instructions URL: `https://jacketsandmore.com/data-deletion`.
+3. **App settings -> Basic** - Privacy Policy `https://jacketsandmore.com/privacy`, Terms `https://jacketsandmore.com/terms`, category Business, app icon 1024x1024 (`public/mjic-app-icon-draft.png` is a draft).
 4. **Business Verification** (Business Settings -> Security Center): legal name, address, phone, plus one document (SEC/DTI registration, business permit or utility bill). Needed for Advanced Access.
 5. **Add Testers** while waiting - buyers who press "request access" on `/dashboard/connect` arrive on Telegram with the Roles link.
 6. **Submit App Review** for the permissions below, then switch the app to **Live**.
@@ -22,7 +22,7 @@ Meta does not allow App Review, Business Verification or the OAuth Redirect URI 
 | `public_profile` | Standard Login: create the customer's account and show their name. |
 
 ## Screencast script (2-3 min, English captions)
-1. Open `https://jacket-ai.vercel.app/dashboard/connect`; click **Continue with Facebook**.
+1. Open `https://jacketsandmore.com/dashboard/connect`; click **Continue with Facebook**.
 2. Show the Facebook dialog, tick the Page, accept all permissions.
 3. Back on the wizard: show the Page with green checks (token valid, webhook subscribed, messages/postbacks/comments enabled).
 4. From a second Facebook account message the Page; show the AI reply arriving in Messenger.

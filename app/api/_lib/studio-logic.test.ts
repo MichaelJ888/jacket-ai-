@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {
   buildAutoStudioDescription,
   buildStudioSeoCaption,
+  optimizeStudioCampaignBrief,
+  STUDIO_AD_THEMES,
   buildEnhanceInput,
   buildFaceSwapInput,
   isAllowedStudioAssetUrl,
@@ -31,6 +33,12 @@ test('builds a local SEO caption using category tags without external trend data
   assert.match(caption, /Twill/);
   assert.match(caption, /#MJIC/);
   assert.match(caption, /#CustomJackets/);
+});
+
+test('builds a factual campaign brief without inventing business claims', () => {
+  const brief = optimizeStudioCampaignBrief('Navy Jacket', 'jacket', 'Twill', 'Reflective trim', STUDIO_AD_THEMES[0]);
+  assert.match(brief, /Navy Jacket; jacket; Twill; Reflective trim/);
+  assert.match(brief, /Do not invent prices, certifications, lead times/);
 });
 
 test('validates manually assigned view presets and keeps SEO copy with the job metadata', () => {

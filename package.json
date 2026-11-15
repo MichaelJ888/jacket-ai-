@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/build-image-library.mjs",
+    "predev": "node scripts/sync-features.mjs",
+    "prebuild": "node scripts/build-image-library.mjs && node scripts/sync-features.mjs",
     "build": "next build --webpack",
     "images:optimize": "node scripts/optimize-images.mjs",
     "start": "next start",
@@ -16,6 +17,7 @@
     "devq": "node scripts/devq.mjs",
     "devq:worker": "node scripts/devq-worker.mjs",
     "memory": "node scripts/memory.mjs",
+    "features:sync": "node scripts/sync-features.mjs",
     "ai-gateway:check": "node scripts/ai-gateway-diagnostics.mjs",
     "voice:setup": "node scripts/retell-setup.mjs",
     "bootstrap": "node scripts/bootstrap.mjs",

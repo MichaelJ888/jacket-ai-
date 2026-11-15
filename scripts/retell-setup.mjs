@@ -12,7 +12,7 @@ if (existsSync(envPath)) {
 
 const apiKey = process.env.RETELL_API_KEY;
 const adminToken = process.env.ADMIN_TOKEN || process.env.ADMIN_PASSWORD;
-const base = (process.env.APP_BASE_URL || 'https://jacket-ai.vercel.app').replace(/\/$/, '');
+const base = (process.env.APP_BASE_URL || 'https://jacketsandmore.com').replace(/\/$/, '');
 if (!apiKey || !adminToken) {
   console.error('Set RETELL_API_KEY and ADMIN_TOKEN first (see docs/VOICE_AI.md).');
   process.exit(1);
