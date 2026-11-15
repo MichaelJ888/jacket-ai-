@@ -3,6 +3,13 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  /* Cosmo 4D Luxury Branding */
+  --corp-navy: #0D213F;
+  --exec-gold: #D4A843;
+  --cosmic-dark: #0A0F1B;
+  --glass-light: rgba(255, 255, 255, 0.05);
+  --glow-cyan: rgba(34, 211, 238, 0.35);
+  --glow-gold: rgba(212, 168, 67, 0.25);
 }
 
 @theme inline {
@@ -25,13 +32,22 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Futuristic dark-glass theme for admin tools. Scoped to .neon-admin so the public storefront is untouched. */
+/* Cosmo 4D Luxury Enterprise Admin Theme */
 .neon-admin {
-  background: radial-gradient(circle at 15% 0%, rgba(34, 211, 238, 0.12), transparent 40%), radial-gradient(circle at 90% 10%, rgba(232, 121, 249, 0.1), transparent 45%), #05060b !important;
+  background: linear-gradient(135deg, var(--cosmic-dark) 0%, rgba(13, 33, 63, 0.95) 50%, rgba(13, 33, 63, 0.9) 100%),
+              radial-gradient(circle at 15% 0%, var(--glow-cyan) 0%, transparent 40%),
+              radial-gradient(circle at 90% 10%, var(--glow-gold) 0%, transparent 45%) !important;
+  background-attachment: fixed !important;
   color: #e4e4e7;
   min-height: 100vh;
 }
-.neon-admin h1 { text-shadow: 0 0 18px rgba(34, 211, 238, 0.35); }
+.neon-admin h1 { 
+  text-shadow: 0 0 18px var(--glow-cyan), 0 0 36px rgba(212, 168, 67, 0.2);
+  color: #D4A843;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.neon-admin h2 { text-shadow: 0 0 12px var(--glow-cyan); color: #e4e4e7; }
 .neon-admin .bg-white,
 .neon-admin .bg-zinc-50,
 .neon-admin .bg-zinc-100,
@@ -39,13 +55,14 @@ body {
 .neon-admin .bg-gray-50,
 .neon-admin .bg-indigo-50,
 .neon-admin .bg-sky-50 {
-  background-color: rgba(255, 255, 255, 0.04) !important;
-  backdrop-filter: blur(10px);
-  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12), 0 0 24px -10px rgba(34, 211, 238, 0.35);
+  background: linear-gradient(135deg, rgba(13, 33, 63, 0.6), rgba(212, 168, 67, 0.08)) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(212, 168, 67, 0.2) !important;
+  box-shadow: 0 8px 32px -8px var(--glow-cyan), inset 0 1px 1px rgba(255, 255, 255, 0.08) !important;
 }
-.neon-admin .bg-amber-50 { background-color: rgba(251, 191, 36, 0.1) !important; }
-.neon-admin .bg-emerald-50 { background-color: rgba(52, 211, 153, 0.1) !important; }
-.neon-admin .bg-red-50 { background-color: rgba(248, 113, 113, 0.1) !important; }
+.neon-admin .bg-amber-50 { background: rgba(212, 168, 67, 0.12) !important; }
+.neon-admin .bg-emerald-50 { background: rgba(52, 211, 153, 0.1) !important; }
+.neon-admin .bg-red-50 { background: rgba(248, 113, 113, 0.1) !important; }
 .neon-admin .text-slate-900,
 .neon-admin .text-zinc-900,
 .neon-admin .text-gray-900 { color: #f4f4f5 !important; }
@@ -63,13 +80,31 @@ body {
 .neon-admin .border-slate-200,
 .neon-admin .border-slate-300,
 .neon-admin .border-gray-200,
-.neon-admin .border-gray-300 { border-color: rgba(255, 255, 255, 0.14) !important; }
+.neon-admin .border-gray-300 { border-color: rgba(212, 168, 67, 0.15) !important; }
+.neon-admin button, .neon-admin [role="button"] {
+  background: linear-gradient(135deg, rgba(212, 168, 67, 0.15), rgba(34, 211, 238, 0.1)) !important;
+  border: 1px solid rgba(212, 168, 67, 0.3) !important;
+  color: #D4A843 !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.neon-admin button:hover, .neon-admin [role="button"]:hover {
+  background: linear-gradient(135deg, rgba(212, 168, 67, 0.25), rgba(34, 211, 238, 0.15)) !important;
+  box-shadow: 0 0 20px var(--glow-gold), 0 0 40px rgba(34, 211, 238, 0.1) !important;
+}
 .neon-admin input,
 .neon-admin textarea,
 .neon-admin select {
-  background-color: rgba(0, 0, 0, 0.4);
-  color: #f4f4f5;
-  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(13, 33, 63, 0.8) !important;
+  color: #f4f4f5 !important;
+  border: 1px solid rgba(212, 168, 67, 0.25) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 12px rgba(212, 168, 67, 0.08) !important;
+}
+.neon-admin input:focus,
+.neon-admin textarea:focus,
+.neon-admin select:focus {
+  border-color: var(--exec-gold) !important;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 20px var(--glow-gold) !important;
+  outline: none !important;
 }
 .neon-admin input::placeholder,
 .neon-admin textarea::placeholder { color: #71717a; }
