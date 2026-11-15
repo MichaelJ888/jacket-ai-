@@ -1198,6 +1198,33 @@ create table if not exists public.client_logos (
   storage_path text not null,
   updated_at timestamptz not null default now()
 );
+
+-- Checkout orders: simplified quotation-to-order flow with 50% deposit tracking and Lalamove integration.
+create table if not exists public.checkout_orders (
+  id uuid default gen_random_uuid() primary key,
+  reference text unique not null,
+  client_token text unique not null,
+  quote_number text,
+  customer_name text not null,
+  customer_contact text,
+  quantity numeric not null,
+  total_php numeric not null,
+  deposit_php numeric not null,
+  deposit_paid boolean not null default false,
+  payment_method text check (payment_method in ('gcash', 'maya', 'bpi', 'bank_transfer')),
+  lalamove_estimate_php numeric,
+  lalamove_vehicle text check (lalamove_vehicle in ('motorcycle', 'sedan', 'mpv', 'l300')),
+  order_status text not null default 'draft' check (order_status in ('draft', 'awaiting_deposit', 'deposit_received', 'in_production', 'completed', 'cancelled')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.checkout_orders enable row level security;
+create index if not exists checkout_orders_reference_idx on public.checkout_orders (reference);
+create index if not exists checkout_orders_client_token_idx on public.checkout_orders (client_token);
+create index if not exists checkout_orders_status_idx on public.checkout_orders (order_status, created_at desc);
+create index if not exists checkout_orders_customer_idx on public.checkout_orders (customer_name);
+revoke all on public.checkout_orders from anon, authenticated;
 alter table public.client_logos enable row level security;
 revoke all on public.client_logos from anon, authenticated;
 

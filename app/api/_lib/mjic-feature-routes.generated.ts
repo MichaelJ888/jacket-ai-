@@ -115,6 +115,7 @@ export const MJIC_DETECTED_ROUTE_PATHS: readonly string[] = [
   "/api/proofs/[orderId]",
   "/api/quote",
   "/api/quote-pdf",
+  "/api/quote/checkout-order",
   "/api/quote/dispatch",
   "/api/quote/giveaways",
   "/api/quote/giveaways/analyze",
