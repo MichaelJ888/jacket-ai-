@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("published payment QR, apparel reference gallery, and live design preview work", async ({ page }) => {
+test("published payment QR, apparel gallery, live design preview, and cart reset work", async ({ page }) => {
   test.setTimeout(60_000);
   const testQr = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect width='128' height='128' fill='white'/%3E%3Cpath d='M8 8h40v40H8zm72 0h40v40H80zM8 80h40v40H8zM64 64h16v16H64zm32 32h24v24H96z' fill='black'/%3E%3C/svg%3E";
   await page.route("**/api/site/overlay", (route) =>
@@ -66,4 +66,12 @@ test("published payment QR, apparel reference gallery, and live design preview w
   await expect(mockup.getByText("Total", { exact: true })).toBeVisible();
   await page.locator('#fabrics button[title="Black"]').first().click();
   await expect(page.getByText("Microfiber — Black selected.")).toBeVisible();
+
+  await productCard.getByRole("button", { name: "Add to Cart" }).click();
+  await page.getByTitle("View Cart").click();
+  const resetCart = page.getByRole("button", { name: "Reset Cart to 0" });
+  await expect(resetCart).toBeVisible();
+  await resetCart.click();
+  await expect(page.getByText("Your cart is empty — browse the catalog to add items.")).toBeVisible();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("mji_quote"))).toBe("[]");
 });
