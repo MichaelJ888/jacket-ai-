@@ -7,6 +7,7 @@ import { resolveFabricClass } from '../api/_lib/fabric-class';
 import { FABRIC_OPTIONS } from '../api/_lib/mjic-pricelist';
 import { categoryMinQuantity, MODULAR_ADD_ONS, seedPricelist, tierPrice, type ModularAddOnKey, type PricelistCategory } from '../api/_lib/pricelist-logic';
 import { MOQ_PIECES } from '../api/_lib/pricing-logic';
+import { PaymentTracker, type PaymentReconciliation } from './payment-tracker';
 
 const OTHER = '__other__';
 const peso = (n: number) => `₱${Math.round(n).toLocaleString('en-US')}`;
@@ -45,6 +46,8 @@ export default function QuotePage() {
   const [paymentQrs, setPaymentQrs] = useState<Partial<Record<PaymentQrMethod, string>>>({});
   const [paymentQrError, setPaymentQrError] = useState('');
   const [activePaymentQr, setActivePaymentQr] = useState<PaymentQr | null>(null);
+  const [paymentReconciliation, setPaymentReconciliation] = useState<PaymentReconciliation | null>(null);
+  const [reconciliationLoading, setReconciliationLoading] = useState(false);
 
   const fabricName = fabricChoice === OTHER ? customFabric.trim() : fabricChoice;
   // Class follows the strict fabric rule (same helper the server uses); the customer does not choose it.
@@ -132,6 +135,42 @@ export default function QuotePage() {
       .then((d) => setHistory(Array.isArray(d.quotes) ? d.quotes : []))
       .catch(() => setHistory([]));
   }, []);
+
+  // Load payment reconciliation data when a quote is saved
+  useEffect(() => {
+    if (!saved) {
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      setReconciliationLoading(true);
+      try {
+        const r = await fetch(`/api/quote/checkout-order?quoteNumber=${encodeURIComponent(saved.quoteNumber)}`);
+        const data = r.ok ? await r.json() : null;
+        if (!mounted) return;
+        if (data?.orderReference && data?.depositAmount) {
+          setPaymentReconciliation({
+            orderReference: data.orderReference,
+            depositAmount: data.depositAmount,
+            depositDue: data.depositDue || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            paymentStatus: data.paymentStatus || 'pending',
+            paymentSlipUrl: data.paymentSlipUrl || undefined,
+            submittedAt: data.submittedAt,
+            verifiedAt: data.verifiedAt,
+            verificationNote: data.verificationNote,
+          });
+        } else {
+          setPaymentReconciliation(null);
+        }
+      } catch {
+        if (!mounted) return;
+        setPaymentReconciliation(null);
+      } finally {
+        if (mounted) setReconciliationLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [saved]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -391,6 +430,7 @@ export default function QuotePage() {
                   <p className="text-xs text-slate-600">{saved.quote.signatory.title}</p>
                 </div>
               </div>
+              {!reconciliationLoading && paymentReconciliation && <PaymentTracker reconciliation={paymentReconciliation} />}
               <ol className="mt-4 list-decimal space-y-1 pl-4 text-xs text-slate-600">
                 {TERMS.map((t) => (
                   <li key={t}>{t}</li>
