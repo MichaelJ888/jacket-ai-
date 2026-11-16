@@ -45,6 +45,7 @@ export default function EditorPage() {
   const [notice, setNotice] = useState('');
   const [draft, setDraft] = useState<SiteDoc | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [linkMode, setLinkMode] = useState(false);
   const [frameKey, setFrameKey] = useState(0);
   const [pageId, setPageId] = useState<(typeof EDIT_PAGES)[number]['id']>('home');
   const editPage = EDIT_PAGES.find((p) => p.id === pageId) ?? EDIT_PAGES[0];
@@ -139,6 +140,7 @@ export default function EditorPage() {
       if (!message || message.source !== 'mjic-cms-frame') return;
       if (message.type === 'ready') {
         if (draftRef.current) pushToFrame(draftRef.current);
+        frameRef.current?.contentWindow?.postMessage({ source: 'mjic-cms-editor', type: 'link-mode', enabled: linkMode }, location.origin);
         return;
       }
       setDirty(true);
@@ -149,6 +151,9 @@ export default function EditorPage() {
         }
         if (message.type === 'image' && message.key !== undefined && message.url !== undefined) {
           return { ...prev, images: { ...prev.images, [message.key]: message.url } };
+        }
+        if (message.type === 'link' && message.key !== undefined && message.url !== undefined) {
+          return { ...prev, links: { ...prev.links, [message.key]: message.url } };
         }
         if (message.type === 'order' && Array.isArray(message.catalogOrder)) {
           return { ...prev, catalogOrder: message.catalogOrder };
@@ -173,7 +178,11 @@ export default function EditorPage() {
     }
     window.addEventListener('message', onMessage);
     return () => window.removeEventListener('message', onMessage);
-  }, [pushToFrame]);
+  }, [pushToFrame, linkMode]);
+
+  useEffect(() => {
+    frameRef.current?.contentWindow?.postMessage({ source: 'mjic-cms-editor', type: 'link-mode', enabled: linkMode }, location.origin);
+  }, [linkMode, pageId, stage]);
 
   function updateTheme(field: 'primary' | 'secondary' | 'background' | 'bgImage', value: string) {
     setDirty(true);
@@ -318,8 +327,9 @@ export default function EditorPage() {
             <button key={p.id} onClick={() => setPageId(p.id)} className={`rounded px-2.5 py-1 text-xs font-medium ${pageId === p.id ? 'bg-zinc-900 text-white' : 'bg-zinc-200 text-zinc-800'}`}>{p.label}</button>
           ))}
         </nav>
-        <span className="text-xs text-zinc-500 hidden md:inline">Click text to edit · Click an image to pick a local photo (or upload) · Drag a library photo or image file onto a slot · Drag the corner handle to resize · Drag ☰ Move section or catalogue cards to reorder</span>
+        <span className="text-xs text-zinc-500 hidden md:inline">Click text or images to edit · Use Edit links for CTA destinations · Drag ☰ to reorder</span>
         <div className="ml-auto flex flex-wrap items-center gap-3">
+          <button type="button" aria-pressed={linkMode} onClick={() => setLinkMode((v) => !v)} className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm">{linkMode ? 'Done editing links' : 'Edit links'}</button>
           {draft && (
             <>
               <ColorField label="Primary" value={draft.theme.primary} onChange={(v) => updateTheme('primary', v)} />
@@ -355,6 +365,7 @@ export default function EditorPage() {
       {(notice || error) && (
         <div className={`px-4 py-2 text-sm ${error ? 'bg-red-50 text-red-700' : 'bg-emerald-50 text-emerald-700'}`}>{error || notice}</div>
       )}
+      {linkMode && <p className="bg-amber-100 px-4 py-2 text-sm text-amber-900">Select a link in the preview to edit its destination. Select Done editing links to resume editing text and images.</p>}
       {library.length > 0 && (
         <details className="border-b border-zinc-200 bg-white px-4 py-2 text-sm">
           <summary className="cursor-pointer font-semibold text-zinc-800">Image library ({library.length}) — drag a photo onto any image on the page</summary>

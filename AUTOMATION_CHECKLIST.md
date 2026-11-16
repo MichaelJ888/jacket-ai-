@@ -122,10 +122,12 @@ Env: optional `ADMIN_PASSWORD` (separate admin login).
 | `/api/admin/editor/login`, `/verify` | Password (+ OTP) | Issues the 6-digit OTP via Telegram DM, then sets the httpOnly `mjic_editor` cookie (8 h). |
 | `/api/admin/editor` GET / POST / DELETE | Editor cookie | Read draft, publish (sanitised), sign out. |
 | `/api/admin/editor/media` | Editor cookie | Image upload (PNG/JPEG/WebP/GIF, 5 MB) to public bucket `site-media`. |
+| `/admin/command` | Admin bearer token | Swarm employee view uses related job heartbeats where available; on-demand digitizer and Lalamove activity is not individually monitored. |
 | `/api/updates` | GET public, POST/DELETE editor cookie | "Latest From the Floor" feed. Reads/writes table `production_updates` (RLS on, service role only). Status badges: cutting/embroidery/sewing/quality/dispatch/update. |
 | `/api/admin/analytics` | Admin bearer | 14-day Manila-time enquiries, orders, sample status, log severity, job heartbeats, alert metrics. Feeds the `/admin` Dashboard tab. |
 
 - Storage: table `site_content` (key `site` for the document, `editor_otp:<chatId>` for OTP hashes). RLS on, service role only.
+- Editor link mode changes CTA destinations in the preview; Publish persists them alongside text and images. Destinations accept HTTPS URLs, local paths, or fragment anchors.
 - `EDITOR_PASSWORD` must be set in `.env.local` and on Vercel production. It is in `PRODUCTION_SYNC_KEYS`. Session and OTP keys are derived from it.
 - Cron run history is not stored as a table. The dashboard uses `job_heartbeats` (last run and status). Alert metrics are derived from `system_logs` and `outbound_request_queue`.
 - Tests: `app/api/_lib/site-content-logic.test.ts`, `app/api/_lib/analytics-logic.test.ts`. Run with `node --test <file>` (Node 24 strips types).

@@ -38,6 +38,17 @@ test('sanitizeSiteDoc rejects unsafe image URLs', () => {
   }
 });
 
+test('sanitizeSiteDoc preserves safe CTA links and rejects unsafe destinations', () => {
+  const result = sanitizeSiteDoc({ links: { a: '#quote', b: '/quote', c: 'https://example.com/contact' } });
+  assert.equal(result.ok, true);
+  if (result.ok) assert.deepEqual(result.doc.links, { a: '#quote', b: '/quote', c: 'https://example.com/contact' });
+  for (const url of ['javascript:alert(1)', '//evil.example', '/\\evil.example', 'https://', 'https://example.com/\nfoo', '']) {
+    assert.equal(sanitizeSiteDoc({ links: { a: url } }).ok, false, url);
+  }
+  const legacy = sanitizeSiteDoc({});
+  if (legacy.ok) assert.deepEqual(legacy.doc.links, {});
+});
+
 test('sanitizeSiteDoc rejects non-object input and oversized text', () => {
   assert.equal(sanitizeSiteDoc(null).ok, false);
   assert.equal(sanitizeSiteDoc('x').ok, false);

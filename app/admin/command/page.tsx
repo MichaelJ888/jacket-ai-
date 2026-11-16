@@ -71,6 +71,7 @@ export default function CommandCenterPage() {
     setBusy(true);
     try {
       await load(auth);
+      setMessage((previous) => previous === "Telemetry refresh failed; showing the last available snapshot." ? "" : previous);
       setAuthed(true);
       setMessage("");
       sessionStorage.setItem("mjic_admin", auth);
@@ -96,7 +97,7 @@ export default function CommandCenterPage() {
       try {
         await load(auth);
       } catch {
-        // Keep the last good snapshot when a poll fails.
+        setMessage("Telemetry refresh failed; showing the last available snapshot.");
       }
       if (!cancelled) timer = setTimeout(poll, document.visibilityState === "visible" ? POLL_ACTIVE_MS : POLL_BACKGROUND_MS);
     };
@@ -228,6 +229,27 @@ export default function CommandCenterPage() {
 
         {message && <p className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-2 text-sm text-emerald-300">{message}</p>}
         {autoPilot && autoPilot.skipped.length > 0 && <p className="text-xs text-zinc-400">Queued for next pass: {autoPilot.skipped.join(", ")}</p>}
+
+        <section className={panel}>
+          <h2 className="mb-2 text-sm font-bold tracking-wider text-cyan-300">AI SWARM EMPLOYEES</h2>
+          <p className="mb-3 text-xs text-zinc-400">Related job heartbeats are not proof of individual agent activity. Digitizer and Lalamove operate on demand; no individual heartbeat is available.</p>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { name: "Sales Closer", job: "sales-followups", href: "/admin", detail: "Related follow-up job" },
+              { name: "Embroidery Digitizer Specialist", job: null, href: "/admin/digitizer", detail: "On-demand tool; activity unmonitored" },
+              { name: "Logistics Coordinator (Lalamove)", job: null, href: "/admin", detail: "On-demand integration; activity unmonitored" },
+              { name: "Social Media Ad Publisher", job: "content-publisher", href: "/admin", detail: "Related publishing job" },
+            ].map((agent) => {
+              const job = agent.job ? jobs.find((item) => item.job === agent.job) : undefined;
+              return <a key={agent.name} href={agent.href} className="rounded-lg border border-white/10 bg-black/30 p-3 hover:border-fuchsia-400/50">
+                <strong className="block text-sm">{agent.name}</strong>
+                <span className="mt-2 block text-xs text-zinc-400">{agent.detail}</span>
+                {agent.job && <span className="mt-2 flex items-center gap-2 text-xs"><Dot state={job?.state || "unknown"} />{job ? `${job.state} · ${job.lastRunAt ? new Date(job.lastRunAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) : "never run"}` : "Heartbeat unavailable"}</span>}
+              </a>;
+            })}
+          </div>
+          <p className="mt-3 text-xs text-zinc-500">Snapshot: {telemetry?.time ? new Date(telemetry.time).toLocaleString("en-PH", { timeZone: "Asia/Manila" }) + " Manila" : "unavailable"}</p>
+        </section>
 
         <section className="grid gap-4 md:grid-cols-3">
           <div className={panel}>

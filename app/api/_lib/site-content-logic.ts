@@ -7,6 +7,7 @@ export type SiteDoc = {
   theme: SiteTheme;
   texts: Record<string, string>;
   images: Record<string, string>;
+  links: Record<string, string>;
   catalogOrder: string[];
   sectionOrder: string[];
   positions: Record<string, SitePosition>;
@@ -23,6 +24,7 @@ export const ANNE_MANALO_CHAT_ID = '7329264426';
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const IMAGE_URL = /^(https:\/\/|\/(?!\/))[^\s"'<>()]+$/;
+const LINK_URL = /^(?:https:\/\/|\/(?![\/\\])|#)[^\s"'<>\\]*$/i;
 const MAX_TEXTS = 1500;
 const MAX_IMAGES = 600;
 const MAX_KEY = 400;
@@ -35,7 +37,7 @@ const MAX_ROTATION = 360;
 export const DEFAULT_THEME: SiteTheme = { primary: '#0B1E3D', secondary: '#B8912F', background: '#FFFFFF', bgImage: '', bgOpacity: 15 };
 
 export function emptySiteDoc(): SiteDoc {
-  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, catalogOrder: [], sectionOrder: [], positions: {}, styles: {}, updatedAt: null };
+  return { theme: { ...DEFAULT_THEME }, texts: {}, images: {}, links: {}, catalogOrder: [], sectionOrder: [], positions: {}, styles: {}, updatedAt: null };
 }
 
 type SanitizeResult = { ok: true; doc: SiteDoc } | { ok: false; error: string };
@@ -70,6 +72,13 @@ export function sanitizeSiteDoc(input: unknown): SanitizeResult {
   for (const url of Object.values(images.value)) {
     if (!IMAGE_URL.test(url)) return { ok: false, error: 'Image URLs must be https:// or start with /.' };
   }
+  const links = pickStrings(raw.links, MAX_TEXTS, MAX_URL, 'link');
+  if (!links.ok) return links;
+  for (const url of Object.values(links.value)) {
+    if (!LINK_URL.test(url) || (url.toLowerCase().startsWith('https://') && !URL.canParse(url))) {
+      return { ok: false, error: 'Links must be https:// URLs, / paths, or # anchors.' };
+    }
+  }
 
   const catalog = pickKeyList(raw.catalogOrder, 'catalog order');
   if (!catalog.ok) return catalog;
@@ -86,6 +95,7 @@ export function sanitizeSiteDoc(input: unknown): SanitizeResult {
       theme,
       texts: texts.value,
       images: images.value,
+      links: links.value,
       catalogOrder: catalog.value,
       sectionOrder: sections.value,
       positions: positions.value,
