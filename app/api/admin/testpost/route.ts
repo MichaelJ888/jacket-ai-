@@ -5,7 +5,6 @@ import { generateCommercialAd, getNextCategory, type CommercialAdConfig } from '
 import { selectNextImage, recordImageUsage } from '../../_lib/image-rotation';
 import { createReplicatePrediction, replicateOutputUrl } from '../../_lib/replicate';
 import { uploadFacebookVideo, fetchVideoBytes } from '../../_lib/meta-video-ads';
-import { GRAPH, graphPost } from '../../_lib/meta-graph';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes for Replicate video generation + Facebook upload
