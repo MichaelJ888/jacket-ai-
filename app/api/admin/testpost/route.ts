@@ -5,20 +5,23 @@ import { generateCommercialAd, getNextCategory, type CommercialAdConfig } from '
 import { selectNextImage, recordImageUsage } from '../../_lib/image-rotation';
 import { createReplicatePrediction, replicateOutputUrl } from '../../_lib/replicate';
 import { uploadFacebookVideo, fetchVideoBytes } from '../../_lib/meta-video-ads';
-import { GRAPH } from '../../_lib/meta-graph';
+import { GRAPH, graphPost } from '../../_lib/meta-graph';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes for Replicate video generation + Facebook upload
 
 type TestResult = {
   success: boolean;
+  mode?: string;
+  media?: string;
   timestamp: string;
   category?: string;
   caption?: string;
   hashtags?: string[];
   antibanOk?: boolean;
   videoUrl?: string;
-  fbPostUrl?: string;
+  facebookPostId?: string;
+  fbError?: string;
   live?: boolean;
   errors?: string[];
 };
@@ -44,10 +47,12 @@ export async function GET(request: Request) {
     timestamp: new Date().toISOString(),
     errors: [],
     live,
+    mode: live ? 'live' : 'test',
+    media: mediaType,
   };
 
   try {
-    // Step 1: Select a product category
+    // Step 1: Rotate to next MJIC category using getNextCategory()
     const category = getNextCategory();
     result.category = category;
 
@@ -145,23 +150,31 @@ export async function GET(request: Request) {
       result.videoUrl = videoOutputUrl;
       console.log(`[TESTPOST] Video generated: ${videoOutputUrl}`);
 
-      // Upload to Facebook
+      // Upload to Facebook using Graph API directly
       console.log(`[TESTPOST] Uploading to Facebook Page ${fbPageId}`);
-      const videoBytes = await fetchVideoBytes(videoOutputUrl);
-      const fbResult = await uploadFacebookVideo({
-        pageId: fbPageId,
-        token: fbPageToken,
-        bytes: videoBytes,
-        description: result.caption,
-      });
+      try {
+        const fbCaption = result.caption + '\n' + result.hashtags?.join(' ');
+        const videoBytes = await fetchVideoBytes(videoOutputUrl);
+        const fbResult = await uploadFacebookVideo({
+          pageId: fbPageId,
+          token: fbPageToken,
+          bytes: videoBytes,
+          description: fbCaption,
+        });
 
-      if (!fbResult.data || (!fbResult.data.id && !fbResult.data.post_id)) {
-        throw new Error('Facebook upload did not return a post ID');
+        if (!fbResult.data || (!fbResult.data.id && !fbResult.data.post_id)) {
+          result.fbError = 'Facebook upload did not return a post ID';
+          throw new Error(result.fbError);
+        }
+
+        const postId = String(fbResult.data.post_id || fbResult.data.id);
+        result.facebookPostId = postId;
+        console.log(`[TESTPOST] Posted to Facebook: ${postId}`);
+      } catch (fbError) {
+        const fbErrorMsg = fbError instanceof Error ? fbError.message : String(fbError);
+        result.fbError = fbErrorMsg;
+        throw new Error(`Facebook upload failed: ${fbErrorMsg}`);
       }
-
-      const postId = String(fbResult.data.post_id || fbResult.data.id);
-      result.fbPostUrl = `https://www.facebook.com/${postId}`;
-      console.log(`[TESTPOST] Posted to Facebook: ${result.fbPostUrl}`);
     }
 
     result.success = true;
@@ -177,8 +190,8 @@ export async function GET(request: Request) {
       if (result.videoUrl) {
         summary += `\n🎬 Video: ${escapeTelegramHtml(result.videoUrl)}`;
       }
-      if (result.fbPostUrl) {
-        summary += `\n📱 FB Post: ${escapeTelegramHtml(result.fbPostUrl)}`;
+      if (result.facebookPostId) {
+        summary += `\n📱 FB Post ID: ${escapeTelegramHtml(result.facebookPostId)}`;
       }
       
       void sendTelegramMessage(summary).catch((e) => console.error('Telegram notify failed:', e));
