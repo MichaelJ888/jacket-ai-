@@ -3,9 +3,12 @@ import { isCronAuthorized } from '../../_lib/auth';
 import { getSupabaseAdmin, sendTelegramMessage, escapeTelegramHtml } from '../../_lib/integrations';
 import { generateCommercialAd, getNextCategory, type CommercialAdConfig } from '../../_lib/mjic-commercial-engine';
 import { selectNextImage, recordImageUsage } from '../../_lib/image-rotation';
+import { createReplicatePrediction, replicateOutputUrl } from '../../_lib/replicate';
+import { uploadFacebookVideo, fetchVideoBytes } from '../../_lib/meta-video-ads';
+import { GRAPH } from '../../_lib/meta-graph';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 55;
+export const maxDuration = 300; // 5 minutes for Replicate video generation + Facebook upload
 
 type TestResult = {
   success: boolean;
@@ -14,6 +17,9 @@ type TestResult = {
   caption?: string;
   hashtags?: string[];
   antibanOk?: boolean;
+  videoUrl?: string;
+  fbPostUrl?: string;
+  live?: boolean;
   errors?: string[];
 };
 
@@ -21,6 +27,9 @@ export async function GET(request: Request) {
   // Check authorization: either standard cron auth or ?key= query param
   const url = new URL(request.url);
   const queryKey = url.searchParams.get('key');
+  const live = url.searchParams.get('live') === '1';
+  const mediaType = url.searchParams.get('media') || 'picture';
+  
   const isQueryAuthorized = queryKey && (
     queryKey === process.env.CRON_SECRET ||
     queryKey === process.env.ADMIN_TOKEN
@@ -34,6 +43,7 @@ export async function GET(request: Request) {
     success: false,
     timestamp: new Date().toISOString(),
     errors: [],
+    live,
   };
 
   try {
@@ -44,7 +54,7 @@ export async function GET(request: Request) {
     // Step 2: Generate a commercial ad (category-matched caption)
     const config: CommercialAdConfig = {
       category,
-      slotKind: 'picture',
+      slotKind: mediaType === 'video' ? 'video' : 'picture',
     };
     const adContent = await generateCommercialAd(config);
     result.caption = adContent.caption;
@@ -56,7 +66,7 @@ export async function GET(request: Request) {
       recordImageUsage(category, imageAsset.filename);
     }
 
-    // Step 4: Generate SEO hashtags (use the ones from the ad engine)
+    // Step 4: Generate SEO hashtags
     const hashtags = adContent.hashtags;
     result.hashtags = hashtags;
 
@@ -80,15 +90,96 @@ export async function GET(request: Request) {
       }
     }
 
+    // Step 7: If live=1 and media=video, generate video via Replicate and post to Facebook
+    if (live && mediaType === 'video') {
+      const replicateToken = process.env.REPLICATE_API_TOKEN;
+      const fbPageId = '358075757386300'; // MJIC Facebook Page ID
+      const fbPageToken = process.env.META_PAGE_ACCESS_TOKEN;
+
+      if (!replicateToken) {
+        throw new Error('REPLICATE_API_TOKEN not configured');
+      }
+      if (!fbPageToken) {
+        throw new Error('META_PAGE_ACCESS_TOKEN not configured');
+      }
+
+      // Generate video via Replicate (use a simple commercial model)
+      // Using text-to-video model: ideogram/ideogram-ai (or similar)
+      const model = 'ideogram-ai/ideogram-ai-short-form-video'; // Example model
+      const videoPrompt = result.caption.split('\n')[0] || 'MJIC uniform commercial';
+
+      console.log(`[TESTPOST] Starting Replicate video generation for: "${videoPrompt}"`);
+
+      // Create prediction (async webhook-based)
+      const prediction = await createReplicatePrediction(
+        model,
+        { prompt: videoPrompt, duration_seconds: 30 },
+        `${process.env.VERCEL_URL || 'https://jacket-ai.vercel.app'}/api/webhooks/replicate`
+      );
+
+      // Poll for completion (up to 60 seconds)
+      let completed = false;
+      let videoOutputUrl: string | null = null;
+      for (let attempt = 0; attempt < 15; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+
+        const checkResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+          headers: { Authorization: `Bearer ${replicateToken}` },
+          signal: AbortSignal.timeout(10_000),
+        });
+        const checkData = (await checkResponse.json()) as { status?: string; output?: string | string[] };
+
+        if (checkData.status === 'succeeded') {
+          videoOutputUrl = replicateOutputUrl(checkData as typeof prediction);
+          completed = true;
+          break;
+        } else if (checkData.status === 'failed') {
+          throw new Error(`Replicate video generation failed`);
+        }
+      }
+
+      if (!completed || !videoOutputUrl) {
+        throw new Error('Replicate video generation timed out or produced no output');
+      }
+
+      result.videoUrl = videoOutputUrl;
+      console.log(`[TESTPOST] Video generated: ${videoOutputUrl}`);
+
+      // Upload to Facebook
+      console.log(`[TESTPOST] Uploading to Facebook Page ${fbPageId}`);
+      const videoBytes = await fetchVideoBytes(videoOutputUrl);
+      const fbResult = await uploadFacebookVideo({
+        pageId: fbPageId,
+        token: fbPageToken,
+        bytes: videoBytes,
+        description: result.caption,
+      });
+
+      if (!fbResult.data || (!fbResult.data.id && !fbResult.data.post_id)) {
+        throw new Error('Facebook upload did not return a post ID');
+      }
+
+      const postId = String(fbResult.data.post_id || fbResult.data.id);
+      result.fbPostUrl = `https://www.facebook.com/${postId}`;
+      console.log(`[TESTPOST] Posted to Facebook: ${result.fbPostUrl}`);
+    }
+
     result.success = true;
 
-    // Step 7: Notify Telegram of test completion
+    // Step 8: Notify Telegram of test completion
     if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      const summary = `✅ <b>TEST-AD-PIPELINE</b>\n` +
+      let summary = `✅ <b>TEST-AD-PIPELINE</b>\n` +
         `📦 Category: ${escapeTelegramHtml(result.category || 'unknown')}\n` +
         `📝 Caption: ${result.caption?.length || 0} chars\n` +
         `🏷️ Hashtags: ${result.hashtags?.length || 0}\n` +
         `✅ Meta OK: ${result.antibanOk ? 'Yes' : 'No'}`;
+      
+      if (result.videoUrl) {
+        summary += `\n🎬 Video: ${escapeTelegramHtml(result.videoUrl)}`;
+      }
+      if (result.fbPostUrl) {
+        summary += `\n📱 FB Post: ${escapeTelegramHtml(result.fbPostUrl)}`;
+      }
       
       void sendTelegramMessage(summary).catch((e) => console.error('Telegram notify failed:', e));
     }
@@ -107,7 +198,7 @@ export async function GET(request: Request) {
       ).catch((e) => console.error('Telegram notify failed:', e));
     }
 
-    return NextResponse.json(result, { status: 503 });
+    return NextResponse.json(result, { status: live ? 503 : 200 });
   }
 }
 
