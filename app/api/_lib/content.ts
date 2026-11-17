@@ -31,7 +31,6 @@ import {
   withContactFooter,
 } from './content-policy';
 import { generateCommercialAd, getNextCategory, type ProductCategory } from './mjic-commercial-engine';
-import { selectNextImage, recordImageUsage, type ImageAsset } from './image-rotation';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const VIDEO_MODEL = 'google/veo-3.1-fast-generate-001';
@@ -56,13 +55,6 @@ type CalendarRow = {
 };
 
 type IdeaPost = { theme: string; caption: string; hashtags: string[]; video: boolean; videoPrompt: string };
-
-const FALLBACK_IDEAS: IdeaPost[] = [
-  { theme: 'quality', caption: 'Executive-quality custom jackets for your whole team. High-density Tajima embroidery, heavy-duty zippers, tailor-fit. Message us for a free quotation!', hashtags: ['#MJIC', '#CustomJackets', '#CorporateWear'], video: false, videoPrompt: '' },
-  { theme: 'sample', caption: 'Gusto mong makita muna ang quality? 1-pc sample available, at fully deductible sa final order. Zero risk! Message us today.', hashtags: ['#MJIC', '#UniformSupplier', '#MadeInPH'], video: false, videoPrompt: '' },
-  { theme: 'factory', caption: 'Behind the scenes sa MJIC: cutting, embroidery, at precision stitching. 25+ years ng experience sa bawat tahi.', hashtags: ['#MJIC', '#FactoryStyle', '#CustomApparel'], video: true, videoPrompt: 'Cinematic vertical video inside a Philippine garment factory: cutting table, embroidery machine stitching a logo, seamstresses assembling navy corporate jackets, close-up of zipper and stitching, premium lighting, no text overlays.' },
-  { theme: 'team', caption: 'Ang suot ng team ninyo ang mukha ng inyong brand. Custom company jackets at uniforms, delivered nationwide. Request a quote!', hashtags: ['#MJIC', '#CompanyUniform', '#BrandWear'], video: false, videoPrompt: '' },
-];
 
 // Slot times are UTC; `daysFromToday` counts from today's UTC date.
 function utcSlot(daysFromToday: number, hourUtc: number, minuteUtc = 0) {
@@ -98,28 +90,6 @@ function leastUsedVideo(videoUrls: string[], useCount: Map<string, number>): str
 
 const CONTENT_SYSTEM_PROMPT = "You are MJIC's B2B social media manager, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write concise, high-converting Taglish procurement copy for HR, school, sports-team, and company buyers: lead with a real product/use case, explain one practical benefit, and close with a clear quotation CTA. Naturally use a relevant phrase such as custom jackets Philippines or corporate uniforms when it fits. Use only confirmed facts; NEVER invent prices, discounts, certifications, lead times, guarantees, or delivery promises. Never mention being an AI. Corporate hotlines (Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61) are appended automatically; do not write phone numbers yourself.";
 
-async function generateIdeas(count: number): Promise<IdeaPost[]> {
-  if (!process.env.GEMINI_API_KEY) return [];
-  try {
-    const supabase = getSupabaseAdmin();
-    const recent = supabase ? (await supabase.from('content_calendar').select('caption').order('created_at', { ascending: false }).limit(8)).data || [] : [];
-    const result = await generateText({
-      model: google('gemini-3.6-flash'),
-      system: `${CONTENT_SYSTEM_PROMPT} Return ONLY a JSON array.`,
-      prompt: `Create ${count} distinct posts as JSON: [{"theme":"...","caption":"max 280 chars with one relevant B2B use case and quotation CTA","hashtags":["#MJIC", "..."],"video":false,"videoPrompt":""}]. Use relevant SEO concepts without keyword stuffing; hashtags must be relevant. Set "video" to false for every idea; videos come from the ad library. Avoid repeating these recent captions:\n${recent.map((row) => `- ${row.caption}`).join('\n') || '(none yet)'}`,
-      abortSignal: AbortSignal.timeout(40000),
-    });
-    const text = result.text;
-    const parsed = JSON.parse(text.slice(text.indexOf('['), text.lastIndexOf(']') + 1)) as IdeaPost[];
-    return parsed
-      .filter((idea) => typeof idea.caption === 'string' && idea.caption.length > 10)
-      .map((idea) => ({ theme: String(idea.theme || ''), caption: idea.caption.slice(0, 600), hashtags: Array.isArray(idea.hashtags) ? idea.hashtags.map(String).slice(0, 8) : [], video: Boolean(idea.video && idea.videoPrompt), videoPrompt: String(idea.videoPrompt || '') }));
-  } catch (error) {
-    console.error('content idea generation failed:', error);
-    return [];
-  }
-}
-
 // Creates `days` of calendar rows: rotating commercial categories with OpenRouter SEO captions and Replicate video prompts.
 export async function planContent(days = 7) {
   const supabase = getSupabaseAdmin();
@@ -137,8 +107,6 @@ export async function planContent(days = 7) {
   const useCount = new Map<string, number>();
   for (const row of usedRows.data || []) useCount.set(row.media_url, (useCount.get(row.media_url) || 0) + 1);
 
-  // Track last commercial category to avoid consecutive repeats.
-  const lastRow = await supabase.from('content_calendar').select('caption').order('created_at', { ascending: false }).limit(1).maybeSingle();
   let lastCategory: ProductCategory | undefined;
   
   const rows: Array<Record<string, unknown>> = [];
