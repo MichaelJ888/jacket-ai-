@@ -49,6 +49,7 @@ export const MJIC_DETECTED_ROUTE_PATHS: readonly string[] = [
   "/api/admin/subcons/outreach",
   "/api/admin/system-health",
   "/api/admin/tenants",
+  "/api/admin/testpost",
   "/api/admin/voice",
   "/api/chat",
   "/api/client-logos",

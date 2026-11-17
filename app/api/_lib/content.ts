@@ -30,6 +30,7 @@ import {
   selectWithinQuota,
   withContactFooter,
 } from './content-policy';
+import { generateCommercialAd, getNextCategory, type ProductCategory } from './mjic-commercial-engine';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const VIDEO_MODEL = 'google/veo-3.1-fast-generate-001';
@@ -118,7 +119,7 @@ async function generateIdeas(count: number): Promise<IdeaPost[]> {
   }
 }
 
-// Creates `days` of calendar rows: one idea per day, expanded across platforms.
+// Creates `days` of calendar rows: rotating commercial categories with OpenRouter SEO captions and Replicate video prompts.
 export async function planContent(days = 7) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { created: 0, error: 'Supabase is not configured' };
@@ -127,8 +128,6 @@ export async function planContent(days = 7) {
   const startOffset = last.data ? Math.max(1, Math.ceil((new Date(last.data.scheduled_at).getTime() - Date.now()) / 86400000) + 1) : 1;
 
   const slotCount = POSTING_SLOTS_UTC.length;
-  let ideas = await generateIdeas(days * slotCount);
-  if (!ideas.length) ideas = FALLBACK_IDEAS;
 
   // Video slots draw from the bucket, rotating through the least-used clips. A video slot with no clip available is skipped
   // rather than filled with a picture, so the posted sequence keeps strict video/picture alternation.
@@ -137,20 +136,42 @@ export async function planContent(days = 7) {
   const useCount = new Map<string, number>();
   for (const row of usedRows.data || []) useCount.set(row.media_url, (useCount.get(row.media_url) || 0) + 1);
 
+  // Track last commercial category to avoid consecutive repeats.
+  const lastRow = await supabase.from('content_calendar').select('caption').order('created_at', { ascending: false }).limit(1).maybeSingle();
+  let lastCategory: ProductCategory | undefined;
+  
   const rows: Array<Record<string, unknown>> = [];
   let skippedVideoSlots = 0;
   for (let day = 0; day < days; day += 1) {
     for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
       const slot = POSTING_SLOTS_UTC[slotIndex];
-      const ideaIndex = day * slotCount + slotIndex;
-      const idea = ideas[ideaIndex % ideas.length];
       const video = slot.kind === 'video' ? leastUsedVideo(bucketVideos, useCount) : null;
       if (slot.kind === 'video' && !video) {
         skippedVideoSlots += 1;
         continue;
       }
       if (video) useCount.set(video, (useCount.get(video) || 0) + 1);
-      const mediaUrl = video || `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + ideaIndex) % SAMPLE_JACKET_IMAGES.length]}`;
+
+      // Rotate through product categories.
+      const category = getNextCategory(lastCategory);
+      lastCategory = category;
+
+      // Generate commercial ad with OpenRouter SEO caption and Replicate video prompt.
+      let ad;
+      try {
+        ad = await generateCommercialAd({ category, slotKind: slot.kind });
+      } catch (error) {
+        console.error('Commercial ad generation failed:', error);
+        // Fallback to simple caption + hashtags.
+        ad = {
+          caption: `Custom apparel for ${category.replace(/-/g, ' ')}. Direct factory pricing, fast turnaround. Request your free mock-up today!`,
+          hashtags: ['#MJIC', '#CustomApparel'],
+          videoPrompt: null,
+          keywordPhrase: 'Direct Custom Apparel Manufacturer',
+        };
+      }
+
+      const mediaUrl = video || `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + day * slotIndex) % SAMPLE_JACKET_IMAGES.length]}`;
       const scheduledAt = utcSlot(startOffset + day, slot.hour, slot.minute).toISOString();
 
       // Each slot fans out to Facebook and Instagram at the same time; each platform gets 2 videos + 2 pictures per day.
@@ -158,9 +179,9 @@ export async function planContent(days = 7) {
         rows.push({
           platform,
           media_type: video ? 'video' : 'image',
-          caption: idea.caption,
-          hashtags: idea.hashtags,
-          video_prompt: null,
+          caption: ad.caption,
+          hashtags: ad.hashtags,
+          video_prompt: ad.videoPrompt,
           media_url: mediaUrl,
           scheduled_at: scheduledAt,
           status: 'READY',

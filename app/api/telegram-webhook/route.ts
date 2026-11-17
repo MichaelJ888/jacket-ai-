@@ -358,8 +358,32 @@ export async function POST(req: Request) {
       reply = await handleOrderUpdateCommand(command.replace(/^\/?update_/i, '').replace(/@\w+$/, ''), text.slice(text.indexOf(command) + command.length).trim());
     } else if (/^move$/i.test(command)) {
       reply = await handleOrderMoveCommand(text.slice(text.indexOf(command) + command.length).trim());
+    } else     if (/^testpost$/i.test(command)) {
+      reply = '🧪 Testing ad pipeline... hang on.';
+      await sendTelegramDirectMessage(String(chatId), reply);
+      after(async () => {
+        try {
+          const testUrl = `${new URL(req.url).origin}/api/admin/testpost`;
+          const testResponse = await fetch(testUrl, {
+            headers: { authorization: `Bearer ${process.env.CRON_SECRET || ''}` },
+            signal: AbortSignal.timeout(55000),
+          });
+          const testResult = await testResponse.json();
+          if (testResult.success) {
+            const details = `✅ <b>Ad Pipeline Ready</b>\n📦 Category: ${escapeTelegramHtml(testResult.category || '?')}\n📝 Caption: ${testResult.caption?.length || 0} chars\n🏷️ Hashtags: ${testResult.hashtags?.length || 0}\n✅ Anti-ban: ${testResult.antibanOk ? 'OK' : 'FAIL'}`;
+            await sendTelegramDirectMessage(String(chatId), details);
+          } else {
+            const errors = testResult.errors?.join(', ') || 'unknown error';
+            await sendTelegramDirectMessage(String(chatId), `❌ <b>Ad Pipeline Failed</b>\n${escapeTelegramHtml(errors.slice(0, 300))}`);
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : 'unknown error';
+          await sendTelegramDirectMessage(String(chatId), `❌ Test failed: ${escapeTelegramHtml(msg.slice(0, 100))}`);
+        }
+      });
+      return NextResponse.json({ ok: true });
     } else if (/^start$/i.test(command)) {
-      reply = '🚀 MJIC Wave 3 Ops Bot Ready!\n\nAI COO Commands: /status, /deploy, /quote, /post\n\nTeam Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, CLIENTS.';
+      reply = '🚀 MJIC Wave 3 Ops Bot Ready!\n\nAI COO Commands: /status, /deploy, /quote, /post, /testpost\n\nTeam Commands: IN Jonathan, OUT Jonathan, PAYROLL Jonathan, LINK Jonathan, TASK Jonathan <bilin>, PICKUP <job-id> YYYY-MM-DD HH:mm, ORDER <client> | <project> | <total>, MOVE <client> <stage>, CLIENTS.';
     }
 
     if (!reply) {

@@ -14,6 +14,7 @@ import { serializeCustomerKnowledge } from './knowledge-logic';
 import { getDiscoveredPageName } from './meta-pages';
 import { getTenantBotForPage } from './tenant-bot';
 import { type BotProfile, buildTenantPrompt, defaultHandoff } from './tenant-bot-logic';
+import { injectFaqsIntoSystemPrompt } from './mjic-commercial-engine';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || '' });
@@ -119,7 +120,8 @@ async function customerKnowledgeBlock() {
 }
 
 async function buildSystem(isFirst: boolean, audience = 'client', brand?: string) {
-  return `${MJIC_SYSTEM_PROMPT}${isFirst ? FIRST_MESSAGE_ADDENDUM : ''}${CLOSER_ADDENDUM}${brandAddendum(brand)}${await styleBlock(audience)}${await customerKnowledgeBlock()}`;
+  const basePrompt = `${MJIC_SYSTEM_PROMPT}${isFirst ? FIRST_MESSAGE_ADDENDUM : ''}${CLOSER_ADDENDUM}${brandAddendum(brand)}${await styleBlock(audience)}${await customerKnowledgeBlock()}`;
+  return injectFaqsIntoSystemPrompt(basePrompt);
 }
 
 function galleryUrls(count = 5) {
