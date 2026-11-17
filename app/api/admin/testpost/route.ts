@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
 import { getSupabaseAdmin, sendTelegramMessage, escapeTelegramHtml } from '../../_lib/integrations';
 import { generateCommercialAd, getNextCategory, type CommercialAdConfig } from '../../_lib/mjic-commercial-engine';
+import { selectNextImage, recordImageUsage } from '../../_lib/image-rotation';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 55;
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
     const category = getNextCategory();
     result.category = category;
 
-    // Step 2: Generate a commercial ad
+    // Step 2: Generate a commercial ad (category-matched caption)
     const config: CommercialAdConfig = {
       category,
       slotKind: 'picture',
@@ -48,15 +49,22 @@ export async function GET(request: Request) {
     const adContent = await generateCommercialAd(config);
     result.caption = adContent.caption;
 
-    // Step 3: Generate SEO hashtags (use the ones from the ad engine)
+    // Step 3: Select a category-matched image (dynamic rotation)
+    const imageAsset = await selectNextImage(category);
+    if (imageAsset) {
+      result.caption = `🎯 [${imageAsset.filename}]\n${result.caption}`;
+      recordImageUsage(category, imageAsset.filename);
+    }
+
+    // Step 4: Generate SEO hashtags (use the ones from the ad engine)
     const hashtags = adContent.hashtags;
     result.hashtags = hashtags;
 
-    // Step 4: Validate against Meta constraints
+    // Step 5: Validate against Meta constraints
     const metaValid = result.caption.length <= 2048 && hashtags.length >= 1 && hashtags.length <= 30;
     result.antibanOk = metaValid;
 
-    // Step 5: Check post count against 4-per-24h cap (dry-run)
+    // Step 6: Check post count against 4-per-24h cap (dry-run)
     const supabase = getSupabaseAdmin();
     if (supabase) {
       const twentyFourHoursAgo = new Date(Date.now() - 86400000).toISOString();
@@ -74,7 +82,7 @@ export async function GET(request: Request) {
 
     result.success = true;
 
-    // Step 6: Notify Telegram of test completion
+    // Step 7: Notify Telegram of test completion
     if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
       const summary = `✅ <b>TEST-AD-PIPELINE</b>\n` +
         `📦 Category: ${escapeTelegramHtml(result.category || 'unknown')}\n` +

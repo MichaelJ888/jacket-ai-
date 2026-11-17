@@ -31,6 +31,7 @@ import {
   withContactFooter,
 } from './content-policy';
 import { generateCommercialAd, getNextCategory, type ProductCategory } from './mjic-commercial-engine';
+import { selectNextImage, recordImageUsage, type ImageAsset } from './image-rotation';
 
 const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 const VIDEO_MODEL = 'google/veo-3.1-fast-generate-001';
@@ -384,11 +385,21 @@ async function requireMetaPostSuccess(platform: MetaPlatform, result: Awaited<Re
 async function publishFacebook(row: CalendarRow, mediaUrl: string | null, validateMeta: ReturnType<typeof createMetaPublishingPreflight>) {
   const { token, pageId } = await validateMeta('facebook', row.page_key || 'mjic');
   const caption = fullCaption(row);
-  const result = row.media_type === 'video' && mediaUrl
-    ? await uploadFacebookVideo({ pageId, token, bytes: await fetchVideoBytes(mediaUrl), description: caption })
-    : row.media_type === 'image'
-      ? await postMetaImage('facebook', mediaUrl, (url) => graphPost(`/${pageId}/photos`, { url, caption }, token))
-      : await graphPost(`/${pageId}/feed`, { message: caption }, token);
+  
+  // Fix: Use correct Facebook Graph API endpoint format
+  // Photos: POST /{page_id}/photos
+  // Videos: POST /{page_id}/videos
+  let result;
+  if (row.media_type === 'video' && mediaUrl) {
+    result = await uploadFacebookVideo({ pageId, token, bytes: await fetchVideoBytes(mediaUrl), description: caption });
+  } else if (row.media_type === 'image') {
+    result = await postMetaImage('facebook', mediaUrl, (url) => 
+      graphPost(`/${pageId}/photos`, { url, caption }, token)
+    );
+  } else {
+    result = await graphPost(`/${pageId}/feed`, { message: caption }, token);
+  }
+  
   await requireMetaPostSuccess('facebook', result);
   const id = String(result.data.post_id || result.data.id || '');
   return { id, url: id ? `https://www.facebook.com/${id}` : null };
@@ -502,10 +513,31 @@ async function publishCalendarRow(supabase: NonNullable<ReturnType<typeof getSup
   }
   if (!claimed?.length) return;
   try {
+    // Infer category from caption keywords for dynamic image rotation
+    let category: 'varsity-jackets' | 'corporate-uniforms' | 'school-uniforms' | 'custom-bags' | 'corporate-giveaways' | 'safety-jackets' = 'corporate-uniforms';
+    const captionLower = row.caption.toLowerCase();
+    if (captionLower.includes('varsity') || captionLower.includes('sports jacket')) category = 'varsity-jackets';
+    else if (captionLower.includes('school') || captionLower.includes('olopsch')) category = 'school-uniforms';
+    else if (captionLower.includes('bag') || captionLower.includes('tote')) category = 'custom-bags';
+    else if (captionLower.includes('giveaway') || captionLower.includes('mug') || captionLower.includes('lanyard')) category = 'corporate-giveaways';
+    else if (captionLower.includes('safety') || captionLower.includes('reflective')) category = 'safety-jackets';
+
     const media = await resolveMedia(row);
     if (row.media_type === 'video' && !media.url) throw new Error('video file not available yet');
-    const result = row.platform === 'facebook' ? await publishFacebook(row, media.url, validateMeta)
-      : row.platform === 'instagram' ? await publishInstagram(row, media.url, validateMeta)
+    
+    // For Facebook/Instagram images, select a category-matched image for rotation
+    let imageUrl = media.url;
+    if ((row.platform === 'facebook' || row.platform === 'instagram') && row.media_type === 'image' && !imageUrl) {
+      const { selectNextImage, recordImageUsage } = await import('./image-rotation');
+      const imageAsset = await selectNextImage(category);
+      if (imageAsset) {
+        imageUrl = imageAsset.url;
+        recordImageUsage(category, imageAsset.filename);
+      }
+    }
+
+    const result = row.platform === 'facebook' ? await publishFacebook(row, imageUrl, validateMeta)
+      : row.platform === 'instagram' ? await publishInstagram(row, imageUrl, validateMeta)
         : row.platform === 'youtube' ? await publishYoutube(row, media.storagePath)
           : await publishTiktok(row, media.url);
     await supabase.from('content_calendar').update({ status: 'PUBLISHED', external_post_id: result.id, post_url: result.url, published_at: new Date().toISOString(), error: null }).eq('id', row.id);
