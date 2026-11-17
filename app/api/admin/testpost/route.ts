@@ -17,7 +17,15 @@ type TestResult = {
 };
 
 export async function GET(request: Request) {
-  if (!isCronAuthorized(request)) {
+  // Check authorization: either standard cron auth or ?key= query param
+  const url = new URL(request.url);
+  const queryKey = url.searchParams.get('key');
+  const isQueryAuthorized = queryKey && (
+    queryKey === process.env.CRON_SECRET ||
+    queryKey === process.env.ADMIN_TOKEN
+  );
+
+  if (!isCronAuthorized(request) && !isQueryAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
