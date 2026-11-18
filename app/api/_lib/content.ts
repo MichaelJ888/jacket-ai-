@@ -64,29 +64,32 @@ function utcSlot(daysFromToday: number, hourUtc: number, minuteUtc = 0) {
 
 const VIDEO_BUCKET = 'mjic-video-ads';
 
-async function listBucketVideoUrls(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<string[]> {
-  const storage = supabase.storage.from(VIDEO_BUCKET);
-  const { data, error } = await storage.list('', { limit: 200, sortBy: { column: 'name', order: 'asc' } });
-  if (error) {
-    console.error('listing mjic-video-ads failed:', error.message);
-    return [];
-  }
-  return (data || []).filter((file) => file.name.toLowerCase().endsWith('.mp4')).map((file) => storage.getPublicUrl(file.name).data.publicUrl);
-}
+// DISABLED: Bucket fallback functions are no longer used. All video slots must trigger live Replicate generation.
+// @deprecated Use live Replicate AI video generation instead.
+// async function listBucketVideoUrls(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<string[]> {
+//   const storage = supabase.storage.from(VIDEO_BUCKET);
+//   const { data, error } = await storage.list('', { limit: 200, sortBy: { column: 'name', order: 'asc' } });
+//   if (error) {
+//     console.error('listing mjic-video-ads failed:', error.message);
+//     return [];
+//   }
+//   return (data || []).filter((file) => file.name.toLowerCase().endsWith('.mp4')).map((file) => storage.getPublicUrl(file.name).data.publicUrl);
+// }
 
-// Picks the bucket video that has been queued the fewest times, so every video rotates before any repeats.
-function leastUsedVideo(videoUrls: string[], useCount: Map<string, number>): string | null {
-  let best: string | null = null;
-  let bestCount = Infinity;
-  for (const url of videoUrls) {
-    const count = useCount.get(url) || 0;
-    if (count < bestCount) {
-      best = url;
-      bestCount = count;
-    }
-  }
-  return best;
-}
+// DISABLED: Bucket fallback rotation is no longer used. All video slots must trigger live Replicate generation.
+// @deprecated Use live Replicate AI video generation instead.
+// function leastUsedVideo(videoUrls: string[], useCount: Map<string, number>): string | null {
+//   let best: string | null = null;
+//   let bestCount = Infinity;
+//   for (const url of videoUrls) {
+//     const count = useCount.get(url) || 0;
+//     if (count < bestCount) {
+//       best = url;
+//       bestCount = count;
+//     }
+//   }
+//   return best;
+// }
 
 const CONTENT_SYSTEM_PROMPT = "You are MJIC's B2B social media manager, a Philippine direct manufacturer (25+ years) of custom corporate jackets, uniforms and embroidery. Write concise, high-converting Taglish procurement copy for HR, school, sports-team, and company buyers: lead with a real product/use case, explain one practical benefit, and close with a clear quotation CTA. Naturally use a relevant phrase such as custom jackets Philippines or corporate uniforms when it fits. Use only confirmed facts; NEVER invent prices, discounts, certifications, lead times, guarantees, or delivery promises. Never mention being an AI. Corporate hotlines (Smart 0920 695 91 67, Globe 0997 411 45 94, Viber/Telegram 0929 227 17 61) are appended automatically; do not write phone numbers yourself.";
 
@@ -100,26 +103,12 @@ export async function planContent(days = 7) {
 
   const slotCount = POSTING_SLOTS_UTC.length;
 
-  // Video slots draw from the bucket, rotating through the least-used clips. A video slot with no clip available is skipped
-  // rather than filled with a picture, so the posted sequence keeps strict video/picture alternation.
-  const bucketVideos = await listBucketVideoUrls(supabase);
-  const usedRows = await supabase.from('content_calendar').select('media_url').like('media_url', `%/${VIDEO_BUCKET}/%`);
-  const useCount = new Map<string, number>();
-  for (const row of usedRows.data || []) useCount.set(row.media_url, (useCount.get(row.media_url) || 0) + 1);
-
   let lastCategory: ProductCategory | undefined;
   
   const rows: Array<Record<string, unknown>> = [];
-  let skippedVideoSlots = 0;
   for (let day = 0; day < days; day += 1) {
     for (let slotIndex = 0; slotIndex < slotCount; slotIndex += 1) {
       const slot = POSTING_SLOTS_UTC[slotIndex];
-      const video = slot.kind === 'video' ? leastUsedVideo(bucketVideos, useCount) : null;
-      if (slot.kind === 'video' && !video) {
-        skippedVideoSlots += 1;
-        continue;
-      }
-      if (video) useCount.set(video, (useCount.get(video) || 0) + 1);
 
       // Rotate through product categories.
       const category = getNextCategory(lastCategory);
@@ -140,57 +129,66 @@ export async function planContent(days = 7) {
         };
       }
 
-      const mediaUrl = video || `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + day * slotIndex) % SAMPLE_JACKET_IMAGES.length]}`;
+      // For video slots, force AWAITING_VIDEO status to trigger live Replicate generation.
+      // For image slots, use static gallery image.
       const scheduledAt = utcSlot(startOffset + day, slot.hour, slot.minute).toISOString();
 
-      // Each slot fans out to Facebook and Instagram at the same time; each platform gets 2 videos + 2 pictures per day.
-      for (const platform of ['facebook', 'instagram'] as Platform[]) {
-        rows.push({
-          platform,
-          media_type: video ? 'video' : 'image',
-          caption: ad.caption,
-          hashtags: ad.hashtags,
-          video_prompt: ad.videoPrompt,
-          media_url: mediaUrl,
-          scheduled_at: scheduledAt,
-          status: 'READY',
-        });
+      if (slot.kind === 'video') {
+        // All video slots are queued for live Replicate AI generation; no bucket fallback.
+        for (const platform of ['facebook', 'instagram'] as Platform[]) {
+          rows.push({
+            platform,
+            media_type: 'video',
+            caption: ad.caption,
+            hashtags: ad.hashtags,
+            video_prompt: ad.videoPrompt,
+            media_url: null,
+            scheduled_at: scheduledAt,
+            status: 'AWAITING_VIDEO',
+          });
+        }
+      } else {
+        // Image slots use static gallery images.
+        const imageUrl = `${publicBaseUrl()}${SAMPLE_JACKET_IMAGES[(startOffset * slotCount + day * slotIndex) % SAMPLE_JACKET_IMAGES.length]}`;
+        for (const platform of ['facebook', 'instagram'] as Platform[]) {
+          rows.push({
+            platform,
+            media_type: 'image',
+            caption: ad.caption,
+            hashtags: ad.hashtags,
+            video_prompt: null,
+            media_url: imageUrl,
+            scheduled_at: scheduledAt,
+            status: 'READY',
+          });
+        }
       }
     }
   }
 
-  if (!rows.length) return { created: 0, error: null, skippedVideoSlots };
+  if (!rows.length) return { created: 0, error: null };
   const { error } = await supabase.from('content_calendar').insert(rows);
-  return { created: error ? 0 : rows.length, error: error?.message || null, skippedVideoSlots };
+  return { created: error ? 0 : rows.length, error: error?.message || null };
 }
 
-// When AI video generation is unavailable (no gateway key or credit limit hit), AWAITING_VIDEO slots take ready clips
-// from the bucket instead, so the slot still posts a video and the video/picture alternation holds.
-async function fallbackAwaitingVideosToBucket(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<number> {
-  const pending = await supabase.from('content_calendar').select('id').eq('status', 'AWAITING_VIDEO').is('media_generation_id', null).order('scheduled_at');
-  if (!pending.data?.length) return 0;
-  const videoUrls = await listBucketVideoUrls(supabase);
-  if (!videoUrls.length) return 0;
-  const usedRows = await supabase.from('content_calendar').select('media_url').like('media_url', `%/${VIDEO_BUCKET}/%`);
-  const useCount = new Map<string, number>();
-  for (const row of usedRows.data || []) useCount.set(row.media_url, (useCount.get(row.media_url) || 0) + 1);
+// DISABLED: Fallback to bucket videos is prohibited. All video slots must trigger live Replicate generation.
+// This function is kept for reference but should never be called.
+async function _fallbackAwaitingVideosToBucket(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<number> {
+  console.warn('FALLBACK DISABLED: All video slots must trigger live Replicate generation. Bucket fallback is prohibited.');
+  return 0;
+}
 
-  let moved = 0;
-  for (const row of pending.data) {
-    const url = leastUsedVideo(videoUrls, useCount);
-    if (!url) break;
-    useCount.set(url, (useCount.get(url) || 0) + 1);
-    const { error } = await supabase.from('content_calendar').update({ status: 'READY', media_type: 'video', media_url: url, video_prompt: null, error: null }).eq('id', row.id).eq('status', 'AWAITING_VIDEO');
-    if (!error) moved += 1;
-  }
-  return moved;
+// Legacy function (disabled—do not use)
+async function fallbackAwaitingVideosToBucket(supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>): Promise<number> {
+  console.warn('FALLBACK DISABLED: Use live Replicate AI video generation instead. Bucket fallback is prohibited.');
+  return 0;
 }
 
 async function startVideos(limit: number, errors: string[]) {
   const supabase = getSupabaseAdmin();
   if (!supabase) return 0;
   if (!process.env.AI_GATEWAY_API_KEY) {
-    await fallbackAwaitingVideosToBucket(supabase);
+    errors.push('AI_GATEWAY_API_KEY not configured: cannot start live Replicate video generation.');
     return 0;
   }
   const { data } = await supabase.from('content_calendar').select('id, video_prompt, scheduled_at').eq('status', 'AWAITING_VIDEO').is('media_generation_id', null).lte('scheduled_at', new Date(Date.now() + 3 * 86400000).toISOString()).order('scheduled_at');
@@ -213,8 +211,7 @@ async function startVideos(limit: number, errors: string[]) {
       if (isAiGatewayBillingFailure(error)) {
         logAiGatewayBilling('content.start-videos', error);
         errors.push(AI_GATEWAY_BILLING_MESSAGE);
-        const moved = await fallbackAwaitingVideosToBucket(supabase);
-        if (moved) errors.push(`${moved} video slot(s) filled from the mjic-video-ads bucket`);
+        errors.push('CRITICAL: Billing failure. No fallback videos. Slots will remain AWAITING_VIDEO until AI Gateway billing is resolved.');
         break;
       }
       console.error('auto video start failed:', error);
