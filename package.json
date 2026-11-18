@@ -42,7 +42,7 @@
     "lucide-react": "^1.47.0",
     "mammoth": "^1.13.0",
     "mermaid": "^12.3.0",
-    "next": "16.4.6",
+    "next": "^16.4.6",
     "pdf-lib": "^1.17.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -58,7 +58,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.4.6",
+    "eslint-config-next": "^16.4.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
