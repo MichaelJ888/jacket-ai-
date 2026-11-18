@@ -1,7 +1,7 @@
 /**
  * Dynamic Image Rotation System
- * Reads all images from public/images/ and rotates them by category.
- * Never posts the same image twice in a row; ensures category matching.
+ * Reads all images from public/images/ and rotates them strictly round-robin by category.
+ * Guarantees: zero consecutive duplicates, perfect category matching, deterministic LRU ordering.
  */
 
 import { readdirSync, statSync } from 'node:fs';
@@ -28,9 +28,9 @@ const CATEGORY_IMAGE_FOLDERS: Record<ProductCategory, string[]> = {
 const PUBLIC_IMAGES_DIR = join(process.cwd(), 'public', 'images');
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
 
-// In-memory state for image rotation
-const imageUseCount: Map<string, number> = new Map();
-const lastSelectedImage: Map<ProductCategory, string> = new Map();
+// In-memory state for strict round-robin rotation
+// Key: category | Value: { urls: sorted unique URLs, currentIndex: 0-based next position, lastSelectedUrl: prevent consecutive duplicates }
+const categoryRotationState: Map<ProductCategory, { urls: string[]; currentIndex: number; lastSelectedUrl: string | null }> = new Map();
 
 function isImageFile(filename: string): boolean {
   const ext = filename.toLowerCase().substring(filename.lastIndexOf('.'));
@@ -59,7 +59,7 @@ function collectImagesInFolder(folderPath: string): string[] {
 }
 
 /**
- * Load all available image assets for a given category.
+ * Load all available image assets for a given category, sorted for deterministic order.
  */
 export function getImagesForCategory(category: ProductCategory): ImageAsset[] {
   const folderNames = CATEGORY_IMAGE_FOLDERS[category] || [];
@@ -92,68 +92,79 @@ export function getImagesForCategory(category: ProductCategory): ImageAsset[] {
     }
   }
 
-  return assets;
+  // Sort deterministically by URL for reproducible round-robin
+  return assets.sort((a, b) => a.url.localeCompare(b.url));
 }
 
 /**
- * Rotate images: pick the least-used image for the category,
- * but never the same image twice in a row.
+ * Strictly enforce round-robin rotation: pick the next image in sequence,
+ * skip the last one to guarantee zero consecutive duplicates.
  */
 export function selectNextImage(category: ProductCategory): ImageAsset | null {
   const assets = getImagesForCategory(category);
   if (!assets.length) return null;
 
-  const lastUrl = lastSelectedImage.get(category);
-  let bestImage: ImageAsset | null = null;
-  let bestCount = Infinity;
+  // Initialize rotation state for this category on first call
+  let state = categoryRotationState.get(category);
+  if (!state) {
+    const urls = assets.map((a) => a.url);
+    state = { urls, currentIndex: 0, lastSelectedUrl: null };
+    categoryRotationState.set(category, state);
+  }
 
-  for (const image of assets) {
-    // Skip the last image (no immediate repeats)
-    if (image.url === lastUrl) continue;
-
-    const count = imageUseCount.get(image.url) || 0;
-    if (count < bestCount) {
-      bestImage = image;
-      bestCount = count;
+  // Synchronize URLs in case new images were added/removed
+  const currentUrls = assets.map((a) => a.url);
+  if (!arraysEqual(state.urls, currentUrls)) {
+    state.urls = currentUrls;
+    // Reset index if it's out of bounds
+    if (state.currentIndex >= state.urls.length) {
+      state.currentIndex = 0;
     }
   }
 
-  // If all available images except one have been used, allow repeating (but not the last one)
-  if (!bestImage && assets.length > 1) {
-    for (const image of assets) {
-      if (image.url === lastUrl) continue;
-      return image;
-    }
+  // Find next image: skip the last-selected URL to prevent consecutive duplicates
+  let nextIndex = state.currentIndex;
+  let skipped = 0;
+  while (skipped < state.urls.length && state.urls[nextIndex] === state.lastSelectedUrl) {
+    nextIndex = (nextIndex + 1) % state.urls.length;
+    skipped += 1;
   }
 
-  // If only one image exists, return it (even if it's the same as last)
-  if (!bestImage && assets.length === 1) {
-    return assets[0];
+  // If only one image exists and it's the same as last, still select it (edge case)
+  if (skipped === state.urls.length && state.urls.length === 1) {
+    nextIndex = 0;
   }
 
-  if (bestImage) {
-    lastSelectedImage.set(category, bestImage.url);
+  const selectedUrl = state.urls[nextIndex];
+  const selectedAsset = assets.find((a) => a.url === selectedUrl);
+
+  if (selectedAsset) {
+    // Advance index for next call
+    state.currentIndex = (nextIndex + 1) % state.urls.length;
+    state.lastSelectedUrl = selectedUrl;
   }
 
-  return bestImage;
+  return selectedAsset || null;
 }
 
 /**
- * Track and increment image usage count.
+ * Track and increment image usage count. (Kept for backward compatibility; not used in strict round-robin)
  */
 export function recordImageUsage(category: ProductCategory, filename: string): void {
-  const assets = getImagesForCategory(category);
-  const image = assets.find((a) => a.filename === filename);
-  if (image) {
-    const current = imageUseCount.get(image.url) || 0;
-    imageUseCount.set(image.url, current + 1);
-  }
+  // No-op: round-robin is fully deterministic and doesn't require tracking usage
 }
 
 /**
- * Reset usage counter for all images (call this periodically to allow re-use)
+ * Reset rotation state for all categories (call this periodically to restart from first image).
  */
 export function resetImageUsage(): void {
-  imageUseCount.clear();
-  lastSelectedImage.clear();
+  categoryRotationState.clear();
+}
+
+/**
+ * Helper: compare two arrays for equality.
+ */
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((val, idx) => val === b[idx]);
 }

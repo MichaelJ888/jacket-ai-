@@ -98,13 +98,22 @@ export async function GET(request: Request) {
     if (live && mediaType === 'video') {
       const replicateToken = process.env.REPLICATE_API_TOKEN;
       const fbPageId = '358075757386300'; // MJIC Facebook Page ID
-      const fbPageToken = process.env.META_PAGE_ACCESS_TOKEN;
+      
+      // Resolve Facebook token: check META_PAGE_TOKENS map first, then fallback
+      let fbPageToken: string | undefined;
+      try {
+        const { getPageToken } = await import('../../_lib/meta-pages');
+        fbPageToken = await getPageToken(fbPageId);
+      } catch {
+        // Fallback to direct env lookup
+        fbPageToken = process.env.META_PAGE_ACCESS_TOKEN;
+      }
 
       if (!replicateToken) {
         throw new Error('REPLICATE_API_TOKEN not configured');
       }
       if (!fbPageToken) {
-        throw new Error('META_PAGE_ACCESS_TOKEN not configured');
+        throw new Error(`META Page ${fbPageId} token not configured (check META_PAGE_TOKENS, META_SYSTEM_USER_TOKEN, or META_PAGE_ACCESS_TOKEN)`);
       }
 
       // Generate video via Replicate (use a simple commercial model)
@@ -121,9 +130,10 @@ export async function GET(request: Request) {
         `${process.env.VERCEL_URL || 'https://jacket-ai.vercel.app'}/api/webhooks/replicate`
       );
 
-      // Poll for completion (up to 60 seconds)
+      // Poll for completion (up to 60 seconds) with strict sequential awaits
       let completed = false;
       let videoOutputUrl: string | null = null;
+      let lastStatus = '';
       for (let attempt = 0; attempt < 15; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 4000));
 
@@ -133,17 +143,21 @@ export async function GET(request: Request) {
         });
         const checkData = (await checkResponse.json()) as { status?: string; output?: string | string[] };
 
+        lastStatus = checkData.status || 'unknown';
+        console.log(`[TESTPOST] Replicate status: ${lastStatus} (attempt ${attempt + 1}/15)`);
+
         if (checkData.status === 'succeeded') {
           videoOutputUrl = replicateOutputUrl(checkData as typeof prediction);
           completed = true;
+          console.log(`[TESTPOST] Video generation succeeded`);
           break;
         } else if (checkData.status === 'failed') {
-          throw new Error(`Replicate video generation failed`);
+          throw new Error(`Replicate video generation failed: ${JSON.stringify(checkData)}`);
         }
       }
 
       if (!completed || !videoOutputUrl) {
-        throw new Error('Replicate video generation timed out or produced no output');
+        throw new Error(`Replicate video generation timed out (last status: ${lastStatus}) or produced no output`);
       }
 
       result.videoUrl = videoOutputUrl;
@@ -154,6 +168,8 @@ export async function GET(request: Request) {
       try {
         const fbCaption = result.caption + '\n' + result.hashtags?.join(' ');
         const videoBytes = await fetchVideoBytes(videoOutputUrl);
+        console.log(`[TESTPOST] Downloaded video bytes: ${videoBytes.byteLength} bytes`);
+        
         const fbResult = await uploadFacebookVideo({
           pageId: fbPageId,
           token: fbPageToken,
@@ -161,8 +177,13 @@ export async function GET(request: Request) {
           description: fbCaption,
         });
 
+        if (!fbResult.ok) {
+          result.fbError = fbResult.reason || 'Facebook upload returned not-ok';
+          throw new Error(result.fbError);
+        }
+
         if (!fbResult.data || (!fbResult.data.id && !fbResult.data.post_id)) {
-          result.fbError = 'Facebook upload did not return a post ID';
+          result.fbError = 'Facebook upload did not return a video ID';
           throw new Error(result.fbError);
         }
 
