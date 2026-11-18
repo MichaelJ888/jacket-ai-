@@ -1,27 +1,27 @@
 import { NextResponse } from 'next/server';
 import { isCronAuthorized } from '../../_lib/auth';
-import { getSupabaseAdmin, sendTelegramMessage, escapeTelegramHtml } from '../../_lib/integrations';
+import { sendTelegramMessage, escapeTelegramHtml } from '../../_lib/integrations';
 import { generateCommercialAd, getNextCategory, type CommercialAdConfig } from '../../_lib/mjic-commercial-engine';
 import { selectNextImage, recordImageUsage } from '../../_lib/image-rotation';
 import { createReplicatePrediction, replicateOutputUrl } from '../../_lib/replicate';
 import { uploadFacebookVideo, fetchVideoBytes } from '../../_lib/meta-video-ads';
+import { getPageToken } from '../../_lib/meta-pages';
+import { GRAPH } from '../../_lib/meta-graph';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes for Replicate video generation + Facebook upload
 
 type TestResult = {
   success: boolean;
-  mode?: string;
-  media?: string;
+  mode: 'live' | 'test';
+  media: 'image' | 'video';
   timestamp: string;
   category?: string;
   caption?: string;
-  hashtags?: string[];
-  antibanOk?: boolean;
+  imageUrl?: string;
   videoUrl?: string;
   facebookPostId?: string;
   fbError?: string;
-  live?: boolean;
   errors?: string[];
 };
 
@@ -29,8 +29,8 @@ export async function GET(request: Request) {
   // Check authorization: either standard cron auth or ?key= query param
   const url = new URL(request.url);
   const queryKey = url.searchParams.get('key');
-  const live = url.searchParams.get('live') === '1';
-  const mediaType = url.searchParams.get('media') || 'picture';
+  const mediaParam = url.searchParams.get('media') || 'image';
+  const media = mediaParam === 'video' ? 'video' : 'image';
   
   const isQueryAuthorized = queryKey && (
     queryKey === process.env.CRON_SECRET ||
@@ -45,67 +45,88 @@ export async function GET(request: Request) {
     success: false,
     timestamp: new Date().toISOString(),
     errors: [],
-    live,
-    mode: live ? 'live' : 'test',
-    media: mediaType,
+    mode: 'live',
+    media,
   };
 
   try {
-    // Step 1: Rotate to next MJIC category using getNextCategory()
+    // Step 1: Rotate to next MJIC category
     const category = getNextCategory();
     result.category = category;
 
-    // Step 2: Generate a commercial ad (category-matched caption)
-    const config: CommercialAdConfig = {
-      category,
-      slotKind: mediaType === 'video' ? 'video' : 'picture',
-    };
-    const adContent = await generateCommercialAd(config);
-    result.caption = adContent.caption;
-
-    // Step 3: Select a category-matched image (dynamic rotation)
-    const imageAsset = await selectNextImage(category);
-    if (imageAsset) {
-      result.caption = `🎯 [${imageAsset.filename}]\n${result.caption}`;
-      recordImageUsage(category, imageAsset.filename);
-    }
-
-    // Step 4: Generate SEO hashtags
-    const hashtags = adContent.hashtags;
-    result.hashtags = hashtags;
-
-    // Step 5: Validate against Meta constraints
-    const metaValid = result.caption.length <= 2048 && hashtags.length >= 1 && hashtags.length <= 30;
-    result.antibanOk = metaValid;
-
-    // Step 6: Check post count against 4-per-24h cap (dry-run)
-    const supabase = getSupabaseAdmin();
-    if (supabase) {
-      const twentyFourHoursAgo = new Date(Date.now() - 86400000).toISOString();
-      const { count } = await supabase
-        .from('content_calendar')
-        .select('id', { count: 'exact', head: true })
-        .eq('platform', 'facebook')
-        .eq('status', 'published')
-        .gte('updated_at', twentyFourHoursAgo);
-
-      if (typeof count === 'number') {
-        result.antibanOk = result.antibanOk && count < 4;
-      }
-    }
-
-    // Step 7: If live=1 and media=video, generate video via Replicate and post to Facebook
-    if (live && mediaType === 'video') {
-      const replicateToken = process.env.REPLICATE_API_TOKEN;
-      const fbPageId = '358075757386300'; // MJIC Facebook Page ID
+    if (media === 'image') {
+      // IMAGE PATH: Select next unique image, generate caption, publish immediately to Facebook
       
-      // Resolve Facebook token: check META_PAGE_TOKENS map first, then fallback
+      // Step 2: Select next unique image using strict round-robin rotation
+      const imageAsset = selectNextImage(category);
+      if (!imageAsset) {
+        throw new Error(`No images found for category: ${category}`);
+      }
+
+      result.imageUrl = imageAsset.url;
+      recordImageUsage(category, imageAsset.filename);
+
+      // Step 3: Generate commercial ad caption
+      const config: CommercialAdConfig = {
+        category,
+        slotKind: 'picture',
+      };
+      const adContent = await generateCommercialAd(config);
+      result.caption = adContent.caption;
+
+      // Step 4: Publish to Facebook immediately
+      const fbPageId = '358075757386300'; // MJIC Facebook Page ID
       let fbPageToken: string | undefined;
+      
       try {
-        const { getPageToken } = await import('../../_lib/meta-pages');
         fbPageToken = await getPageToken(fbPageId);
       } catch {
-        // Fallback to direct env lookup
+        fbPageToken = process.env.META_PAGE_ACCESS_TOKEN;
+      }
+
+      if (!fbPageToken) {
+        throw new Error(`Facebook Page ${fbPageId} token not configured`);
+      }
+
+      // Build full caption with hashtags
+      const fullCaption = result.caption + '\n' + adContent.hashtags.join(' ');
+
+      // POST image to Facebook using Graph API: POST /{page_id}/photos
+      const graphUrl = `${GRAPH}/${fbPageId}/photos`;
+      const postPayload = {
+        url: `${process.env.VERCEL_URL || 'https://jacket-ai.vercel.app'}${imageAsset.url}`,
+        caption: fullCaption,
+      };
+
+      const fbResponse = await fetch(graphUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Bearer ${fbPageToken}`,
+        },
+        body: new URLSearchParams(postPayload).toString(),
+        signal: AbortSignal.timeout(30_000),
+      });
+
+      const fbResult = await fbResponse.json() as { id?: string; post_id?: string; error?: { message: string } };
+
+      if (!fbResponse.ok || fbResult.error) {
+        result.fbError = fbResult.error?.message || `Facebook returned HTTP ${fbResponse.status}`;
+        throw new Error(`Facebook publish failed: ${result.fbError}`);
+      }
+
+      result.facebookPostId = String(fbResult.post_id || fbResult.id || '');
+      
+    } else {
+      // VIDEO PATH: Generate video via Replicate and publish to Facebook
+      
+      const replicateToken = process.env.REPLICATE_API_TOKEN;
+      const fbPageId = '358075757386300';
+      
+      let fbPageToken: string | undefined;
+      try {
+        fbPageToken = await getPageToken(fbPageId);
+      } catch {
         fbPageToken = process.env.META_PAGE_ACCESS_TOKEN;
       }
 
@@ -113,27 +134,34 @@ export async function GET(request: Request) {
         throw new Error('REPLICATE_API_TOKEN not configured');
       }
       if (!fbPageToken) {
-        throw new Error(`META Page ${fbPageId} token not configured (check META_PAGE_TOKENS, META_SYSTEM_USER_TOKEN, or META_PAGE_ACCESS_TOKEN)`);
+        throw new Error(`Facebook Page ${fbPageId} token not configured`);
       }
 
-      // Generate video via Replicate (use a simple commercial model)
-      // Using text-to-video model: ideogram/ideogram-ai (or similar)
-      const model = 'ideogram-ai/ideogram-ai-short-form-video'; // Example model
+      // Step 2: Generate caption for video
+      const config: CommercialAdConfig = {
+        category,
+        slotKind: 'video',
+      };
+      const adContent = await generateCommercialAd(config);
+      result.caption = adContent.caption;
+
+      // Step 3: Create Replicate video generation prediction
+      const model = 'ideogram-ai/ideogram-ai-short-form-video';
       const videoPrompt = result.caption.split('\n')[0] || 'MJIC uniform commercial';
 
       console.log(`[TESTPOST] Starting Replicate video generation for: "${videoPrompt}"`);
 
-      // Create prediction (async webhook-based)
       const prediction = await createReplicatePrediction(
         model,
         { prompt: videoPrompt, duration_seconds: 30 },
         `${process.env.VERCEL_URL || 'https://jacket-ai.vercel.app'}/api/webhooks/replicate`
       );
 
-      // Poll for completion (up to 60 seconds) with strict sequential awaits
+      // Step 4: Poll for video completion
       let completed = false;
       let videoOutputUrl: string | null = null;
       let lastStatus = '';
+      
       for (let attempt = 0; attempt < 15; attempt++) {
         await new Promise((resolve) => setTimeout(resolve, 4000));
 
@@ -157,61 +185,54 @@ export async function GET(request: Request) {
       }
 
       if (!completed || !videoOutputUrl) {
-        throw new Error(`Replicate video generation timed out (last status: ${lastStatus}) or produced no output`);
+        throw new Error(`Replicate video generation timed out (last status: ${lastStatus})`);
       }
 
       result.videoUrl = videoOutputUrl;
-      console.log(`[TESTPOST] Video generated: ${videoOutputUrl}`);
 
-      // Upload to Facebook using Graph API directly
+      // Step 5: Upload to Facebook
       console.log(`[TESTPOST] Uploading to Facebook Page ${fbPageId}`);
-      try {
-        const fbCaption = result.caption + '\n' + result.hashtags?.join(' ');
-        const videoBytes = await fetchVideoBytes(videoOutputUrl);
-        console.log(`[TESTPOST] Downloaded video bytes: ${videoBytes.byteLength} bytes`);
-        
-        const fbResult = await uploadFacebookVideo({
-          pageId: fbPageId,
-          token: fbPageToken,
-          bytes: videoBytes,
-          description: fbCaption,
-        });
+      
+      const videoBytes = await fetchVideoBytes(videoOutputUrl);
+      const fbCaption = result.caption + '\n' + adContent.hashtags.join(' ');
+      
+      const fbResult = await uploadFacebookVideo({
+        pageId: fbPageId,
+        token: fbPageToken,
+        bytes: videoBytes,
+        description: fbCaption,
+      });
 
-        if (!fbResult.ok) {
-          result.fbError = fbResult.reason || 'Facebook upload returned not-ok';
-          throw new Error(result.fbError);
-        }
-
-        if (!fbResult.data || (!fbResult.data.id && !fbResult.data.post_id)) {
-          result.fbError = 'Facebook upload did not return a video ID';
-          throw new Error(result.fbError);
-        }
-
-        const postId = String(fbResult.data.post_id || fbResult.data.id);
-        result.facebookPostId = postId;
-        console.log(`[TESTPOST] Posted to Facebook: ${postId}`);
-      } catch (fbError) {
-        const fbErrorMsg = fbError instanceof Error ? fbError.message : String(fbError);
-        result.fbError = fbErrorMsg;
-        throw new Error(`Facebook upload failed: ${fbErrorMsg}`);
+      if (!fbResult.ok) {
+        result.fbError = fbResult.reason || 'Facebook upload returned not-ok';
+        throw new Error(result.fbError);
       }
+
+      if (!fbResult.data || (!fbResult.data.id && !fbResult.data.post_id)) {
+        result.fbError = 'Facebook upload did not return a video ID';
+        throw new Error(result.fbError);
+      }
+
+      result.facebookPostId = String(fbResult.data.post_id || fbResult.data.id);
+      console.log(`[TESTPOST] Posted to Facebook: ${result.facebookPostId}`);
     }
 
     result.success = true;
 
-    // Step 8: Notify Telegram of test completion
+    // Notify Telegram of test completion
     if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
-      let summary = `✅ <b>TEST-AD-PIPELINE</b>\n` +
+      let summary = `✅ <b>TESTPOST-${media.toUpperCase()}</b>\n` +
         `📦 Category: ${escapeTelegramHtml(result.category || 'unknown')}\n` +
-        `📝 Caption: ${result.caption?.length || 0} chars\n` +
-        `🏷️ Hashtags: ${result.hashtags?.length || 0}\n` +
-        `✅ Meta OK: ${result.antibanOk ? 'Yes' : 'No'}`;
+        `📝 Caption: ${result.caption?.length || 0} chars`;
       
+      if (result.imageUrl) {
+        summary += `\n🖼️ Image: ${escapeTelegramHtml(result.imageUrl)}`;
+      }
       if (result.videoUrl) {
         summary += `\n🎬 Video: ${escapeTelegramHtml(result.videoUrl)}`;
       }
       if (result.facebookPostId) {
-        summary += `\n📱 FB Post ID: ${escapeTelegramHtml(result.facebookPostId)}`;
+        summary += `\n📱 FB Post: ${escapeTelegramHtml(result.facebookPostId)}`;
       }
       
       void sendTelegramMessage(summary).catch((e) => console.error('Telegram notify failed:', e));
@@ -223,15 +244,15 @@ export async function GET(request: Request) {
     result.errors?.push(message);
     result.success = false;
 
-    console.error('[TEST-AD-PIPELINE] Error:', message);
+    console.error('[TESTPOST] Error:', message);
 
     if (process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID) {
       void sendTelegramMessage(
-        `❌ <b>TEST-AD-PIPELINE Failed</b>\n${escapeTelegramHtml(message.slice(0, 300))}`
+        `❌ <b>TESTPOST-${media.toUpperCase()} Failed</b>\n${escapeTelegramHtml(message.slice(0, 300))}`
       ).catch((e) => console.error('Telegram notify failed:', e));
     }
 
-    return NextResponse.json(result, { status: live ? 503 : 200 });
+    return NextResponse.json(result, { status: 503 });
   }
 }
 
