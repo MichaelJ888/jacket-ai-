@@ -11,6 +11,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  NEXT_IGNORE_UNSAFE: "true"
+
 jobs:
   validate:
     name: Validate
