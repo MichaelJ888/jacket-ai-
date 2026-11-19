@@ -61,14 +61,26 @@ export async function POST(req: Request) {
 }
 
 // Returning client: every quote issued to this client token, newest first.
-// Also supports fabric-specs queries for Wave 2 fabric selector.
+// Also supports fabric-specs queries for Wave 2 fabric selector, and pricelist catalog.
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const client = url.searchParams.get('client') || '';
+  const pricelist = url.searchParams.get('pricelist');
   const fabricName = url.searchParams.get('fabric');
   const water = url.searchParams.get('water');
   const breathe = url.searchParams.get('breathe');
   const useCase = url.searchParams.get('use');
+
+  // Pricelist catalog endpoint (consolidated from /api/quote/pricelist)
+  if (pricelist) {
+    try {
+      const catalog = await loadPricelist();
+      const categories = catalog.categories.filter((c) => c.active).map(({ key, label, tiers }) => ({ key, label, tiers }));
+      return NextResponse.json({ ok: true, categories }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch (error) {
+      return NextResponse.json({ ok: false, error: error instanceof Error ? error.message : 'Failed to load pricelist' }, { status: 500 });
+    }
+  }
 
   // Fabric specs endpoint
   if (fabricName || water || breathe || useCase) {

@@ -120,7 +120,7 @@ export const MJIC_DETECTED_ROUTE_PATHS: readonly string[] = [
   "/api/quote/dispatch",
   "/api/quote/giveaways",
   "/api/quote/giveaways/analyze",
-  "/api/quote/pricelist",
+  "/api/quote?pricelist=1",
   "/api/samples",
   "/api/site",
   "/api/site/overlay",

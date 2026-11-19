@@ -65,7 +65,7 @@ export default function QuotePage() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/quote/pricelist', { cache: 'no-store' })
+    fetch('/api/quote?pricelist=1', { cache: 'no-store' })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!cancelled && data?.ok && Array.isArray(data.categories) && data.categories.length > 0) setCatalog(data.categories);
